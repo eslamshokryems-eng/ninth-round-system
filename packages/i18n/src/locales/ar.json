@@ -6,9 +6,37 @@
     "cancel": "إلغاء",
     "save": "حفظ",
     "continue": "متابعة",
+    "back": "رجوع",
+    "next": "التالي",
+    "done": "تم",
+    "skip": "تخطي",
+    "signOut": "تسجيل الخروج",
     "error": {
-      "generic": "حدث خطأ ما. حاول مرة أخرى."
+      "generic": "حدث خطأ ما. حاول مرة أخرى.",
+      "invalidEmail": "أدخل بريدًا إلكترونيًا صحيحًا.",
+      "passwordTooShort": "يجب أن تتكون كلمة المرور من 10 أحرف على الأقل.",
+      "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+      "invalidAge": "أدخل عمرًا بين 13 و100 عام.",
+      "invalidHeight": "أدخل طولًا بين 100 و250 سم.",
+      "invalidWeight": "أدخل وزنًا بين 30 و300 كجم.",
+      "nameRequired": "أدخل اسمك."
     }
+  },
+  "welcome": {
+    "slide1": {
+      "title": "تدرّب وكأنها الجولة التاسعة.",
+      "subtitle": "تدريب فتري مستوحى من الملاكمة، مبني على علم الرياضة الحقيقي."
+    },
+    "slide2": {
+      "title": "مدرّب في ركنك.",
+      "subtitle": "مدربون حقيقيون ومدرب ذكاء اصطناعي، يعملان بنفس الخطة."
+    },
+    "slide3": {
+      "title": "كل تكرار، مُسجَّل.",
+      "subtitle": "التمارين والتغذية والعادات والتقدم — كل ذلك في مكان واحد."
+    },
+    "getStarted": "ابدأ الآن",
+    "skip": "تخطي"
   },
   "auth": {
     "welcomeTitle": "تدرّب وكأنها الجولة التاسعة.",
@@ -17,38 +45,112 @@
     "continueWithApple": "المتابعة باستخدام Apple",
     "signUp": {
       "title": "أنشئ حسابك",
+      "subtitle": "ابدأ جولتك الأولى.",
       "emailLabel": "البريد الإلكتروني",
       "passwordLabel": "كلمة المرور",
       "submit": "إنشاء حساب",
-      "haveAccount": "لديك حساب بالفعل؟"
+      "haveAccount": "لديك حساب بالفعل؟",
+      "logInLink": "تسجيل الدخول"
     },
     "logIn": {
       "title": "مرحبًا بعودتك",
+      "subtitle": "مستعد للجولة التالية؟",
       "emailLabel": "البريد الإلكتروني",
       "passwordLabel": "كلمة المرور",
       "submit": "تسجيل الدخول",
-      "noAccount": "جديد على 9th Round؟"
+      "noAccount": "جديد على 9th Round؟",
+      "signUpLink": "إنشاء حساب",
+      "forgotPassword": "نسيت كلمة المرور؟"
+    },
+    "forgotPassword": {
+      "title": "إعادة تعيين كلمة المرور",
+      "subtitle": "أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.",
+      "emailLabel": "البريد الإلكتروني",
+      "submit": "إرسال رابط إعادة التعيين",
+      "backToLogin": "العودة لتسجيل الدخول",
+      "successTitle": "تحقق من بريدك الإلكتروني",
+      "successMessage": "إذا كان هناك حساب مرتبط بهذا البريد، فسيصلك رابط إعادة التعيين قريبًا."
     }
   },
   "onboarding": {
     "step": "الخطوة {{current}} من {{total}}",
     "languagePicker": {
       "title": "اختر لغتك",
+      "subtitle": "يمكنك تغيير هذا لاحقًا من الإعدادات.",
+      "restartNotice": "أعد تشغيل 9th Round لتطبيق اتجاه التخطيط لهذه اللغة.",
       "english": "English",
       "arabic": "العربية"
     },
+    "profileSetup": {
+      "title": "بماذا نناديك؟",
+      "subtitle": "هكذا ستظهر لمدربك وفي المجتمع.",
+      "nameLabel": "الاسم الكامل",
+      "namePlaceholder": "اسمك"
+    },
     "goal": {
       "question": "ما هو هدفك الأساسي؟",
-      "weightLoss": "فقدان الوزن / حرق الدهون",
-      "athleticPerformance": "الأداء الرياضي",
+      "subtitle": "سنُخصص برنامجك الأول بناءً على هذا.",
+      "weightLoss": "فقدان الوزن",
+      "muscleGain": "زيادة الكتلة العضلية",
       "generalFitness": "اللياقة العامة",
-      "homeWorkout": "تمارين منزلية"
+      "athleticPerformance": "الأداء الرياضي"
     },
     "experience": {
-      "question": "ما هو مستوى خبرتك؟",
+      "question": "ما هي خبرتك التدريبية؟",
+      "subtitle": "كن صادقًا — برنامجك يتكيف على أي حال.",
       "beginner": "مبتدئ",
+      "beginnerDescription": "جديد على التدريب المنظم",
       "intermediate": "متوسط",
-      "advanced": "متقدم"
+      "intermediateDescription": "أتدرب بانتظام منذ أكثر من 6 أشهر",
+      "advanced": "متقدم",
+      "advancedDescription": "سنوات من التدريب المنتظم"
+    },
+    "bodyMetrics": {
+      "title": "بعض التفاصيل الأخيرة",
+      "subtitle": "هذا يساعدنا على ضبط خطتك بدقة.",
+      "genderLabel": "الجنس",
+      "genderFemale": "أنثى",
+      "genderMale": "ذكر",
+      "genderUnspecified": "أفضّل عدم الإفصاح",
+      "ageLabel": "العمر",
+      "heightLabel": "الطول (سم)",
+      "weightLabel": "الوزن (كجم)",
+      "finish": "إنهاء الإعداد"
+    }
+  },
+  "dashboard": {
+    "greeting": "صباح الخير، {{name}}",
+    "streakDays": "سلسلة {{count}} يوم",
+    "todayWorkout": {
+      "title": "تمرين اليوم",
+      "comingSoonTitle": "برنامجك الأول قادم قريبًا",
+      "comingSoonSubtitle": "مؤقت الجولة التاسعة وخطتك التدريبية قادمان قريبًا جدًا.",
+      "start": "ابدأ التمرين"
+    },
+    "tabs": {
+      "home": "الرئيسية",
+      "train": "التدريب",
+      "nutrition": "التغذية",
+      "progress": "التقدم",
+      "profile": "الملف الشخصي"
+    }
+  },
+  "comingSoon": {
+    "train": {
+      "title": "برامجك التدريبية قادمة قريبًا",
+      "subtitle": "مكتبة التمارين والبرامج التدريبية قادمة قريبًا جدًا."
+    },
+    "nutrition": {
+      "title": "خطط التغذية قادمة قريبًا",
+      "subtitle": "تتبع الوجبات والإرشاد الغذائي قادمان قريبًا جدًا."
+    },
+    "progress": {
+      "title": "تتبع التقدم قادم قريبًا",
+      "subtitle": "تتبع الوزن وتكوين الجسم والصور قادم قريبًا جدًا."
+    },
+    "profile": {
+      "title": "الملف الشخصي والإعدادات قادمان قريبًا",
+      "subtitle": "إعدادات الحساب وإدارة الاشتراك قادمان قريبًا جدًا."
     }
   }
 }

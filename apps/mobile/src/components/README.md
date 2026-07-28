@@ -1,7 +1,9 @@
 # Shared Components
 
-**Phase:** Phase 1
+**Phase:** 1 — one component so far
 
-Feature-agnostic primitives (Button, Card, Input, Sheet, etc.) built on `packages/ui/native`.
+App-specific but feature-agnostic composites built on `packages/ui/native` — see docs/phase-1/07-component-architecture.md §7.1 layer 3.
 
-> Scaffolding only — no application code yet. Structure follows `docs/03-folder-structure.md`; this feature is implemented per the plan in `docs/09-development-phases.md`.
+- `coming-soon.tsx` — the placeholder screen for tabs whose bounded context isn't implemented yet.
+
+Grows as more app-specific (not generic-design-system) composites are needed.

@@ -8,5 +8,5 @@
     "noEmit": false,
     "declaration": true
   },
-  "include": ["tokens", "native", "web"]
+  "include": ["tokens", "native", "web", "nativewind-env.d.ts"]
 }

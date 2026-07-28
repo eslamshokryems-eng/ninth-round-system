@@ -1,6 +1,7 @@
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import { CompleteOnboardingUseCase } from "./application/complete-onboarding";
 import { AssignStaffRoleUseCase } from "./application/assign-staff-role";
+import { GetCurrentProfileUseCase } from "./application/get-current-profile";
 import { SignUpUseCase } from "./application/sign-up";
 import { SignInUseCase } from "./application/sign-in";
 import { RequestPasswordResetUseCase } from "./application/request-password-reset";
@@ -24,6 +25,11 @@ export {
   type AssignStaffRoleInput,
   type AssignStaffRoleOutput,
 } from "./application/assign-staff-role";
+export {
+  GetCurrentProfileUseCase,
+  type GetCurrentProfileInput,
+  type GetCurrentProfileOutput,
+} from "./application/get-current-profile";
 export { SignUpUseCase, type SignUpInput } from "./application/sign-up";
 export { SignInUseCase, type SignInInput } from "./application/sign-in";
 export {
@@ -49,6 +55,7 @@ export function createIdentityModule(client: TypedSupabaseClient) {
   return {
     completeOnboarding: new CompleteOnboardingUseCase(profileRepository),
     assignStaffRole: new AssignStaffRoleUseCase(profileRepository),
+    getCurrentProfile: new GetCurrentProfileUseCase(profileRepository),
     signUp: new SignUpUseCase(authPort),
     signIn: new SignInUseCase(authPort),
     requestPasswordReset: new RequestPasswordResetUseCase(authPort),

@@ -6,9 +6,37 @@
     "cancel": "Cancel",
     "save": "Save",
     "continue": "Continue",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "skip": "Skip",
+    "signOut": "Sign out",
     "error": {
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "invalidEmail": "Enter a valid email address.",
+      "passwordTooShort": "Password must be at least 10 characters.",
+      "invalidCredentials": "Incorrect email or password.",
+      "invalidAge": "Enter an age between 13 and 100.",
+      "invalidHeight": "Enter a height between 100cm and 250cm.",
+      "invalidWeight": "Enter a weight between 30kg and 300kg.",
+      "nameRequired": "Enter your name."
     }
+  },
+  "welcome": {
+    "slide1": {
+      "title": "Train like it's round nine.",
+      "subtitle": "Boxing-inspired interval training, built on real sports science."
+    },
+    "slide2": {
+      "title": "A coach in your corner.",
+      "subtitle": "Real trainers and an AI coach, working from the same plan."
+    },
+    "slide3": {
+      "title": "Every rep, tracked.",
+      "subtitle": "Workouts, nutrition, habits, and progress — all in one place."
+    },
+    "getStarted": "Get started",
+    "skip": "Skip"
   },
   "auth": {
     "welcomeTitle": "Train like it's round nine.",
@@ -17,38 +45,112 @@
     "continueWithApple": "Continue with Apple",
     "signUp": {
       "title": "Create your account",
+      "subtitle": "Start your first round.",
       "emailLabel": "Email",
       "passwordLabel": "Password",
       "submit": "Sign up",
-      "haveAccount": "Already have an account?"
+      "haveAccount": "Already have an account?",
+      "logInLink": "Log in"
     },
     "logIn": {
       "title": "Welcome back",
+      "subtitle": "Ready for the next round?",
       "emailLabel": "Email",
       "passwordLabel": "Password",
       "submit": "Log in",
-      "noAccount": "New to 9th Round?"
+      "noAccount": "New to 9th Round?",
+      "signUpLink": "Sign up",
+      "forgotPassword": "Forgot password?"
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "subtitle": "Enter your email and we'll send you a reset link.",
+      "emailLabel": "Email",
+      "submit": "Send reset link",
+      "backToLogin": "Back to log in",
+      "successTitle": "Check your email",
+      "successMessage": "If an account exists for that email, a reset link is on its way."
     }
   },
   "onboarding": {
     "step": "Step {{current}} of {{total}}",
     "languagePicker": {
       "title": "Choose your language",
+      "subtitle": "You can change this later in Settings.",
+      "restartNotice": "Restart 9th Round to apply this language's layout direction.",
       "english": "English",
       "arabic": "العربية"
     },
+    "profileSetup": {
+      "title": "What should we call you?",
+      "subtitle": "This is how you'll appear to your coach and in the community.",
+      "nameLabel": "Full name",
+      "namePlaceholder": "Your name"
+    },
     "goal": {
       "question": "What's your main goal?",
-      "weightLoss": "Weight loss / fat burning",
-      "athleticPerformance": "Athletic performance",
+      "subtitle": "We'll tailor your first program around this.",
+      "weightLoss": "Weight loss",
+      "muscleGain": "Muscle gain",
       "generalFitness": "General fitness",
-      "homeWorkout": "Home workouts"
+      "athleticPerformance": "Athletic performance"
     },
     "experience": {
-      "question": "What's your experience level?",
+      "question": "What's your training experience?",
+      "subtitle": "Be honest — your program adjusts either way.",
       "beginner": "Beginner",
+      "beginnerDescription": "New to structured training",
       "intermediate": "Intermediate",
-      "advanced": "Advanced"
+      "intermediateDescription": "Training consistently for 6+ months",
+      "advanced": "Advanced",
+      "advancedDescription": "Years of consistent training"
+    },
+    "bodyMetrics": {
+      "title": "A few last details",
+      "subtitle": "This helps us calibrate your plan accurately.",
+      "genderLabel": "Gender",
+      "genderFemale": "Female",
+      "genderMale": "Male",
+      "genderUnspecified": "Prefer not to say",
+      "ageLabel": "Age",
+      "heightLabel": "Height (cm)",
+      "weightLabel": "Weight (kg)",
+      "finish": "Finish setup"
+    }
+  },
+  "dashboard": {
+    "greeting": "Good morning, {{name}}",
+    "streakDays": "{{count}} day streak",
+    "todayWorkout": {
+      "title": "Today's workout",
+      "comingSoonTitle": "Your first program is on its way",
+      "comingSoonSubtitle": "The 9-Round Timer and your training plan are coming very soon.",
+      "start": "Start workout"
+    },
+    "tabs": {
+      "home": "Home",
+      "train": "Train",
+      "nutrition": "Nutrition",
+      "progress": "Progress",
+      "profile": "Profile"
+    }
+  },
+  "comingSoon": {
+    "train": {
+      "title": "Your programs are on their way",
+      "subtitle": "The exercise library and workout programs are coming very soon."
+    },
+    "nutrition": {
+      "title": "Nutrition plans are on their way",
+      "subtitle": "Meal tracking and nutrition coaching are coming very soon."
+    },
+    "progress": {
+      "title": "Progress tracking is on its way",
+      "subtitle": "Weight, body composition, and photo tracking are coming very soon."
+    },
+    "profile": {
+      "title": "Profile & settings are on their way",
+      "subtitle": "Account settings and subscription management are coming very soon."
     }
   }
 }

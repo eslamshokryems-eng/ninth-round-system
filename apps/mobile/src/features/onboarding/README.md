@@ -1,7 +1,7 @@
 # Onboarding
 
-**Phase:** Phase 1
+**Phase:** 1 — implemented
 
-Goal, experience level, equipment, and body-metrics capture; produces the initial plan recommendation.
+Profile setup (name), fitness goal, training experience, and body metrics (gender/age/height/weight), accumulated in `store.ts` across four screens and submitted in one call to `CompleteOnboardingUseCase` on the last step — see docs/phase-1/08-state-management.md §8.2.
 
-> Scaffolding only — no application code yet. Structure follows `docs/03-folder-structure.md`; this feature is implemented per the plan in `docs/09-development-phases.md`.
+Screens: `app/(auth)/onboarding/{profile,goal,experience,body-metrics}.tsx`.
