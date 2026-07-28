@@ -4,41 +4,63 @@ Maintained continuously as code lands, per the requirement to generate technical
 
 ## What's Implemented and Tested Right Now
 
-| Package | Layer | Status | Tests |
-|---|---|---|---|
-| `packages/shared-kernel` | — (cross-cutting) | ✅ Implemented | 6 passing (Result, Locale value object) |
-| `packages/i18n` | — (cross-cutting) | ✅ Implemented | 3 passing (en/ar key parity, locale resolution + fallback) |
-| `packages/database-types` | — (cross-cutting) | ✅ Implemented (hand-authored placeholder — see file header for the `pnpm db:types` replacement note) | — (generated/mapping data, no logic to test) |
-| `packages/supabase-client` | — (cross-cutting) | ✅ Implemented | — (thin factory; exercised indirectly via `identity`'s repository) |
-| `packages/ui` | `tokens/` | ✅ Implemented (real color/spacing/type-scale values) | — |
-| `packages/ui` | `native/`, `web/` | 📋 Skeleton only | — |
-| `packages/config` | — | ✅ Implemented (ESLint flat-config preset, shared tsconfigs) | — |
-| **`packages/identity`** | `domain/` | ✅ Implemented — `Profile` entity, `Role` value object, `ProfileRepository` port | 4 (`Role` rules) |
-| **`packages/identity`** | `application/` | ✅ Implemented — `CompleteOnboardingUseCase`, `AssignStaffRoleUseCase` | 6 (2 + 4, using in-memory fake repository) |
-| **`packages/identity`** | `infrastructure/` | ✅ Implemented — `SupabaseProfileRepository`, row↔entity mapper | Untested against a live Supabase project (none provisioned yet); the mapping logic itself is straightforward field renaming, exercised transitively by the typecheck |
-| `packages/training`, `packages/nutrition`, `packages/tracking`, `packages/billing`, `packages/notifications` | all | 📋 Skeleton only (`domain/`, `application/`, `infrastructure/` folders + README) | — |
-| `packages/ai` | all | 📋 Skeleton only (Phase 3) | — |
-| `apps/mobile` | all screens | 📋 Not started — zero `.tsx` files | — |
-| `apps/web` | all screens | 📋 Not started — zero `.tsx` files | — |
-| `supabase/functions/*` | all | 📋 Contract documented in each function's README; zero `index.ts` implementations | — |
+| Package / App | Status | Tests |
+|---|---|---|
+| `packages/shared-kernel` | ✅ Implemented | 6 passing |
+| `packages/i18n` | ✅ Implemented — full en/ar coverage for every shipped screen | 3 passing (key-parity + locale resolution) |
+| `packages/database-types` | ✅ Implemented (hand-authored placeholder — see file header for the `pnpm db:types` replacement note) | — |
+| `packages/supabase-client` | ✅ Implemented | — |
+| `packages/ui` — `tokens/` | ✅ Implemented | — |
+| `packages/ui` — `native/` | ✅ Implemented — `Text`, `Button`, `TextField`, `Card`, `ScreenContainer`, `ProgressDots`, `OptionCard`, `Divider`, `IconButton`/`BackButton` | — (presentational; exercised via the mobile app's bundle-level smoke test, see below) |
+| `packages/ui` — `web/` | 📋 Not started | — |
+| `packages/config` | ✅ Implemented | — |
+| **`packages/identity`** | ✅ Implemented — the reference bounded context, now covering registration, login, forgot-password, onboarding (name/goal/experience/body-metrics), and role assignment | **41 passing** (domain, application, and infrastructure-mapping tests, all using in-memory fakes — zero database) |
+| **`packages/training`** | 🟡 Partially prepared — see [§12.2](#122-9th-round-timer-architecture-prep) | 5 passing (`RoundPlan` value object) |
+| `packages/nutrition`, `packages/tracking`, `packages/billing`, `packages/notifications` | 📋 Skeleton only | — |
+| `packages/ai` | 📋 Skeleton only (Phase 3) | — |
+| **`apps/mobile`** | ✅ 16 real screens shipped — see [§12.1](#121-mobile-screens-shipped) | Typechecks + lints clean; verified with a real `expo export` bundle (see below) |
+| `apps/web` | 📋 Not started — zero `.tsx` files | — |
+| `supabase/functions/*` | 📋 Contract documented in each function's README; zero `index.ts` implementations | — |
 
-**Total: 19 automated tests, all passing** (`pnpm test` via Turborepo). **7 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
+**Total: 53 automated tests, all passing** (`pnpm test` via Turborepo). **9 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
 
-## Why Identity First
+## 12.1 Mobile Screens Shipped
 
-Every other bounded context depends on knowing who the caller is and what role they hold — Training needs to know if a caller is the assigned trainer, Billing needs to know if a caller is a client, Notifications needs a profile's `preferred_locale`. Building Identity first, completely, with real domain logic (`Role.canAssignRole`) and a real (if not-yet-connected-to-a-live-database) infrastructure implementation, gives every subsequent context a working example to copy the pattern from rather than a description of the pattern.
+| Screen | Route |
+|---|---|
+| Language selection (en/ar) | `app/(auth)/language.tsx` |
+| Welcome carousel (3 animated slides) | `app/(auth)/welcome.tsx` |
+| Sign up | `app/(auth)/sign-up.tsx` |
+| Log in | `app/(auth)/log-in.tsx` |
+| Forgot password | `app/(auth)/forgot-password.tsx` |
+| Onboarding — Profile setup (name) | `app/(auth)/onboarding/profile.tsx` |
+| Onboarding — Fitness goal | `app/(auth)/onboarding/goal.tsx` |
+| Onboarding — Training experience | `app/(auth)/onboarding/experience.tsx` |
+| Onboarding — Body metrics (gender/age/height/weight) | `app/(auth)/onboarding/body-metrics.tsx` |
+| Dashboard Home | `app/(tabs)/index.tsx` |
+| Train / Nutrition / Progress (honest "coming soon" placeholders) | `app/(tabs)/{train,nutrition,progress}.tsx` |
+| Profile (working sign-out; settings not built yet) | `app/(tabs)/profile.tsx` |
 
-## Known Gaps / Honest Caveats
+Root routing gate (`app/index.tsx`) redirects based on locale/session/onboarding state; `app/_layout.tsx` bootstraps providers and holds the splash screen until auth state resolves.
 
-- **No live Supabase project exists yet.** `packages/database-types` is a hand-authored placeholder; `SupabaseProfileRepository` has never executed against a real Postgres instance. It typechecks against a pinned `@supabase/supabase-js@2.45.4` and follows the exact shape `supabase gen types typescript` produces, so swapping in real generated types and a real project URL should be a non-event — but "should be" is not "has been verified."
-- **No screens exist.** The Identity context's use cases are ready to be called from a screen, but no Expo Router route or Next.js page has been built yet. The next implementation slice is the mobile language-picker → sign-up → log-in → onboarding flow (screens 1–8 in [Screen List](05-screen-list.md)) wired to `createIdentityModule`.
-- **`packages/ui/native` and `packages/ui/web` are empty.** Building real screens requires at least `Button`, `TextInput`, and `Text` primitives first — these don't exist yet.
-- **CI's `build` step is expected to fail right now** for `apps/mobile` (`expo export`) and `apps/web` (`next build`), since neither app has any route content yet. This is expected at this stage, not a regression — `lint`/`typecheck`/`test` are the meaningful gates until the first screens land.
+## 12.2 9th Round Timer — Architecture Prep
 
-## Next Slice (proposed)
+Per explicit instruction, the timer itself is **not implemented** — only prepared:
 
-1. `packages/ui/native`: `Button`, `Text`, `TextInput`, `Card` — minimal, token-driven, RTL-aware (logical properties from the start).
-2. `apps/mobile`: language picker → sign-up → log-in → onboarding screens, calling `createIdentityModule(supabaseClient).completeOnboarding` from a container component per [Component Architecture §7.2](07-component-architecture.md#72-container--presentation-split-within-a-feature).
-3. A real (free-tier) Supabase project provisioned for `development`, migrations applied, `pnpm db:types` run for real, `packages/database-types` replaced with generated output.
+- `packages/training/domain/round-plan.ts` — a validated value object for a round-based workout's shape (rounds/work-seconds/rest-seconds), tested (5 tests). Not a timer: no notion of "currently running."
+- `packages/training/domain/timer-phase.ts` — the discriminated union (`idle`/`work`/`rest`/`complete`) the future timer's state will take. Type declaration only, no reducer/countdown logic.
+- **Not yet built**: the `TimerSession` aggregate, `StartWorkoutSessionUseCase`/`CompleteWorkoutSessionUseCase`, the Supabase-backed `WorkoutLogRepository`, the mobile `useWorkoutSessionStore`, and the `TimerRing` design-system primitive. See `packages/training/README.md` for the full planned shape.
 
-Not started until explicitly requested — see [`docs/09-development-phases.md`](../09-development-phases.md) for how this fits the overall Phase 1 sequence.
+## 12.3 Known Gaps / Honest Caveats
+
+- **No live Supabase project exists yet.** Every screen above is verified to *bundle* correctly (`expo export`, both iOS and Android — a real 1415-module Hermes bundle) and to typecheck against a hand-authored `database-types` placeholder matching the migrations exactly. None of it has executed against a real Postgres instance or been visually verified in a running simulator — there is no simulator/display available in this environment. **This is the single biggest thing to verify before treating this slice as done**: run `pnpm --filter @9thround/mobile dev` against a real Expo dev client, on a real or simulated device, with a provisioned Supabase project's credentials in `.env`.
+- **RTL manual QA needed**: the welcome carousel's horizontal `ScrollView` + `scrollTo` is a known rough edge for RTL on Android (horizontal scroll direction doesn't always mirror automatically); the language-picker's "restart to apply" flow for `I18nManager.forceRTL` has never been exercised on a device. Both need hands-on verification in Arabic.
+- **SecureStore session size**: the Supabase auth session storage adapter (`apps/mobile/src/lib/secure-store-adapter.ts`) doesn't chunk large values; flagged as a follow-up if a JWT with several custom claims ever approaches SecureStore's per-key limit.
+- **Google/Apple sign-in**: `expo-apple-authentication` is a declared dependency but no OAuth screen/flow has been built yet — email/password only, so far.
+- **Placeholder brand assets**: `apps/mobile/assets/{icon,splash,adaptive-icon,favicon}.png` are solid-color placeholders generated for the build pipeline to have valid files, not real designed assets.
+
+## 12.4 Next Slice (proposed)
+
+1. Provision a real (free-tier) Supabase project for `development`; apply the migrations; run `pnpm db:types` for real; replace the hand-authored `packages/database-types`.
+2. Run the app in a real Expo dev client and visually verify every screen in both English and Arabic, both themes' contrast, and the RTL caveats above.
+3. Build out the `training` context for real (Program/Workout/Exercise entities, the `TimerSession` aggregate, and the actual 9-Round Timer UI) — the natural next feature given Dashboard Home already has a "your first program is on its way" placeholder waiting for it.

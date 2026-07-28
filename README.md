@@ -3,10 +3,10 @@
 **Premium online personal training platform** — scientific fitness, boxing-inspired interval training, nutrition coaching, AI support, and habit tracking. Bilingual (English/Arabic, LTR/RTL) and multi-role (Client, Trainer, Nutritionist, Reception, Admin, Super Admin) from day one.
 
 - **Founder:** Eslam Shokry
-- **Status:** Phase 1 (MVP: Core Training & Tracking) — architecture approved with modifications; implementation underway. See [Implementation Status](docs/phase-1/12-implementation-status.md) for exactly what's built and tested right now.
+- **Status:** Phase 1 (MVP: Core Training & Tracking) — the first mobile experience (language selection through Dashboard Home) is built and tested. See [Implementation Status](docs/phase-1/12-implementation-status.md) for exactly what's built and tested right now.
 - **Design language:** Black / White / Gold, Apple-quality minimal UI, glassmorphism, motion-first
 
-This repository contains the full product & technical architecture for 9th Round, the Phase 1 engineering architecture (real monorepo, real database schema, detailed specs), and the first real implementation slice (the Identity bounded context, fully built and tested).
+This repository contains the full product & technical architecture for 9th Round, the Phase 1 engineering architecture (real monorepo, real database schema, detailed specs), and a real, tested mobile app slice: 16 screens from language selection through onboarding to Dashboard Home.
 
 ## Architecture Documents
 
@@ -34,10 +34,14 @@ Implementation-ready detail for the current phase — see [`docs/phase-1/00-over
 
 ## What's Actually Built (not just designed)
 
-- **`packages/shared-kernel`**, **`packages/i18n`**, **`packages/database-types`**, **`packages/supabase-client`**, **`packages/ui/tokens`** — real, working, tested code.
-- **`packages/identity`** — a complete Clean Architecture bounded context: domain entities (`Profile`, `Role`), application use cases (`CompleteOnboardingUseCase`, `AssignStaffRoleUseCase`), and a Supabase-backed infrastructure repository. **20 automated tests pass**, the whole repo **typechecks** and **lints clean** (including type-aware ESLint rules).
+- **16 real mobile screens** (`apps/mobile/app`): language selection, an animated welcome carousel, registration, login, forgot password, 4-step onboarding (profile setup, fitness goal, training experience, body metrics), Dashboard Home, and a 5-tab shell. Dark-theme-first, bilingual (English/Arabic with RTL/LTR), responsive via flexbox. Verified with a real `expo export` bundle (iOS and Android) — not yet visually verified in a running simulator (none available in this environment).
+- **`packages/identity`** — a complete Clean Architecture bounded context covering registration, login, forgot-password, onboarding, and role assignment. **41 automated tests pass.**
+- **`packages/ui/native`** — the design system these screens are built from: `Text`, `Button`, `TextField`, `Card`, `ScreenContainer`, `ProgressDots`, `OptionCard`, `Divider`, `IconButton`.
+- **`packages/training`** — the 9th Round Timer's architecture is prepared (a validated `RoundPlan` value object, a `TimerPhase` type) without implementing the timer itself, per instruction.
+- **`packages/shared-kernel`**, **`packages/i18n`**, **`packages/database-types`**, **`packages/supabase-client`** — real, working, tested code.
 - **7 SQL migrations** in `supabase/migrations/` implementing the full Phase 1 schema: the 6-role model, bilingual (`translated_text`) content, row-level security on every table, and the AI-readiness event log.
-- Every other bounded context (`training`, `nutrition`, `tracking`, `billing`, `notifications`, `ai`) and every mobile/web screen is still a scaffold — see [Implementation Status](docs/phase-1/12-implementation-status.md) for the exact ledger and what's next.
+- **53 automated tests, all passing**; the whole repo **typechecks** and **lints clean** (including type-aware ESLint rules).
+- Every other bounded context (`nutrition`, `tracking`, `billing`, `notifications`, `ai`) and the admin/trainer web app are still scaffolds — see [Implementation Status](docs/phase-1/12-implementation-status.md) for the exact ledger, known gaps, and what's next.
 
 ## Stack at a Glance
 

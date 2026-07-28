@@ -4,11 +4,16 @@
   "private": true,
   "sideEffects": false,
   "main": "./index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@9thround/shared-kernel": "workspace:*"
   },
   "devDependencies": {
     "@9thround/config": "workspace:*",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
   }
 }
