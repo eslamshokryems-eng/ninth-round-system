@@ -33,6 +33,31 @@ create trigger trg_subscriptions_updated_at
 
 create index idx_subscriptions_profile on subscriptions (profile_id);
 
+-- AI-readiness / audit trail: every status transition is worth having in the
+-- domain_events stream (churn-risk signals for AI progress analysis, dunning
+-- automation, etc.) — see docs/04-database-schema.md §4.7.
+create or replace function trg_subscriptions_emit_event()
+returns trigger
+language plpgsql
+as $$
+begin
+  if (tg_op = 'UPDATE' and new.status is distinct from old.status) or tg_op = 'INSERT' then
+    perform emit_domain_event(
+      'subscription.status_changed',
+      'subscription',
+      new.id,
+      new.profile_id,
+      jsonb_build_object('status', new.status, 'plan_id', new.plan_id)
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_subscriptions_domain_event
+  after insert or update on subscriptions
+  for each row execute function trg_subscriptions_emit_event();
+
 create table payments (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references profiles (id) on delete cascade,
@@ -72,6 +97,42 @@ create table coupon_redemptions (
 );
 
 -- ---------------------------------------------------------------------------
+-- Reception support: front-desk member lookup without granting reception a
+-- broad SELECT on `profiles` (which would expose goal, DOB, referral data,
+-- etc. that front-desk staff have no legitimate need for). RLS is row-level,
+-- not column-level, so a narrow SECURITY DEFINER function is the correct
+-- primitive here — it is also, not incidentally, a plain PostgREST RPC call,
+-- so mobile and web hit the same endpoint (API-first, docs/05 §5.1).
+-- ---------------------------------------------------------------------------
+
+create or replace function reception_member_lookup(search_term text default null)
+returns table (
+  id uuid,
+  full_name text,
+  avatar_url text,
+  has_active_subscription boolean
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    p.id,
+    p.full_name,
+    p.avatar_url,
+    exists (
+      select 1 from subscriptions s
+      where s.profile_id = p.id and s.status = 'active'
+    ) as has_active_subscription
+  from profiles p
+  where auth_role() in ('reception', 'admin', 'super_admin')
+    and (search_term is null or p.full_name ilike '%' || search_term || '%')
+  order by p.full_name
+  limit 25;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- RLS
 -- ---------------------------------------------------------------------------
 
@@ -83,26 +144,26 @@ alter table coupons enable row level security;
 alter table coupon_redemptions enable row level security;
 
 create policy "anyone reads active plans" on subscription_plans for select using (is_active = true);
-create policy "admins manage plans" on subscription_plans for all
-  using ((auth.jwt() ->> 'role') = 'admin');
+create policy "admins manage plans" on subscription_plans for all using (is_admin());
 
 create policy "read own subscription" on subscriptions for select using (profile_id = auth.uid());
-create policy "admins manage subscriptions" on subscriptions for all
-  using ((auth.jwt() ->> 'role') = 'admin');
+create policy "reception reads active subscriptions for check-in" on subscriptions for select
+  using (auth_role() = 'reception' and status = 'active');
+create policy "admins manage subscriptions" on subscriptions for all using (is_admin());
 -- No client insert/update policy: subscriptions are written exclusively by
 -- Edge Functions via the service-role key, which bypasses RLS by design.
 
 create policy "read own payments" on payments for select using (profile_id = auth.uid());
-create policy "admins manage payments" on payments for all
-  using ((auth.jwt() ->> 'role') = 'admin');
+create policy "admins manage payments" on payments for all using (is_admin());
+-- Refund issuance is an application-layer (Edge Function) concern gated to
+-- super_admin specifically — see docs/12-roles-and-permissions.md §12.3;
+-- RLS grants admin+super_admin equal row access since the distinction here
+-- is an *action* permission, not a *visibility* one.
 
-create policy "admins only: processed_stripe_events" on processed_stripe_events for all
-  using ((auth.jwt() ->> 'role') = 'admin');
+create policy "admins only: processed_stripe_events" on processed_stripe_events for all using (is_admin());
 
 create policy "anyone reads active coupons by code lookup" on coupons for select using (is_active = true);
-create policy "admins manage coupons" on coupons for all
-  using ((auth.jwt() ->> 'role') = 'admin');
+create policy "admins manage coupons" on coupons for all using (is_admin());
 
 create policy "read own redemptions" on coupon_redemptions for select using (profile_id = auth.uid());
-create policy "admins manage redemptions" on coupon_redemptions for all
-  using ((auth.jwt() ->> 'role') = 'admin');
+create policy "admins manage redemptions" on coupon_redemptions for all using (is_admin());

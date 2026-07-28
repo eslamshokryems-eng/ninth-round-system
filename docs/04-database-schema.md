@@ -1,5 +1,7 @@
 # 4. Database Schema
 
+> **Updated for the 6-role model, bilingual content, and AI-readiness tables** (see [Roles & Permissions](12-roles-and-permissions.md), [Internationalization](11-internationalization.md), and [DDD Architecture §13.4](13-ddd-architecture.md)). The exact, currently-implemented Phase 1 schema — matching the real SQL in `supabase/migrations/` — is [`docs/phase-1/02-database-schema.md`](phase-1/02-database-schema.md); this document remains the whole-product (all-phase) reference.
+
 PostgreSQL via Supabase. `auth.users` (managed by Supabase Auth) is extended with a `public.profiles` table rather than modified directly. Every table has Row Level Security (RLS) enabled; policies are summarized per table and detailed in [Security Plan §7.2](07-security-plan.md#72-row-level-security-strategy).
 
 Conventions: `id uuid default gen_random_uuid()` primary keys, `created_at` / `updated_at timestamptz` on every table, soft-delete via `deleted_at timestamptz null` on user-facing content tables.
@@ -8,9 +10,9 @@ Conventions: `id uuid default gen_random_uuid()` primary keys, `created_at` / `u
 
 ```mermaid
 erDiagram
-    PROFILES ||--o{ TRAINER_CLIENTS : "is client of"
-    PROFILES ||--o{ TRAINER_PROFILES : "is trainer (1:1)"
-    TRAINER_PROFILES ||--o{ TRAINER_CLIENTS : manages
+    PROFILES ||--o{ STAFF_CLIENT_ASSIGNMENTS : "is client of"
+    PROFILES ||--o| STAFF_PROFILES : "is staff (1:1, trainer/nutritionist/reception)"
+    STAFF_PROFILES ||--o{ STAFF_CLIENT_ASSIGNMENTS : manages
     PROFILES ||--o{ SUBSCRIPTIONS : has
     SUBSCRIPTION_PLANS ||--o{ SUBSCRIPTIONS : defines
     PROFILES ||--o{ PAYMENTS : makes
@@ -52,6 +54,8 @@ erDiagram
     PROFILES ||--o{ SUPPORT_TICKETS : opens
     SUPPORT_TICKETS ||--o{ SUPPORT_TICKET_MESSAGES : contains
     COUPONS ||--o{ COUPON_REDEMPTIONS : redeemed_as
+    PROFILES ||--o{ DOMAIN_EVENTS : "acted on"
+    PROFILES ||--o{ AI_INSIGHTS : "receives"
 ```
 
 ## 4.2 Tables by Domain
@@ -64,7 +68,8 @@ erDiagram
 | id | uuid PK, FK → auth.users.id | |
 | full_name | text | |
 | avatar_url | text | Supabase Storage path |
-| role | enum: `client`, `trainer`, `admin` | Drives RLS and app routing |
+| role | enum: `client`, `trainer`, `nutritionist`, `reception`, `admin`, `super_admin` | Drives RLS and app routing — see [Roles & Permissions](12-roles-and-permissions.md) |
+| preferred_locale | enum: `en`, `ar` | Drives RTL/LTR + notification language — see [Internationalization](11-internationalization.md) |
 | gender | text nullable | For female-specific program tracks |
 | date_of_birth | date nullable | |
 | goal | enum: `weight_loss`, `fat_burning`, `athletic_performance`, `general_fitness`, `home_workout` | Drives onboarding recommendations |
@@ -73,27 +78,29 @@ erDiagram
 | referral_code | text unique | auto-generated |
 | referred_by | uuid nullable, FK → profiles.id | |
 
-**`trainer_profiles`** (1:1 extension of `profiles` where `role = 'trainer'`)
+**`staff_profiles`** (1:1 extension of `profiles` where `role` is `trainer`/`nutritionist`/`reception` — one shared table for all three staff types instead of three parallel ones; see [Roles & Permissions §12.2](12-roles-and-permissions.md#122-why-one-shared-staff-model-instead-of-three-parallel-ones))
 | Column | Type | Notes |
 |---|---|---|
 | profile_id | uuid PK, FK → profiles.id | |
+| role | enum: `trainer`, `nutritionist`, `reception` | |
 | bio | text | |
 | specialties | text[] | e.g. `{boxing, weight_loss, football}` |
 | certifications | jsonb | list of {name, issuer, verified} |
 | years_experience | int | |
-| is_approved | boolean default false | Admin must approve before trainer is client-facing |
+| is_approved | boolean default false | Admin/super_admin must approve before staff is client-facing |
 | rating_avg | numeric(3,2) | Denormalized, recalculated on new reviews (future) |
 
-**`trainer_clients`**
+**`staff_client_assignments`**
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| trainer_id | uuid, FK → trainer_profiles.profile_id | |
+| staff_id | uuid, FK → staff_profiles.profile_id | |
 | client_id | uuid, FK → profiles.id | |
+| context | enum: `training`, `nutrition` | Which coaching relationship this governs |
 | status | enum: `active`, `paused`, `ended` | |
 | assigned_at | timestamptz | |
 
-Unique constraint on `(trainer_id, client_id)` where `status = 'active'`.
+Unique constraint on `(staff_id, client_id, context)` where `status = 'active'`.
 
 ### Billing
 
@@ -138,14 +145,16 @@ Unique constraint on `(trainer_id, client_id)` where `status = 'active'`.
 
 ### Training Content
 
-**`exercise_categories`** — id, name, slug, icon
+Every `name`/`description` column below is a `translated_text` domain (`jsonb` shaped `{"en": "...", "ar": "..."}`, English required) rather than a plain `text` column — see [Internationalization §11.3](11-internationalization.md#113-translatable-content-database-strategy).
+
+**`exercise_categories`** — id, name (translated_text), slug, icon
 **`exercises`** — the exercise library
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
 | category_id | uuid, FK | |
-| name | text | |
-| description | text | |
+| name | translated_text | |
+| description | translated_text nullable | |
 | equipment | text[] | e.g. `{bodyweight}`, `{dumbbell, bench}` — powers "home workout" filtering |
 | muscle_groups | text[] | |
 | difficulty | enum: `beginner`,`intermediate`,`advanced` | |
@@ -154,10 +163,10 @@ Unique constraint on `(trainer_id, client_id)` where `status = 'active'`.
 | created_by | uuid, FK → profiles.id | trainer/admin who added it |
 
 **`programs`** — a full training program (e.g. "6-Week Fat Burn," "Football Conditioning")
-| id, name, description, cover_image_url, goal (matches profiles.goal enum), duration_weeks, difficulty, is_template (boolean — reusable vs trainer-custom), created_by, is_published |
+| id, name (translated_text), description (translated_text), cover_image_url, goal (matches profiles.goal enum), duration_weeks, difficulty, is_template (boolean — reusable vs trainer-custom), created_by, is_published |
 
 **`program_weeks`** — id, program_id, week_number
-**`workouts`** — id, program_week_id nullable (null = standalone/library workout), name, description, format (enum: `9_round`, `circuit`, `strength`, `hiit`, `steady_state`), estimated_duration_minutes, order_index
+**`workouts`** — id, program_week_id nullable (null = standalone/library workout), name (translated_text), description (translated_text), format (enum: `9_round`, `circuit`, `strength`, `hiit`, `steady_state`), estimated_duration_minutes, order_index
 **`workout_exercises`** — id, workout_id, exercise_id, order_index, rounds, work_seconds, rest_seconds, sets, reps, target_weight, notes
 
 **`user_programs`** — a program assigned to / chosen by a user
@@ -177,9 +186,9 @@ Unique constraint on `(trainer_id, client_id)` where `status = 'active'`.
 
 ### Nutrition
 
-**`nutrition_plans`** — id, profile_id, assigned_by nullable, name, daily_calorie_target, macro_protein_g, macro_carbs_g, macro_fat_g, start_date, end_date
+**`nutrition_plans`** — id, profile_id, assigned_by nullable, name (plain text — personally authored, not library content), daily_calorie_target, macro_protein_g, macro_carbs_g, macro_fat_g, start_date, end_date. Owned by nutritionists, not trainers — see [Roles & Permissions](12-roles-and-permissions.md).
 **`meals`** — id, nutrition_plan_id, name (`breakfast`,`lunch`,`dinner`,`snack`), order_index
-**`food_items`** — id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, is_verified (admin-curated vs user-added)
+**`food_items`** — id, name (translated_text — shared library content), calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, is_verified (nutritionist/admin-curated vs user-added)
 **`meal_food_items`** — id, meal_id, food_item_id, quantity_grams
 
 ### Gamification & Community
@@ -215,16 +224,27 @@ A materialized view `leaderboard_weekly` aggregates `workout_logs` + `challenge_
 
 ## 4.3 Row Level Security Strategy (summary)
 
-| Table group | Client (`role=client`) | Trainer (`role=trainer`) | Admin (`role=admin`) |
-|---|---|---|---|
-| `profiles` (own row) | SELECT/UPDATE own | SELECT own + assigned clients | ALL |
-| `workout_logs`, `habit_logs`, `weight_logs`, etc. | SELECT/INSERT/UPDATE own only | SELECT for assigned clients only | ALL |
-| `programs`, `exercises` (content) | SELECT published only | SELECT all + INSERT/UPDATE own-created | ALL |
-| `chat_messages` | SELECT/INSERT where profile is a participant | same | ALL (support access) |
-| `subscriptions`, `payments` | SELECT own (read-only; writes only via Edge Function w/ service role) | none | ALL |
-| `admin_audit_log` | none | none | SELECT/INSERT (system) |
+| Table group | Client | Trainer | Nutritionist | Reception | Admin / Super Admin |
+|---|---|---|---|---|---|
+| `profiles` (own row) | SELECT/UPDATE own | SELECT own + assigned clients | SELECT own + assigned clients | SELECT (narrow, via `reception_member_lookup`) | ALL |
+| `workout_logs`, `habit_logs`, `weight_logs`, etc. | SELECT/INSERT/UPDATE own only | SELECT for assigned clients only | SELECT for assigned clients only (weight/body-comp only) | none | ALL |
+| `programs`, `exercises` (content) | SELECT published only | SELECT all + INSERT/UPDATE own-created | SELECT all | none | ALL |
+| `nutrition_plans`, `meals`, `food_items` | SELECT own | none | SELECT all + INSERT/UPDATE own-created | none | ALL |
+| `chat_messages` | SELECT/INSERT where profile is a participant | same | same | none | ALL (support access) |
+| `subscriptions`, `payments` | SELECT own (read-only; writes only via Edge Function w/ service role) | none | none | SELECT active subscriptions only (check-in) | ALL; refunds gated to super_admin at the application layer |
+| `admin_audit_log` | none | none | none | none | SELECT/INSERT |
+| `domain_events`, `ai_insights` | SELECT own (`ai_insights` only) | none | none | none | SELECT (`domain_events`); ALL (`ai_insights`) |
 
-Full policy definitions live as SQL in `supabase/migrations/`, one policy per operation per table (never a blanket `USING (true)`), detailed further in [Security Plan §7.2](07-security-plan.md#72-row-level-security-strategy).
+Every policy check in every migration routes through the `is_admin()` / `is_super_admin()` / `is_staff(roles)` SQL helper functions (`supabase/migrations/20260801000001_extensions_and_enums.sql`) rather than inlining `auth.jwt() ->> 'role'` comparisons — see [Roles & Permissions §12.3](12-roles-and-permissions.md#123-admin-vs-super-admin--the-actual-distinction) for why admin and super_admin need to be distinguishable at all. Full policy definitions live as SQL in `supabase/migrations/`, one policy per operation per table (never a blanket `USING (true)`), detailed further in [Security Plan §7.2](07-security-plan.md#72-row-level-security-strategy).
+
+## 4.7 AI-Readiness Tables
+
+Two tables exist specifically so **every** feature can plug into AI without a bespoke integration, per the requirement that every feature support future AI (see [DDD Architecture §13.4–13.5](13-ddd-architecture.md#134-cross-context-communication-domain-events-not-direct-calls)):
+
+- **`domain_events`** — an append-only log of "what happened" (`workout.completed`, `subscription.status_changed`, …), written via the `emit_domain_event()` helper function from triggers on the tables that matter. This is the one stream any future AI feature (progress analysis, adaptive plans) reads from, instead of each feature building its own bespoke event pipeline.
+- **`ai_insights`** — a polymorphic table (`entity_type`, `entity_id`, `insight_type`, `content`, `model`) any context can attach AI-generated content to (a motivation message, a plan-adjustment suggestion) without a dedicated table per AI feature.
+
+Both are implemented now, in Phase 1, even though the `ai` bounded context's actual use cases (Phase 3) don't exist yet — the infrastructure is cheap to build early and expensive to retrofit once every other table already has activity that should have been logged from day one.
 
 ## 4.4 Indexing Notes
 

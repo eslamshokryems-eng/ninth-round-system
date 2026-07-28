@@ -1,4 +1,5 @@
 -- Phase 1 — nutrition plans, meals, and the food-item catalog.
+-- Nutritionists (not trainers) own this content — see docs/12-roles-and-permissions.md.
 
 create table nutrition_plans (
   id uuid primary key default gen_random_uuid(),
@@ -22,9 +23,10 @@ create table meals (
   order_index int not null default 0
 );
 
+-- Library content (shared across all plans) — translatable, like exercises.
 create table food_items (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
+  name translated_text not null,
   calories_per_100g numeric(6, 2) not null,
   protein_per_100g numeric(6, 2) not null default 0,
   carbs_per_100g numeric(6, 2) not null default 0,
@@ -33,7 +35,7 @@ create table food_items (
   created_by uuid references profiles (id)
 );
 
-create index idx_food_items_name_trgm on food_items using gin (name gin_trgm_ops);
+create index idx_food_items_name_en_trgm on food_items using gin ((name ->> 'en') gin_trgm_ops);
 
 create table meal_food_items (
   id uuid primary key default gen_random_uuid(),
@@ -54,32 +56,32 @@ alter table food_items enable row level security;
 alter table meal_food_items enable row level security;
 
 create policy "own plans" on nutrition_plans for select using (profile_id = auth.uid());
-create policy "trainer reads assigned clients' plans" on nutrition_plans for select
+create policy "staff reads assigned clients' plans" on nutrition_plans for select
   using (exists (
-    select 1 from trainer_clients tc
-    where tc.client_id = nutrition_plans.profile_id and tc.trainer_id = auth.uid() and tc.status = 'active'
+    select 1 from staff_client_assignments sca
+    where sca.client_id = nutrition_plans.profile_id and sca.staff_id = auth.uid() and sca.status = 'active'
   ));
-create policy "trainers/admins manage plans" on nutrition_plans for all
-  using ((auth.jwt() ->> 'role') in ('trainer', 'admin'));
+create policy "nutritionists/admins manage plans" on nutrition_plans for all
+  using (is_staff(array['nutritionist']));
 
 create policy "read meals of visible plans" on meals for select
   using (exists (
     select 1 from nutrition_plans np
     where np.id = meals.nutrition_plan_id and np.profile_id = auth.uid()
   ));
-create policy "trainers/admins manage meals" on meals for all
-  using ((auth.jwt() ->> 'role') in ('trainer', 'admin'));
+create policy "nutritionists/admins manage meals" on meals for all
+  using (is_staff(array['nutritionist']));
 
 create policy "anyone reads food items" on food_items for select using (true);
 create policy "authenticated users add unverified food items" on food_items for insert
   with check (auth.uid() is not null);
-create policy "admins manage food items" on food_items for update
-  using ((auth.jwt() ->> 'role') = 'admin');
+create policy "admins/nutritionists verify food items" on food_items for update
+  using (is_staff(array['nutritionist']));
 
 create policy "read own meal_food_items" on meal_food_items for select
   using (exists (
     select 1 from meals m join nutrition_plans np on np.id = m.nutrition_plan_id
     where m.id = meal_food_items.meal_id and np.profile_id = auth.uid()
   ));
-create policy "trainers/admins manage meal_food_items" on meal_food_items for all
-  using ((auth.jwt() ->> 'role') in ('trainer', 'admin'));
+create policy "nutritionists/admins manage meal_food_items" on meal_food_items for all
+  using (is_staff(array['nutritionist']));

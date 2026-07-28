@@ -1,0 +1,54 @@
+{
+  "common": {
+    "appName": "9th Round",
+    "loading": "جارٍ التحميل…",
+    "retry": "إعادة المحاولة",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "continue": "متابعة",
+    "error": {
+      "generic": "حدث خطأ ما. حاول مرة أخرى."
+    }
+  },
+  "auth": {
+    "welcomeTitle": "تدرّب وكأنها الجولة التاسعة.",
+    "orContinueWith": "أو تابع باستخدام",
+    "continueWithGoogle": "المتابعة باستخدام Google",
+    "continueWithApple": "المتابعة باستخدام Apple",
+    "signUp": {
+      "title": "أنشئ حسابك",
+      "emailLabel": "البريد الإلكتروني",
+      "passwordLabel": "كلمة المرور",
+      "submit": "إنشاء حساب",
+      "haveAccount": "لديك حساب بالفعل؟"
+    },
+    "logIn": {
+      "title": "مرحبًا بعودتك",
+      "emailLabel": "البريد الإلكتروني",
+      "passwordLabel": "كلمة المرور",
+      "submit": "تسجيل الدخول",
+      "noAccount": "جديد على 9th Round؟"
+    }
+  },
+  "onboarding": {
+    "step": "الخطوة {{current}} من {{total}}",
+    "languagePicker": {
+      "title": "اختر لغتك",
+      "english": "English",
+      "arabic": "العربية"
+    },
+    "goal": {
+      "question": "ما هو هدفك الأساسي؟",
+      "weightLoss": "فقدان الوزن / حرق الدهون",
+      "athleticPerformance": "الأداء الرياضي",
+      "generalFitness": "اللياقة العامة",
+      "homeWorkout": "تمارين منزلية"
+    },
+    "experience": {
+      "question": "ما هو مستوى خبرتك؟",
+      "beginner": "مبتدئ",
+      "intermediate": "متوسط",
+      "advanced": "متقدم"
+    }
+  }
+}

@@ -8,15 +8,16 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
+    "lint": "eslint .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:migrate": "supabase db push",
-    "db:types": "supabase gen types typescript --local > packages/types/src/supabase.ts"
+    "db:types": "supabase gen types typescript --local > packages/database-types/src/index.ts"
   },
   "devDependencies": {
+    "@9thround/config": "workspace:*",
     "turbo": "^2.0.0",
     "typescript": "^5.5.0",
     "prettier": "^3.3.0",

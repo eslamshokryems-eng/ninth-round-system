@@ -3,14 +3,12 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
-/** @type {import("eslint").Linter.Config[]} */
-export const basePreset = [
+export const basePreset = tseslint.config(
   js.configs.recommended,
-  ...tseslint.configs.recommended,
   {
+    files: ["**/*.ts", "**/*.tsx"],
+    extends: [...tseslint.configs.recommended],
     rules: {
-      "no-console": ["warn", { allow: ["warn", "error"] }],
-      "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
@@ -21,8 +19,13 @@ export const basePreset = [
     },
   },
   {
+    rules: {
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+    },
+  },
+  {
     ignores: ["dist/**", ".next/**", ".expo/**", ".turbo/**", "coverage/**"],
   },
-];
+);
 
 export default basePreset;

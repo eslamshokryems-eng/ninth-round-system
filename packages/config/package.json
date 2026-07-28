@@ -7,5 +7,9 @@
     "./eslint-preset": "./eslint-preset.mjs",
     "./tsconfig.mobile.json": "./tsconfig.mobile.json",
     "./tsconfig.web.json": "./tsconfig.web.json"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.9.0",
+    "typescript-eslint": "^8.0.0"
   }
 }

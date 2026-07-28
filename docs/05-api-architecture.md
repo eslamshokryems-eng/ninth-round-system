@@ -1,13 +1,15 @@
 # 5. API Architecture
 
+> **Package names updated**: `packages/api-client` and `packages/schemas` (referenced below) were superseded by the per-bounded-context `application`/`infrastructure` layers described in [`docs/13-ddd-architecture.md`](13-ddd-architecture.md) — e.g. what this document calls "the typed api-client" is now each context's composition-root factory (`createIdentityModule`, etc.). The principles and endpoint catalog below are otherwise unchanged.
+
 ## 5.1 Principles
 
-9th Round does **not** hand-roll a REST layer for CRUD. Two complementary API surfaces:
+9th Round does **not** hand-roll a REST layer for CRUD, and the backend is built **API-first**: every capability — mobile screens, the admin/trainer web portals, and any future integration — is a consumer of the same two surfaces below, never a special direct-database path unique to one client. This is what makes "future web and mobile apps use the same backend" (requirement 3) true by construction rather than by convention.
 
-1. **Supabase auto-generated PostgREST API** — used directly by clients (via the typed `packages/api-client`) for straightforward, RLS-protected reads/writes: fetching programs, logging a workout set, listing habits, etc. This is ~70% of app traffic and needs zero hand-written endpoint code — RLS *is* the authorization layer.
-2. **Supabase Edge Functions** — used for anything that is (a) business logic beyond a row insert, (b) talks to a third party (Stripe, Claude, FCM, Cloudflare), or (c) needs the service-role key. These are the "real" API endpoints and are cataloged below.
+1. **Supabase auto-generated PostgREST API** — used directly by clients (via each bounded context's `infrastructure/` repository — see [`docs/13-ddd-architecture.md §13.2`](13-ddd-architecture.md#132-the-layering-inside-every-bounded-context-package)) for straightforward, RLS-protected reads/writes: fetching programs, logging a workout set, listing habits, etc. This is ~70% of app traffic and needs zero hand-written endpoint code — RLS *is* the authorization layer.
+2. **Supabase Edge Functions and Postgres RPC functions** — used for anything that is (a) business logic beyond a row insert, (b) talks to a third party (Stripe, Claude, FCM, Cloudflare), (c) needs the service-role key, or (d) needs column-level (not just row-level) access restriction — e.g. `reception_member_lookup()`, a `SECURITY DEFINER` SQL function callable via PostgREST RPC exactly like any other endpoint (see [Roles & Permissions §12.5](12-roles-and-permissions.md#125-receptions-narrow-surface-by-design)). These are the "real" API endpoints and are cataloged below.
 
-All Edge Functions: TypeScript (Deno), validate input with the shared Zod schemas from `packages/schemas`, return a consistent envelope, and are independently deployable/versionable from the app releases.
+All Edge Functions: TypeScript (Deno), validate input with shared Zod schemas (living in each bounded context's `application/` layer post-restructure), return a consistent envelope, and are independently deployable/versionable from the app releases.
 
 ## 5.2 Auth Flow
 

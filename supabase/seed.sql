@@ -11,11 +11,13 @@ values
   ('Elite Annual', 'elite', 'annual', 49999, 'price_dev_elite_annual', '{"programs": "full", "ai_coach": true, "trainer": true}', true)
 on conflict (stripe_price_id) do nothing;
 
+-- name is `translated_text` (jsonb keyed by locale, 'en' required) — see
+-- docs/11-internationalization.md §11.3.
 insert into exercise_categories (name, slug, icon)
 values
-  ('Boxing Conditioning', 'boxing-conditioning', 'gloves'),
-  ('Strength', 'strength', 'dumbbell'),
-  ('Core', 'core', 'core'),
-  ('Mobility', 'mobility', 'stretch'),
-  ('Cardio', 'cardio', 'heart')
+  ('{"en": "Boxing Conditioning", "ar": "تكييف الملاكمة"}', 'boxing-conditioning', 'gloves'),
+  ('{"en": "Strength", "ar": "القوة"}', 'strength', 'dumbbell'),
+  ('{"en": "Core", "ar": "عضلات البطن"}', 'core', 'core'),
+  ('{"en": "Mobility", "ar": "المرونة"}', 'mobility', 'stretch'),
+  ('{"en": "Cardio", "ar": "القلب"}', 'cardio', 'heart')
 on conflict (slug) do nothing;

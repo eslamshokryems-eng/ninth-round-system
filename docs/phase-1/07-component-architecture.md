@@ -1,5 +1,7 @@
 # 7. Component Architecture (Phase 1)
 
+> **Reference update**: `packages/api-client` (referenced below) was superseded by each bounded context's `application`/`infrastructure` layers — see [`docs/13-ddd-architecture.md`](../13-ddd-architecture.md). A feature component now calls a context's composition-root factory (e.g. `createIdentityModule(client).completeOnboarding`) instead. The presentation-layer principles below (three-layer UI stack, container/view split) are otherwise unchanged.
+
 ## 7.1 Three Layers, Enforced by Import Direction
 
 ```
@@ -11,7 +13,7 @@ An import is only allowed to point **left-to-right** in that chain, never backwa
 1. **`packages/ui/tokens`** — pure data: color/spacing/radius/type-scale constants. No JSX, no framework import. This is what makes "black canvas, white content, gold earned" (per [`docs/06-ui-flow-and-wireframes.md §6.1`](../06-ui-flow-and-wireframes.md#61-design-system-tokens)) a single source of truth instead of a copy-pasted hex code in twelve files.
 2. **`packages/ui/native` and `packages/ui/web`** — dumb, reusable primitives built directly on the tokens: `Button`, `Card`, `GlassPanel`, `Pill`, `TimerRing`, `Sheet`. Every primitive takes explicit props for the states it supports (`variant`, `size`, `disabled`) — no primitive reaches into global state or fetches data.
 3. **`apps/*/src/components`** — app-specific but feature-agnostic composites built from `packages/ui` primitives: `AppHeader`, `TabBar`, `EmptyState`. Still no data-fetching.
-4. **`apps/*/src/features/<name>/components`** — feature components. This is the only layer allowed to call hooks from `packages/api-client` or read from a feature's Zustand store.
+4. **`apps/*/src/features/<name>/components`** — feature components. This is the only layer allowed to call a bounded context's use cases (via its composition-root factory) or read from a feature's Zustand store.
 
 ## 7.2 Container / Presentation Split Within a Feature
 

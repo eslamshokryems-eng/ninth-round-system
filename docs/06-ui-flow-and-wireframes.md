@@ -22,6 +22,13 @@ A visual low-fidelity wireframe board (mobile screens + admin/trainer dashboard 
 
 Design principle: **black is the canvas, white is the content, gold is earned** — gold appears on progress, achievements, and premium/CTA moments, not decoratively everywhere, to keep the "luxury minimal" feel rather than looking gaudy.
 
+## 6.1a RTL/LTR and Responsiveness
+
+Every screen listed in this document must render correctly in both directions and at every supported size — these are not a later pass:
+
+- **RTL/LTR**: components are built with logical properties (`start`/`end`, not `left`/`right`) from the first implementation, per [Internationalization §11.5](11-internationalization.md#115-rtl-layout); a screen is not "done" until it has been checked in Arabic, not just translated.
+- **Responsive**: mobile screens target the actual range of shipping phone sizes (small phones through large phones/foldables) using flex-based layout and safe-area insets, never fixed pixel positioning; the admin/trainer web screens are responsive from a single mobile-first breakpoint set (not a separate "mobile web" design), since reception/admin staff may use a tablet at a front desk as often as a desktop.
+
 ## 6.2 Key User Journeys
 
 ### Onboarding → First Workout

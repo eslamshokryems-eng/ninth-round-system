@@ -4,15 +4,24 @@
 
 - **AuthN**: Supabase Auth issues short-lived JWTs (1hr) + refresh tokens. Providers: email/password (with email verification required before write access beyond onboarding), Google OAuth, Apple Sign-In (mandatory on iOS per App Store Guideline 4.8 since Google login exists).
 - **Password policy**: minimum 10 characters, breached-password check against HaveIBeenPwned range API at signup, Supabase Auth rate-limits login attempts.
-- **AuthZ**: role (`client`/`trainer`/`admin`) is a custom JWT claim, checked in both Postgres RLS policies and Edge Function entry guards — defense in depth, never trust the client's stated role.
+- **AuthZ**: role (`client`/`trainer`/`nutritionist`/`reception`/`admin`/`super_admin` — see [Roles & Permissions](12-roles-and-permissions.md)) is a custom JWT claim, checked in both Postgres RLS policies and Edge Function entry guards — defense in depth, never trust the client's stated role.
 - **Session handling**: refresh tokens stored in Expo SecureStore (mobile, Keychain/Keystore-backed) and httpOnly cookies (web), never in plain AsyncStorage/localStorage.
-- **Optional 2FA (TOTP)** for `admin` and `trainer` roles at launch (higher blast radius per compromised account); rollout to clients considered post-launch.
+- **Optional 2FA (TOTP)** for all staff roles (`trainer`/`nutritionist`/`reception`/`admin`/`super_admin`) at launch (higher blast radius per compromised account than a client account); rollout to clients considered post-launch.
 
 ## 7.2 Row Level Security Strategy
 
-Every table has RLS **enabled by default** (`ENABLE ROW LEVEL SECURITY`), with explicit per-operation policies — no table is ever left with an implicit allow. Pattern used throughout:
+Every table has RLS **enabled by default** (`ENABLE ROW LEVEL SECURITY`), with explicit per-operation policies — no table is ever left with an implicit allow. With six roles instead of three, every policy routes through shared SQL helper functions (`supabase/migrations/20260801000001_extensions_and_enums.sql`) rather than inlining `auth.jwt() ->> 'role'` comparisons — this is what keeps "is this an admin" answerable correctly in one place as the role model grows:
 
 ```sql
+create or replace function auth_role() returns text
+language sql stable as $$ select auth.jwt() ->> 'role'; $$;
+
+create or replace function is_admin() returns boolean
+language sql stable as $$ select auth_role() in ('admin', 'super_admin'); $$;
+
+create or replace function is_staff(roles text[]) returns boolean
+language sql stable as $$ select auth_role() = any(roles) or is_admin(); $$;
+
 -- Example: workout_logs
 alter table workout_logs enable row level security;
 
@@ -20,23 +29,25 @@ create policy "clients read own workout logs"
   on workout_logs for select
   using (auth.uid() = profile_id);
 
-create policy "trainers read assigned clients' logs"
+create policy "staff reads assigned clients' logs"
   on workout_logs for select
   using (
     exists (
-      select 1 from trainer_clients tc
-      where tc.client_id = workout_logs.profile_id
-        and tc.trainer_id = auth.uid()
-        and tc.status = 'active'
+      select 1 from staff_client_assignments sca
+      where sca.client_id = workout_logs.profile_id
+        and sca.staff_id = auth.uid()
+        and sca.status = 'active'
     )
   );
 
 create policy "admins full access"
   on workout_logs for all
-  using ((auth.jwt() ->> 'role') = 'admin');
+  using (is_admin());
 ```
 
-Financial tables (`subscriptions`, `payments`) are **read-only to clients** via RLS; all writes happen exclusively through Edge Functions using the Supabase service-role key after verifying a Stripe webhook signature — a compromised client JWT can never grant itself a subscription.
+Financial tables (`subscriptions`, `payments`) are **read-only to clients** via RLS (reception gets a narrow read of *active* subscriptions only, for check-in); all writes happen exclusively through Edge Functions using the Supabase service-role key after verifying a Stripe webhook signature — a compromised client JWT can never grant itself a subscription. Column-level restriction (reception needs a member's name/photo/active-status but nothing else from `profiles`) is handled by a `SECURITY DEFINER` RPC function rather than a broad table grant — see [Roles & Permissions §12.5](12-roles-and-permissions.md#125-receptions-narrow-surface-by-design) — since RLS itself only controls row visibility, not column visibility.
+
+The one role distinction RLS deliberately does **not** encode is admin vs. super_admin for privilege-escalation actions (granting the admin/super_admin role itself, issuing refunds) — both roles have equal row access via `is_admin()`, and the stricter check (`is_super_admin()` / `Role.canAssignRole` in `packages/identity/domain/role.ts`) is enforced at the application layer instead, since it's a decision about an *action*, not about which rows exist. See [Roles & Permissions §12.3](12-roles-and-permissions.md#123-admin-vs-super-admin--the-actual-distinction).
 
 ## 7.3 Data Protection
 

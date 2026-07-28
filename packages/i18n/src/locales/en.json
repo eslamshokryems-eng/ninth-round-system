@@ -1,0 +1,54 @@
+{
+  "common": {
+    "appName": "9th Round",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "continue": "Continue",
+    "error": {
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "auth": {
+    "welcomeTitle": "Train like it's round nine.",
+    "orContinueWith": "or continue with",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple",
+    "signUp": {
+      "title": "Create your account",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submit": "Sign up",
+      "haveAccount": "Already have an account?"
+    },
+    "logIn": {
+      "title": "Welcome back",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submit": "Log in",
+      "noAccount": "New to 9th Round?"
+    }
+  },
+  "onboarding": {
+    "step": "Step {{current}} of {{total}}",
+    "languagePicker": {
+      "title": "Choose your language",
+      "english": "English",
+      "arabic": "العربية"
+    },
+    "goal": {
+      "question": "What's your main goal?",
+      "weightLoss": "Weight loss / fat burning",
+      "athleticPerformance": "Athletic performance",
+      "generalFitness": "General fitness",
+      "homeWorkout": "Home workouts"
+    },
+    "experience": {
+      "question": "What's your experience level?",
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    }
+  }
+}

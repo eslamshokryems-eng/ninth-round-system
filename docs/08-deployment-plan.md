@@ -33,6 +33,23 @@ Every deploy-to-production job requires a manual approval gate (GitHub Environme
 
 Per Apple/Google policy, digital subscription purchases initiated **inside** the app binary must use StoreKit/Play Billing, not an external payment link. Plan: mobile purchases route through native IAP; web purchases (e.g. from a marketing site or the Trainer/Admin portal) route through Stripe Checkout. A reconciliation Edge Function maps both purchase rails into the single `subscriptions` table so entitlement checks are rail-agnostic (see [Security Plan §7.4](07-security-plan.md#74-payment-security)).
 
+### App Store / Google Play Readiness Checklist
+
+Prepared ahead of the first submission, not discovered during it:
+
+- [ ] **Bundle identifiers reserved**: `com.ninthround.app` on both App Store Connect and Google Play Console (already set in `apps/mobile/app.config.ts`).
+- [ ] **Apple Sign-In** implemented and tested — required the moment Google Sign-In exists (Guideline 4.8), already declared in `app.config.ts` (`usesAppleSignIn: true`, `expo-apple-authentication` plugin).
+- [ ] **Privacy manifest (iOS)**: declare data collection categories (account info, health/fitness data, usage data) and any "required reason" API usage (e.g. UserDefaults) via Expo's privacy manifest support.
+- [ ] **Play Data Safety form**: mirrors the iOS privacy manifest — what's collected (health/fitness metrics, photos, payment info via Stripe/IAP), whether it's shared, whether it's encrypted in transit/at rest.
+- [ ] **Permission usage strings**: camera (progress photos, QR check-in), photo library (progress photos, avatar), notifications — each with a clear, localized (en + ar) purpose string, not a generic default.
+- [ ] **Age rating / content rating questionnaire** completed for both stores (fitness/health category, no mature content).
+- [ ] **Localized store listings**: screenshots, description, and metadata in both English and Arabic — matching the app's actual bilingual support (a store listing in only one language for a bilingual app undersells it and can read as inconsistent to reviewers).
+- [ ] **Export compliance (iOS)**: standard encryption-only declaration (HTTPS/TLS use, no custom cryptography).
+- [ ] **Account deletion**: a self-service "delete my account" path reachable from within the app (Apple Guideline 5.1.1(v) requirement since the app supports account creation) — implements the deletion flow from [Security Plan §7.3](07-security-plan.md#73-data-protection).
+- [ ] **Subscription terms surfaced pre-purchase**: price, billing interval, auto-renewal terms shown before the native purchase sheet, per both stores' subscription guidelines.
+- [ ] **Crash-free and cold-start performance** validated on a low-end device profile before submission, not just a development machine.
+- [ ] **TestFlight / Play Internal Testing sign-off** from at least one reviewer per platform before requesting production review.
+
 ## 8.4 Web Deployment (Admin + Trainer Portal)
 
 - Hosted on **Vercel**: automatic preview deployment per PR (reviewers see a live URL before merge), production deploy on merge to `main`.
@@ -43,7 +60,7 @@ Per Apple/Google policy, digital subscription purchases initiated **inside** the
 
 - All schema changes are plain SQL files in `supabase/migrations/`, generated via `supabase migration new <name>` and reviewed in PR like any other code change — no manual production schema edits through the Supabase Studio UI.
 - Migrations are additive/backwards-compatible by default (add nullable column → backfill → make non-null in a later migration) so a migration can run ahead of a client release without breaking the currently-live app version.
-- `packages/types/supabase.ts` is regenerated (`supabase gen types typescript`) and committed as part of the same PR as the migration, so type errors surface immediately if a client used a column that changed shape.
+- `packages/database-types/src/index.ts` is regenerated (`supabase gen types typescript`) and committed as part of the same PR as the migration, so type errors surface immediately if a client used a column that changed shape — see [DDD Architecture §13.2](13-ddd-architecture.md#132-the-layering-inside-every-bounded-context-package) for why only each context's `infrastructure/` layer is allowed to import it.
 
 ## 8.6 Observability
 

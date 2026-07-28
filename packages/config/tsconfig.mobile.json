@@ -4,7 +4,6 @@
     "jsx": "react-native",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["expo/types"],
     "paths": {
       "@/*": ["../../apps/mobile/src/*"]
     }

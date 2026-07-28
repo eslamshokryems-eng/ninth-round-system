@@ -1,6 +1,8 @@
 # 3. Folder Structure
 
-## 3.1 Monorepo Layout
+> **Superseded by [`docs/13-ddd-architecture.md`](13-ddd-architecture.md).** The `packages/` layout below (one package per *layer*: `domain`, `api-client`, `schemas`, `types`) was replaced by one package per *bounded context* (`packages/identity`, `packages/training`, `packages/nutrition`, …), each internally layered into `domain/`/`application/`/`infrastructure/`, to satisfy the Clean Architecture + DDD and independent-module-scalability requirements. This document is kept for the historical product-architecture record and because the `apps/mobile` and `apps/web` route/feature layout below is still accurate — see `docs/phase-1/01-folder-structure.md` for the current, as-built tree.
+
+## 3.1 Monorepo Layout (original draft — see note above)
 
 Turborepo + pnpm workspaces. One repository, three deployable "apps," shared packages, and the Supabase project definition.
 

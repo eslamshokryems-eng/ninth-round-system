@@ -1,0 +1,16 @@
+{
+  "name": "@9thround/shared-kernel",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "devDependencies": {
+    "@9thround/config": "workspace:*",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

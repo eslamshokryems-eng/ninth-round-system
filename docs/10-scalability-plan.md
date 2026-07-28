@@ -12,6 +12,16 @@ For a fitness-tracking + coaching platform, the bottlenecks in order of likely i
 
 Compute (Edge Functions, Next.js) is the *least* of the concerns — both scale horizontally and automatically on their respective platforms (Deno Deploy under Supabase Edge Functions, Vercel serverless/edge for Next.js) without capacity planning from us.
 
+## 10.1a Module (Bounded-Context) Independence
+
+The package-per-bounded-context split in [`docs/13-ddd-architecture.md`](13-ddd-architecture.md) is what makes "every module independently scalable" concrete rather than aspirational: each of `packages/identity`, `packages/training`, `packages/nutrition`, `packages/tracking`, `packages/billing`, `packages/notifications`, and `packages/ai` owns its own domain/application/infrastructure, with cross-context communication only through the `domain_events` table (never a direct import of another context's internals). Practically, this means:
+
+- **Notifications** (the most likely candidate for its own scaling profile — bursty fan-out, e.g. "1,000 users hit a streak milestone today") can be extracted into its own worker/queue-consuming service later without any other context's code changing, because its Edge Function already only talks to `domain_events`/`push_tokens`/`notifications`, not to another context's tables directly.
+- **AI** can be scaled/rate-limited/cost-capped independently of the rest of the platform, since every other context depends on it only through a port interface (`AIWorkoutRecommendationPort`, etc.) — swapping the underlying provider or adding a queue in front of it touches `packages/ai/infrastructure` alone.
+- A context's database tables can be moved to a dedicated read replica or (in the extreme) a separate schema/database without breaking application code, since nothing outside that context's `infrastructure/` layer knows the table shape exists — only the repository port's interface is a public contract.
+
+This is deliberately not implemented as literal separate services on day one (that would be premature for the current scale) — it's a codebase structure that keeps the *option* open and cheap, which is the actual engineering value of the split.
+
 ## 10.2 Database Scaling
 
 - **Connection pooling**: use Supabase's built-in Supavisor pooler (transaction mode) for all Edge Function / serverless connections — serverless functions open/close connections per invocation, and Postgres has a hard connection ceiling, so pooling is not optional past a few hundred concurrent users.

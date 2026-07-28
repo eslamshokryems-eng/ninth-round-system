@@ -1,6 +1,10 @@
 # 9. Authentication Flow (Phase 1)
 
-Builds on [`docs/05-api-architecture.md §5.2`](../05-api-architecture.md#52-auth-flow) and [`docs/07-security-plan.md §7.1`](../07-security-plan.md#71-authentication--authorization) with the concrete Phase 1 sequences.
+Builds on [`docs/05-api-architecture.md §5.2`](../05-api-architecture.md#52-auth-flow) and [`docs/07-security-plan.md §7.1`](../07-security-plan.md#71-authentication--authorization) with the concrete Phase 1 sequences. Updated for the 6-role model ([Roles & Permissions](../12-roles-and-permissions.md)) and bilingual onboarding ([Internationalization](../11-internationalization.md)): the very first screen is now a language picker, not sign-up, since RTL must be set before anything else renders.
+
+## 9.0 Language Selection (before sign-up)
+
+The app's first screen lets the user choose English or Arabic. This choice is held in local UI state (not yet persisted — there's no profile to attach it to before sign-up) and passed as `preferred_locale` signup metadata the moment the user does sign up, so `handle_new_user()` (`supabase/migrations/20260801000002_profiles_and_trainers.sql`) sets the profile's locale on row creation rather than defaulting to English and requiring a second write. See [Internationalization §11.6](../11-internationalization.md#116-locale-selection--persistence).
 
 ## 9.1 Sign-Up (Email)
 
@@ -11,10 +15,11 @@ sequenceDiagram
     participant Auth as Supabase Auth
     participant DB as Postgres
 
+    U->>App: Choose language (en/ar)
     U->>App: Enter email + password
-    App->>Auth: signUp({ email, password })
+    App->>Auth: signUp({ email, password, data: { preferred_locale } })
     Auth->>Auth: create auth.users row
-    Auth->>DB: trigger handle_new_user() → insert profiles row
+    Auth->>DB: trigger handle_new_user() → insert profiles row (role=client, preferred_locale set)
     Auth-->>App: session (JWT) + "verify your email" state
     App->>App: navigate to Onboarding (email verification is soft-gated —
     Note over App: full write access works pre-verification for onboarding,<br/>but a verified-email check gates checkout in Phase 1)
@@ -48,7 +53,7 @@ Apple Sign-In is mandatory on iOS the moment Google login exists (App Store Guid
 
 ## 9.3 Role Claim Propagation
 
-`profiles.role` (`client` / `trainer` / `admin`) must be readable inside RLS policies and Edge Functions **without an extra DB round-trip per request**. Mechanism: a Supabase Auth Hook (`custom_access_token_hook`, configured at the Supabase project level, not app code) reads `profiles.role` for the authenticating user and mirrors it into a custom JWT claim on every token mint/refresh:
+`profiles.role` (`client` / `trainer` / `nutritionist` / `reception` / `admin` / `super_admin`) must be readable inside RLS policies and Edge Functions **without an extra DB round-trip per request**. Mechanism: a Supabase Auth Hook (`custom_access_token_hook`, configured at the Supabase project level, not app code) reads `profiles.role` for the authenticating user and mirrors it into a custom JWT claim on every token mint/refresh:
 
 ```json
 { "sub": "uuid", "role": "trainer", "exp": 1234567890 }

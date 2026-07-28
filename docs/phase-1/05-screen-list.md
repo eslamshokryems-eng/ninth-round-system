@@ -7,6 +7,7 @@ Every screen Phase 1 ships, grouped by app. Screens for Phase 2+ features (commu
 | # | Screen | Route (Expo Router) | Auth required | Primary data |
 |---|---|---|---|---|
 | 1 | Splash | `app/index.tsx` | no | session check → redirect |
+| 1a | Language picker (en/ar) | `app/(auth)/language.tsx` | no | local UI state only — see [Internationalization §11.6](../11-internationalization.md#116-locale-selection--persistence) |
 | 2 | Sign up | `app/(auth)/sign-up.tsx` | no | — |
 | 3 | Log in | `app/(auth)/log-in.tsx` | no | — |
 | 4 | Onboarding — Goal | `app/(auth)/onboarding/goal.tsx` | yes (new user) | `profiles.goal` |
@@ -28,7 +29,7 @@ Every screen Phase 1 ships, grouped by app. Screens for Phase 2+ features (commu
 | 20 | Manage subscription | `app/profile/subscription.tsx` | yes | `subscriptions` → `create-billing-portal-session` |
 | 21 | Notifications center | `app/profile/notifications.tsx` | yes | `notifications` |
 
-21 screens.
+22 screens (including the language picker).
 
 ## 5.2 Admin Web (`apps/web` — `(admin)` route group)
 
@@ -50,6 +51,6 @@ Phase 1 ships only the admin surface needed to *operate* the MVP (per [`docs/09-
 
 ## 5.3 Total Phase 1 Screen Count
 
-**30 screens** (21 mobile + 9 admin web). Trainer web dashboard ships zero screens in Phase 1 — trainer-assigned content (if any Elite clients exist before Phase 4) is operated by admin directly against the same tables.
+**31 screens** (22 mobile + 9 admin web). Trainer web dashboard ships zero screens in Phase 1 — trainer-assigned content (if any Elite clients exist before Phase 4) is operated by admin directly against the same tables.
 
 Next: [Navigation Flow →](06-navigation-flow.md)

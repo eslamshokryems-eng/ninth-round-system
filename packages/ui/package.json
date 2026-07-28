@@ -9,7 +9,7 @@
     "./web": "./web/index.ts"
   },
   "dependencies": {
-    "@9thround/types": "workspace:*"
+    "@9thround/shared-kernel": "workspace:*"
   },
   "devDependencies": {
     "@9thround/config": "workspace:*",
