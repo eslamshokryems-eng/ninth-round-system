@@ -1,0 +1,11 @@
+{
+  "name": "@9thround/config",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.js",
+  "exports": {
+    "./eslint-preset": "./eslint-preset.mjs",
+    "./tsconfig.mobile.json": "./tsconfig.mobile.json",
+    "./tsconfig.web.json": "./tsconfig.web.json"
+  }
+}

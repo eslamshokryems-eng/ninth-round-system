@@ -1,0 +1,29 @@
+{
+  "name": "@9thround/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@9thround/api-client": "workspace:*",
+    "@9thround/domain": "workspace:*",
+    "@9thround/schemas": "workspace:*",
+    "@9thround/types": "workspace:*",
+    "@9thround/ui": "workspace:*",
+    "next": "^14.2.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "@tanstack/react-query": "^5.51.0",
+    "zustand": "^4.5.0",
+    "tailwindcss": "^3.4.0"
+  },
+  "devDependencies": {
+    "@9thround/config": "workspace:*",
+    "typescript": "^5.5.0"
+  }
+}

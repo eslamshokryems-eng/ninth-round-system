@@ -1,0 +1,33 @@
+{
+  "name": "@9thround/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "build": "expo export",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@9thround/api-client": "workspace:*",
+    "@9thround/domain": "workspace:*",
+    "@9thround/schemas": "workspace:*",
+    "@9thround/types": "workspace:*",
+    "@9thround/ui": "workspace:*",
+    "expo": "~51.0.0",
+    "expo-router": "~3.5.0",
+    "react": "18.2.0",
+    "react-native": "0.74.0",
+    "nativewind": "^4.0.0",
+    "zustand": "^4.5.0",
+    "@tanstack/react-query": "^5.51.0"
+  },
+  "devDependencies": {
+    "@9thround/config": "workspace:*",
+    "@babel/core": "^7.24.0",
+    "typescript": "^5.5.0"
+  }
+}

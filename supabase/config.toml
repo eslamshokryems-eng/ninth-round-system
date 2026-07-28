@@ -1,0 +1,37 @@
+project_id = "9th-round"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["9thround://"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_OAUTH_CLIENT_ID)"
+secret = "env(GOOGLE_OAUTH_SECRET)"
+
+[auth.external.apple]
+enabled = true
+client_id = "env(APPLE_OAUTH_CLIENT_ID)"
+secret = "env(APPLE_OAUTH_SECRET)"
+
+[storage]
+enabled = true
+file_size_limit = "25MiB"

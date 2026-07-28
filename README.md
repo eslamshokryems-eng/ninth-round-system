@@ -3,10 +3,10 @@
 **Premium online personal training platform** — scientific fitness, boxing-inspired interval training, nutrition coaching, AI support, and habit tracking.
 
 - **Founder:** Eslam Shokry
-- **Status:** Pre-development — architecture & planning phase
+- **Status:** Phase 1 (MVP: Core Training & Tracking) — engineering architecture complete, implementation not yet started
 - **Design language:** Black / White / Gold, Apple-quality minimal UI, glassmorphism, motion-first
 
-This repository currently contains the **full product & technical architecture** for 9th Round. No application code has been written yet, by design — the plan below must be reviewed and approved before implementation begins (see [Rules](#rules)).
+This repository contains the **full product & technical architecture** for 9th Round, plus the **Phase 1 engineering architecture**: the real monorepo skeleton, the Phase 1 database schema (as SQL migrations), and detailed API/screen/navigation/component/state/auth specs. No application code (components, screens, hooks, Edge Function logic) has been written yet, by design — see [Rules](#rules).
 
 ## Architecture Documents
 
@@ -24,6 +24,12 @@ This repository currently contains the **full product & technical architecture**
 | 10 | [Scalability Plan](docs/10-scalability-plan.md) | Path to 100,000+ concurrent users |
 
 A visual low-fidelity wireframe board (mobile + admin + trainer screens, in the black/white/gold design language) was shared separately as an interactive artifact.
+
+## Phase 1 Engineering Architecture
+
+Implementation-ready detail for the current phase — see [`docs/phase-1/00-overview.md`](docs/phase-1/00-overview.md) for the full index (folder structure, database schema, ER diagram, API docs, screen list, navigation flow, component architecture, state management, authentication flow, naming conventions, coding standards).
+
+The monorepo skeleton described there already exists in this repo: `apps/mobile`, `apps/web`, `packages/*`, and `supabase/*` (including 7 real Phase 1 SQL migrations in `supabase/migrations/`). Every code-bearing folder holds a `README.md` describing what belongs there and which phase implements it — no feature/business logic has been written.
 
 ## Stack at a Glance
 

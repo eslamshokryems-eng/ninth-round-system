@@ -1,0 +1,5 @@
+{
+  "extends": "@9thround/config/tsconfig.web.json",
+  "include": ["app", "src", "next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

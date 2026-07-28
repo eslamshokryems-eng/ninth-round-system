@@ -1,0 +1,17 @@
+{
+  "name": "@9thround/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "main": "./client.ts",
+  "dependencies": {
+    "@9thround/types": "workspace:*",
+    "@9thround/schemas": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0",
+    "@tanstack/react-query": "^5.51.0"
+  },
+  "devDependencies": {
+    "@9thround/config": "workspace:*",
+    "typescript": "^5.5.0"
+  }
+}

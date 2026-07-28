@@ -1,0 +1,5 @@
+{
+  "extends": "@9thround/config/tsconfig.mobile.json",
+  "include": ["app", "src", "*.ts", "*.tsx"],
+  "exclude": ["node_modules"]
+}
