@@ -11,10 +11,6 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   icon: "./assets/icon.png",
-  splash: {
-    image: "./assets/splash.png",
-    backgroundColor: "#0B0B0C",
-  },
   ios: {
     bundleIdentifier: "com.ninthround.app",
     supportsTablet: false,
@@ -27,7 +23,17 @@ const config: ExpoConfig = {
       backgroundColor: "#0B0B0C",
     },
   },
-  plugins: ["expo-router", "expo-apple-authentication"],
+  plugins: [
+    "expo-router",
+    "expo-apple-authentication",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/splash.png",
+        backgroundColor: "#0B0B0C",
+      },
+    ],
+  ],
   extra: {
     eas: {
       projectId: "REPLACE_WITH_EAS_PROJECT_ID",

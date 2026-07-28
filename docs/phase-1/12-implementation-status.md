@@ -53,14 +53,29 @@ Per explicit instruction, the timer itself is **not implemented** — only prepa
 
 ## 12.3 Known Gaps / Honest Caveats
 
-- **No live Supabase project exists yet.** Every screen above is verified to *bundle* correctly (`expo export`, both iOS and Android — a real 1415-module Hermes bundle) and to typecheck against a hand-authored `database-types` placeholder matching the migrations exactly. None of it has executed against a real Postgres instance or been visually verified in a running simulator — there is no simulator/display available in this environment. **This is the single biggest thing to verify before treating this slice as done**: run `pnpm --filter @9thround/mobile dev` against a real Expo dev client, on a real or simulated device, with a provisioned Supabase project's credentials in `.env`.
+- **No live (cloud) Supabase project exists yet — this environment cannot create one.** This sandbox's network policy blocks `api.supabase.com` (and, separately, Expo's and ngrok's tunnel-relay domains) at the proxy layer; Docker's daemon isn't running here either, so a local Supabase stack (`supabase start`) isn't possible from within this session. Creating the actual cloud project is a step only you can do, from your own browser — see [Local Setup](13-local-setup.md).
+- **The migrations themselves have been verified against a real Postgres engine, though.** See §12.5 below — this is new since the last update and materially reduces the "untested SQL" risk that previously existed.
+- **Expo Go compatibility was a real, previously-undetected blocker — now fixed.** The app originally targeted Expo SDK 51 (mid-2024). Expo Go only supports the current SDK; as of this update the current stable release is **SDK 57**, and the whole toolchain (React 19.2, React Native 0.86, Reanimated 4.5 + `react-native-worklets`, Expo Router 57, NativeWind 4.2) has been upgraded to match, using the exact version matrix from `expo`'s own bundled `bundledNativeModules.json` (the Expo CLI's own `expo install --fix` tool needed network access this sandbox doesn't have, so the matrix was read directly from that file instead). Re-verified with a full `expo export` (iOS + Android, 1849 modules) **and** by starting the real Metro dev server and successfully fetching the actual dev bundle over HTTP (`/node_modules/expo-router/entry.bundle?platform=ios&dev=true` → 200, 11MB, real Hermes-ready JS) — the strongest verification achievable without a physical device or simulator, neither of which exists in this environment.
+- **No physical device/simulator exists in this environment**, so no screen has been visually inspected running. Bundle-level and dev-server-level verification (above) catch import errors, missing native modules, and config mistakes — they cannot catch a misaligned layout, a color that doesn't read well, or a gesture that feels wrong. That first real look happens when you run [Local Setup](13-local-setup.md) yourself.
 - **RTL manual QA needed**: the welcome carousel's horizontal `ScrollView` + `scrollTo` is a known rough edge for RTL on Android (horizontal scroll direction doesn't always mirror automatically); the language-picker's "restart to apply" flow for `I18nManager.forceRTL` has never been exercised on a device. Both need hands-on verification in Arabic.
 - **SecureStore session size**: the Supabase auth session storage adapter (`apps/mobile/src/lib/secure-store-adapter.ts`) doesn't chunk large values; flagged as a follow-up if a JWT with several custom claims ever approaches SecureStore's per-key limit.
 - **Google/Apple sign-in**: `expo-apple-authentication` is a declared dependency but no OAuth screen/flow has been built yet — email/password only, so far.
 - **Placeholder brand assets**: `apps/mobile/assets/{icon,splash,adaptive-icon,favicon}.png` are solid-color placeholders generated for the build pipeline to have valid files, not real designed assets.
 
-## 12.4 Next Slice (proposed)
+## 12.5 Database Verification (embedded Postgres, no Docker/cloud required)
 
-1. Provision a real (free-tier) Supabase project for `development`; apply the migrations; run `pnpm db:types` for real; replace the hand-authored `packages/database-types`.
-2. Run the app in a real Expo dev client and visually verify every screen in both English and Arabic, both themes' contrast, and the RTL caveats above.
-3. Build out the `training` context for real (Program/Workout/Exercise entities, the `TimerSession` aggregate, and the actual 9-Round Timer UI) — the natural next feature given Dashboard Home already has a "your first program is on its way" placeholder waiting for it.
+Since neither a cloud Supabase project nor a local Docker-based one is reachable from this sandbox, the 7 migrations + seed data were instead run against `@electric-sql/pglite` — a real Postgres engine compiled to WASM, run in-process via Node, with a minimal stand-in for Supabase's `auth` schema (a `users` table and the real, publicly-documented `auth.uid()`/`auth.jwt()` function bodies). Findings:
+
+- All 7 migrations and `seed.sql` applied with **zero errors**, in order, against a real Postgres parser/executor — the first time any of this SQL had ever actually run.
+- `handle_new_user()` was confirmed to auto-create a `profiles` row the instant a row is inserted into (the stand-in) `auth.users`, with no manual insert needed.
+- RLS was confirmed to actually scope a query correctly: a session with `auth.uid()` set to one user's ID and a `FORCE ROW LEVEL SECURITY` table correctly returned 0 rows for another user's data.
+- One real bug was found and fixed in the test harness's own `auth.uid()` stub (a missing `::uuid` cast) — zero bugs were found in the actual migration files themselves.
+
+This does not replace running against a real Supabase project (Supabase's actual Postgres has extensions/roles/behaviors beyond this minimal stand-in), but it is strong, real evidence the schema is structurally sound before you ever point it at your own project.
+
+## 12.6 Next Slice (proposed)
+
+1. Follow [Local Setup](13-local-setup.md): create a real Supabase project, push the migrations for real, fill in `.env`, and run the app on a physical iPhone via Expo Go — the first real visual/interaction verification this project will have had.
+2. Once running, revisit the RTL caveats above (Arabic welcome-carousel scroll direction, restart-to-apply flow) with the real device in hand.
+3. Run `pnpm db:types` against the real project and replace the hand-authored `packages/database-types` placeholder with genuinely generated types.
+4. Build out the `training` context for real (Program/Workout/Exercise entities, the `TimerSession` aggregate, and the actual 9-Round Timer UI) — the natural next feature given Dashboard Home already has a "your first program is on its way" placeholder waiting for it.

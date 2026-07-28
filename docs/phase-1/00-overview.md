@@ -5,9 +5,9 @@ This folder is the implementation-ready architecture for **Phase 1: MVP — Core
 **What exists in the repo right now** (see [12-implementation-status.md](12-implementation-status.md) for the exhaustive, continuously-maintained ledger):
 
 - Full monorepo skeleton (`apps/mobile`, `apps/web`, `packages/*`, `supabase/*`), restructured around bounded contexts per [`docs/13-ddd-architecture.md`](../13-ddd-architecture.md).
-- Phase 1 database schema as real SQL migrations in `supabase/migrations/`, covering the 6-role model, bilingual content, and AI-readiness tables — see [02-database-schema.md](02-database-schema.md).
-- **The Identity bounded context is fully implemented and tested**: real domain entities/value objects, application use cases, and a Supabase-backed repository, with 14 passing unit tests using in-memory fakes — the reference implementation every other context follows. Every other context (`training`, `nutrition`, `tracking`, `billing`, `notifications`, `ai`) is still a Clean Architecture skeleton awaiting its turn.
-- No mobile/web screens exist yet — every route folder still holds only a `README.md`.
+- Phase 1 database schema as real SQL migrations in `supabase/migrations/`, covering the 6-role model, bilingual content, and AI-readiness tables — see [02-database-schema.md](02-database-schema.md), verified end-to-end against a real Postgres engine (§13 of Implementation Status).
+- **The Identity bounded context is fully implemented and tested**, covering registration, login, forgot-password, onboarding, and role assignment (41 tests). Every other context (`nutrition`, `tracking`, `billing`, `notifications`, `ai`) is still a skeleton; `training` has the 9th Round Timer's architecture prepared but not implemented.
+- **16 real mobile screens** exist and are runnable: language selection through Dashboard Home, targeting **Expo SDK 57** (upgraded from an initial SDK 51 build so the app actually loads in the current Expo Go app). See [13-local-setup.md](13-local-setup.md) to run it.
 
 **Documents in this folder:**
 
@@ -25,6 +25,7 @@ This folder is the implementation-ready architecture for **Phase 1: MVP — Core
 | 10 | [File Naming Conventions](10-file-naming-conventions.md) | How files/folders are named |
 | 11 | [Coding Standards](11-coding-standards.md) | Lint/format/test/commit/PR rules |
 | 12 | [Implementation Status](12-implementation-status.md) | What's real, tested, and pending — right now |
+| 13 | [Local Setup](13-local-setup.md) | Run the app on a real iPhone via Expo Go, step by step |
 
 **Explicitly out of scope for this pass** (per the phase plan): AI Coach endpoints, community feed, challenges/leaderboard, chat-with-coach, QR check-in, referral program, and the full Trainer/Admin dashboards. Their folders exist in the skeleton (marked with their target phase) but are not designed in implementation detail here — that happens when their phase starts, per [`docs/09-development-phases.md`](../09-development-phases.md).
 

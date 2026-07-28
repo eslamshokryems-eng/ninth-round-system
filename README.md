@@ -3,10 +3,10 @@
 **Premium online personal training platform** — scientific fitness, boxing-inspired interval training, nutrition coaching, AI support, and habit tracking. Bilingual (English/Arabic, LTR/RTL) and multi-role (Client, Trainer, Nutritionist, Reception, Admin, Super Admin) from day one.
 
 - **Founder:** Eslam Shokry
-- **Status:** Phase 1 (MVP: Core Training & Tracking) — the first mobile experience (language selection through Dashboard Home) is built and tested. See [Implementation Status](docs/phase-1/12-implementation-status.md) for exactly what's built and tested right now.
+- **Status:** Phase 1 (MVP: Core Training & Tracking) — the first mobile experience (language selection through Dashboard Home) is built, tested, and runnable. **→ [Run it on your iPhone with Expo Go](docs/phase-1/13-local-setup.md)**
 - **Design language:** Black / White / Gold, Apple-quality minimal UI, glassmorphism, motion-first
 
-This repository contains the full product & technical architecture for 9th Round, the Phase 1 engineering architecture (real monorepo, real database schema, detailed specs), and a real, tested mobile app slice: 16 screens from language selection through onboarding to Dashboard Home.
+This repository contains the full product & technical architecture for 9th Round, the Phase 1 engineering architecture (real monorepo, real database schema, detailed specs), and a real, tested, runnable mobile app slice: 16 screens from language selection through onboarding to Dashboard Home, targeting **Expo SDK 57** (current Expo Go compatibility).
 
 ## Architecture Documents
 
@@ -30,11 +30,11 @@ A visual low-fidelity wireframe board (mobile + admin + trainer screens, in the 
 
 ## Phase 1 Engineering Architecture
 
-Implementation-ready detail for the current phase — see [`docs/phase-1/00-overview.md`](docs/phase-1/00-overview.md) for the full index.
+Implementation-ready detail for the current phase — see [`docs/phase-1/00-overview.md`](docs/phase-1/00-overview.md) for the full index. Want to actually run the app? Start with [Local Setup](docs/phase-1/13-local-setup.md).
 
 ## What's Actually Built (not just designed)
 
-- **16 real mobile screens** (`apps/mobile/app`): language selection, an animated welcome carousel, registration, login, forgot password, 4-step onboarding (profile setup, fitness goal, training experience, body metrics), Dashboard Home, and a 5-tab shell. Dark-theme-first, bilingual (English/Arabic with RTL/LTR), responsive via flexbox. Verified with a real `expo export` bundle (iOS and Android) — not yet visually verified in a running simulator (none available in this environment).
+- **16 real mobile screens** (`apps/mobile/app`): language selection, an animated welcome carousel, registration, login, forgot password, 4-step onboarding (profile setup, fitness goal, training experience, body metrics), Dashboard Home, and a 5-tab shell. Dark-theme-first, bilingual (English/Arabic with RTL/LTR), responsive via flexbox. Targets **Expo SDK 57** — verified with a real `expo export` bundle (iOS and Android, 1849 modules) and a live Metro dev server actually serving the bundle over HTTP; not yet visually verified on a physical device (none available in this environment — see [Local Setup](docs/phase-1/13-local-setup.md) to do that yourself).
 - **`packages/identity`** — a complete Clean Architecture bounded context covering registration, login, forgot-password, onboarding, and role assignment. **41 automated tests pass.**
 - **`packages/ui/native`** — the design system these screens are built from: `Text`, `Button`, `TextField`, `Card`, `ScreenContainer`, `ProgressDots`, `OptionCard`, `Divider`, `IconButton`.
 - **`packages/training`** — the 9th Round Timer's architecture is prepared (a validated `RoundPlan` value object, a `TimerPhase` type) without implementing the timer itself, per instruction.
