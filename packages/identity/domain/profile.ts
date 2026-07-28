@@ -1,13 +1,9 @@
 import { AggregateRoot, createDomainEvent } from "@9thround/shared-kernel";
 import type { LocaleCode } from "@9thround/shared-kernel";
 import { Role, type UserRoleName } from "./role";
+import type { BodyMetrics } from "./body-metrics";
 
-export type FitnessGoal =
-  | "weight_loss"
-  | "fat_burning"
-  | "athletic_performance"
-  | "general_fitness"
-  | "home_workout";
+export type FitnessGoal = "weight_loss" | "muscle_gain" | "general_fitness" | "athletic_performance";
 export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
 
 export interface ProfileProps {
@@ -16,6 +12,10 @@ export interface ProfileProps {
   avatarUrl: string | null;
   role: UserRoleName;
   preferredLocale: LocaleCode;
+  gender: "female" | "male" | "unspecified" | null;
+  dateOfBirth: Date | null;
+  heightCm: number | null;
+  weightKg: number | null;
   goal: FitnessGoal | null;
   experienceLevel: ExperienceLevel | null;
   onboardingCompletedAt: Date | null;
@@ -24,11 +24,9 @@ export interface ProfileProps {
 
 /**
  * The Identity context's aggregate root. Deliberately narrower than the
- * `profiles` table row (see @9thround/database-types) — e.g. it has no
- * `date_of_birth`/`gender` here because no Phase 1 use case needs to reason
- * about them as behavior; they round-trip through the infrastructure mapper
- * untouched. A field only earns a place on the entity when domain logic
- * needs to read or change it. See docs/13-ddd-architecture.md.
+ * `profiles` table row (see @9thround/database-types) where it can afford to
+ * be — a field only earns a place here once domain logic needs to read or
+ * change it, not just round-trip it. See docs/13-ddd-architecture.md.
  */
 export class Profile extends AggregateRoot<string> {
   private constructor(private props: ProfileProps) {
@@ -67,6 +65,22 @@ export class Profile extends AggregateRoot<string> {
     return this.props.experienceLevel;
   }
 
+  get gender(): "female" | "male" | "unspecified" | null {
+    return this.props.gender;
+  }
+
+  get dateOfBirth(): Date | null {
+    return this.props.dateOfBirth;
+  }
+
+  get heightCm(): number | null {
+    return this.props.heightCm;
+  }
+
+  get weightKg(): number | null {
+    return this.props.weightKg;
+  }
+
   /** Snapshot for persistence mapping — infrastructure only, never UI. */
   toProps(): Readonly<ProfileProps> {
     return { ...this.props };
@@ -77,15 +91,39 @@ export class Profile extends AggregateRoot<string> {
   }
 
   /**
-   * Onboarding is complete the moment goal + experience level are both set —
-   * this is the one business rule that makes "has this client finished
-   * onboarding" a derived fact instead of a client-settable flag, which is
-   * what the root layout guard (docs/phase-1/06-navigation-flow.md §6.1)
-   * relies on to route between (auth)/onboarding and (tabs).
+   * "User Profile Setup" (docs/phase-1/05-screen-list.md) — the display
+   * name step of onboarding. Split out from `completeOnboarding` because a
+   * user can change their display name later from Settings, long after
+   * onboarding is done; onboarding completion is a one-time event, renaming
+   * is not.
    */
-  completeOnboarding(input: { goal: FitnessGoal; experienceLevel: ExperienceLevel }): void {
+  setFullName(fullName: string): void {
+    const trimmed = fullName.trim();
+    if (trimmed.length === 0) {
+      throw new Error("Full name cannot be empty.");
+    }
+    this.props.fullName = trimmed;
+  }
+
+  /**
+   * Onboarding is complete the moment goal, experience level, and body
+   * metrics are all set — this is the one business rule that makes "has
+   * this client finished onboarding" a derived fact instead of a
+   * client-settable flag, which is what the root layout guard
+   * (docs/phase-1/06-navigation-flow.md §6.1) relies on to route between
+   * (auth)/onboarding and (tabs).
+   */
+  completeOnboarding(input: {
+    goal: FitnessGoal;
+    experienceLevel: ExperienceLevel;
+    bodyMetrics: BodyMetrics;
+  }): void {
     this.props.goal = input.goal;
     this.props.experienceLevel = input.experienceLevel;
+    this.props.gender = input.bodyMetrics.gender;
+    this.props.dateOfBirth = input.bodyMetrics.dateOfBirth;
+    this.props.heightCm = input.bodyMetrics.heightCm;
+    this.props.weightKg = input.bodyMetrics.weightKg;
     this.props.onboardingCompletedAt = new Date();
 
     this.addDomainEvent(

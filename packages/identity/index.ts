@@ -1,11 +1,19 @@
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import { CompleteOnboardingUseCase } from "./application/complete-onboarding";
 import { AssignStaffRoleUseCase } from "./application/assign-staff-role";
+import { SignUpUseCase } from "./application/sign-up";
+import { SignInUseCase } from "./application/sign-in";
+import { RequestPasswordResetUseCase } from "./application/request-password-reset";
 import { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
+import { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 
 export { Profile, type ProfileProps, type FitnessGoal, type ExperienceLevel } from "./domain/profile";
 export { Role, USER_ROLES, type UserRoleName } from "./domain/role";
+export { BodyMetrics, ageFromDateOfBirth, dateOfBirthFromAge, type Gender } from "./domain/body-metrics";
+export { Email } from "./domain/email";
+export { Password } from "./domain/password";
 export type { ProfileRepository } from "./domain/profile-repository";
+export type { AuthPort, AuthSession } from "./domain/auth-port";
 export {
   CompleteOnboardingUseCase,
   type CompleteOnboardingInput,
@@ -16,13 +24,20 @@ export {
   type AssignStaffRoleInput,
   type AssignStaffRoleOutput,
 } from "./application/assign-staff-role";
+export { SignUpUseCase, type SignUpInput } from "./application/sign-up";
+export { SignInUseCase, type SignInInput } from "./application/sign-in";
+export {
+  RequestPasswordResetUseCase,
+  type RequestPasswordResetInput,
+} from "./application/request-password-reset";
 export { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
+export { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 
 /**
  * The Identity context's composition root: wires the Supabase-backed
- * repository to its use cases so an app only ever imports this factory, not
- * the individual infrastructure/application pieces. Each app calls this
- * once at startup with its own Supabase client instance — see
+ * repository/auth-port to its use cases so an app only ever imports this
+ * factory, not the individual infrastructure/application pieces. Each app
+ * calls this once at startup with its own Supabase client instance — see
  * apps/mobile/src/lib/composition-root.ts. This is what makes the context
  * "independently scalable" in practice (requirement 9): everything it needs
  * to run is assembled from one entry point and could be lifted into its own
@@ -30,8 +45,13 @@ export { SupabaseProfileRepository } from "./infrastructure/supabase-profile-rep
  */
 export function createIdentityModule(client: TypedSupabaseClient) {
   const profileRepository = new SupabaseProfileRepository(client);
+  const authPort = new SupabaseAuthPort(client);
   return {
     completeOnboarding: new CompleteOnboardingUseCase(profileRepository),
     assignStaffRole: new AssignStaffRoleUseCase(profileRepository),
+    signUp: new SignUpUseCase(authPort),
+    signIn: new SignInUseCase(authPort),
+    requestPasswordReset: new RequestPasswordResetUseCase(authPort),
+    signOut: () => authPort.signOut(),
   };
 }

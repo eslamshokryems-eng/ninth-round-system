@@ -15,12 +15,8 @@ export type UserRole = "client" | "trainer" | "nutritionist" | "reception" | "ad
 export type StaffRole = "trainer" | "nutritionist" | "reception";
 export type AssignmentContext = "training" | "nutrition";
 export type LocaleCode = "en" | "ar";
-export type FitnessGoal =
-  | "weight_loss"
-  | "fat_burning"
-  | "athletic_performance"
-  | "general_fitness"
-  | "home_workout";
+export type FitnessGoal = "weight_loss" | "muscle_gain" | "general_fitness" | "athletic_performance";
+export type Gender = "female" | "male" | "unspecified";
 export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
 export type TrainerClientStatus = "active" | "paused" | "ended";
 
@@ -30,8 +26,10 @@ export interface ProfileRow {
   avatar_url: string | null;
   role: UserRole;
   preferred_locale: LocaleCode;
-  gender: string | null;
+  gender: Gender | null;
   date_of_birth: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
   goal: FitnessGoal | null;
   experience_level: ExperienceLevel | null;
   onboarding_completed_at: string | null;

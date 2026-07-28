@@ -16,8 +16,15 @@ create table profiles (
   avatar_url text,
   role user_role not null default 'client',
   preferred_locale locale_code not null default 'en',
-  gender text,
+  gender gender,
   date_of_birth date,
+  -- Denormalized "current" body metrics captured during onboarding. Full
+  -- weight *history* is owned by the tracking context's `weight_logs` table
+  -- once it's implemented — see docs/phase-1/12-implementation-status.md.
+  -- This column becomes a cached "latest known weight" convenience read at
+  -- that point, not the source of truth.
+  height_cm numeric(5, 1),
+  weight_kg numeric(5, 2),
   goal fitness_goal,
   experience_level experience_level,
   onboarding_completed_at timestamptz,

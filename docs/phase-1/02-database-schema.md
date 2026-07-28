@@ -38,7 +38,8 @@ Migrations are additive and ordered so each file's foreign keys only ever point 
 | `staff_role` | `trainer`, `nutritionist`, `reception` (subset of `user_role` that gets a `staff_profiles` row) |
 | `assignment_context` | `training`, `nutrition` |
 | `locale_code` | `en`, `ar` |
-| `fitness_goal` | `weight_loss`, `fat_burning`, `athletic_performance`, `general_fitness`, `home_workout` |
+| `fitness_goal` | `weight_loss`, `muscle_gain`, `general_fitness`, `athletic_performance` — matches the Fitness Goal Selection screen exactly |
+| `gender` | `female`, `male`, `unspecified` |
 | `experience_level` | `beginner`, `intermediate`, `advanced` |
 | `trainer_client_status` | `active`, `paused`, `ended` |
 | `subscription_tier` | `free`, `plus`, `elite` |

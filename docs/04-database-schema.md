@@ -70,9 +70,11 @@ erDiagram
 | avatar_url | text | Supabase Storage path |
 | role | enum: `client`, `trainer`, `nutritionist`, `reception`, `admin`, `super_admin` | Drives RLS and app routing — see [Roles & Permissions](12-roles-and-permissions.md) |
 | preferred_locale | enum: `en`, `ar` | Drives RTL/LTR + notification language — see [Internationalization](11-internationalization.md) |
-| gender | text nullable | For female-specific program tracks |
-| date_of_birth | date nullable | |
-| goal | enum: `weight_loss`, `fat_burning`, `athletic_performance`, `general_fitness`, `home_workout` | Drives onboarding recommendations |
+| gender | enum: `female`, `male`, `unspecified` nullable | Collected on the Body Metrics onboarding screen |
+| date_of_birth | date nullable | Collected as "age" in the UI, converted to an approximate date of birth — see `packages/identity/domain/body-metrics.ts` |
+| height_cm | numeric(5,1) nullable | Collected on the Body Metrics onboarding screen |
+| weight_kg | numeric(5,2) nullable | Denormalized "current weight"; full history lives in `weight_logs` once the tracking context ships |
+| goal | enum: `weight_loss`, `muscle_gain`, `general_fitness`, `athletic_performance` | Drives onboarding recommendations — matches the Fitness Goal Selection screen exactly |
 | experience_level | enum: `beginner`, `intermediate`, `advanced` | |
 | onboarding_completed_at | timestamptz nullable | |
 | referral_code | text unique | auto-generated |

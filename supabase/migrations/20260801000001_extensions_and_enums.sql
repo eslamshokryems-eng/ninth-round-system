@@ -25,13 +25,16 @@ create type assignment_context as enum ('training', 'nutrition');
 
 create type locale_code as enum ('en', 'ar');
 
+-- Matches the 4 options on the Fitness Goal Selection screen exactly —
+-- see docs/phase-1/05-screen-list.md.
 create type fitness_goal as enum (
   'weight_loss',
-  'fat_burning',
-  'athletic_performance',
+  'muscle_gain',
   'general_fitness',
-  'home_workout'
+  'athletic_performance'
 );
+
+create type gender as enum ('female', 'male', 'unspecified');
 
 create type experience_level as enum ('beginner', 'intermediate', 'advanced');
 create type trainer_client_status as enum ('active', 'paused', 'ended');
