@@ -7,7 +7,7 @@ This folder is the implementation-ready architecture for **Phase 1: MVP — Core
 - Full monorepo skeleton (`apps/mobile`, `apps/web`, `packages/*`, `supabase/*`), restructured around bounded contexts per [`docs/13-ddd-architecture.md`](../13-ddd-architecture.md).
 - Phase 1 database schema as real SQL migrations in `supabase/migrations/`, covering the 6-role model, bilingual content, and AI-readiness tables — see [02-database-schema.md](02-database-schema.md), verified end-to-end against a real Postgres engine (§13 of Implementation Status).
 - **The Identity bounded context is fully implemented and tested**, covering registration, login, forgot-password, onboarding, and role assignment (41 tests). Every other context (`nutrition`, `tracking`, `billing`, `notifications`, `ai`) is still a skeleton; `training` has the 9th Round Timer's architecture prepared but not implemented.
-- **16 real mobile screens** exist and are runnable: language selection through Dashboard Home, targeting **Expo SDK 57** (upgraded from an initial SDK 51 build so the app actually loads in the current Expo Go app). See [13-local-setup.md](13-local-setup.md) to run it.
+- **16 real mobile screens** exist and are runnable: language selection through Dashboard Home, targeting **Expo SDK 54** (upgraded from an initial SDK 51 build, then corrected from an over-eager SDK 57 upgrade once real-device testing showed the App Store's Expo Go client only supports up to SDK 54 so far). See [13-local-setup.md](13-local-setup.md) to run it.
 
 **Documents in this folder:**
 
