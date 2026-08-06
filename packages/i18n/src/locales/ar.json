@@ -135,6 +135,20 @@
       "profile": "الملف الشخصي"
     }
   },
+  "reception": {
+    "dashboard": {
+      "title": "لوحة تحكم الاستقبال",
+      "activeMembers": "الأعضاء النشطون",
+      "newMembersToday": "جديد اليوم",
+      "expiringToday": "تنتهي اليوم",
+      "expiringThisWeek": "تنتهي هذا الأسبوع",
+      "expiredMemberships": "منتهية",
+      "dailyRevenue": "إيرادات اليوم",
+      "monthlyRevenue": "هذا الشهر",
+      "loadError": "تعذر تحميل لوحة التحكم.",
+      "refresh": "تحديث"
+    }
+  },
   "comingSoon": {
     "train": {
       "title": "برامجك التدريبية قادمة قريبًا",

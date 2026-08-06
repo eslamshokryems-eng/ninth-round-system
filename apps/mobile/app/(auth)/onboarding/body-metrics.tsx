@@ -67,7 +67,9 @@ export default function OnboardingBodyMetricsScreen() {
       return;
     }
 
-    setSignedIn({ profileId, fullName, isOnboarded: true });
+    // Public sign-up always creates a `member` — staff accounts are
+    // provisioned separately (assignStaffRole), not through this flow.
+    setSignedIn({ profileId, fullName, role: "member", isOnboarded: true });
     useOnboardingStore.getState().reset();
     router.replace("/(tabs)");
   }

@@ -41,6 +41,7 @@ export function useAuthBootstrap(): void {
       setSignedIn({
         profileId: result.value.profileId,
         fullName: result.value.fullName,
+        role: result.value.role,
         isOnboarded: result.value.isOnboarded,
       });
       setLocale(result.value.preferredLocale);

@@ -14,15 +14,16 @@ Maintained continuously as code lands, per the requirement to generate technical
 | `packages/ui` — `native/` | ✅ Implemented — `Text`, `Button`, `TextField`, `Card`, `ScreenContainer`, `ProgressDots`, `OptionCard`, `Divider`, `IconButton`/`BackButton` | — (presentational; exercised via the mobile app's bundle-level smoke test, see below) |
 | `packages/ui` — `web/` | 📋 Not started | — |
 | `packages/config` | ✅ Implemented | — |
-| **`packages/identity`** | ✅ Implemented — the reference bounded context, now covering registration, login, forgot-password, onboarding (name/goal/experience/body-metrics), and role assignment | **41 passing** (domain, application, and infrastructure-mapping tests, all using in-memory fakes — zero database) |
+| **`packages/identity`** | ✅ Implemented — the reference bounded context, now covering registration, login, forgot-password, onboarding (name/goal/experience/body-metrics), and role assignment against the 5-role model (member/coach/reception/branch_manager/super_admin) | **39 passing** (domain, application, and infrastructure-mapping tests, all using in-memory fakes — zero database) |
+| **`packages/reception`** | 🟡 Reception Dashboard done — see [§14](14-reception-membership.md); Member/Membership/Payment CRUD not yet built | 3 passing |
 | **`packages/training`** | 🟡 Partially prepared — see [§12.2](#122-9th-round-timer-architecture-prep) | 5 passing (`RoundPlan` value object) |
 | `packages/nutrition`, `packages/tracking`, `packages/billing`, `packages/notifications` | 📋 Skeleton only | — |
 | `packages/ai` | 📋 Skeleton only (Phase 3) | — |
-| **`apps/mobile`** | ✅ 16 real screens shipped — see [§12.1](#121-mobile-screens-shipped) | Typechecks + lints clean; verified with a real `expo export` bundle (see below) |
+| **`apps/mobile`** | ✅ 16 member-facing screens + the Reception Dashboard — see [§12.1](#121-mobile-screens-shipped) and [§14](14-reception-membership.md) | Typechecks + lints clean; verified with a real `expo export` bundle (see below) |
 | `apps/web` | 📋 Not started — zero `.tsx` files | — |
 | `supabase/functions/*` | 📋 Contract documented in each function's README; zero `index.ts` implementations | — |
 
-**Total: 53 automated tests, all passing** (`pnpm test` via Turborepo). **9 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
+**Total: 56 automated tests, all passing** (`pnpm test` via Turborepo). **10 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
 
 ## 12.1 Mobile Screens Shipped
 

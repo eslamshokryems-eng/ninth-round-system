@@ -1,5 +1,6 @@
 import { createSupabaseClient, type TypedSupabaseClient } from "@9thround/supabase-client";
 import { createIdentityModule } from "@9thround/identity";
+import { createReceptionModule } from "@9thround/reception";
 import { env } from "./env";
 import { secureStoreAdapter } from "./secure-store-adapter";
 
@@ -37,4 +38,11 @@ let identityModule: ReturnType<typeof createIdentityModule> | null = null;
 export function getIdentityModule(): ReturnType<typeof createIdentityModule> {
   identityModule ??= createIdentityModule(getSupabaseClient());
   return identityModule;
+}
+
+let receptionModule: ReturnType<typeof createReceptionModule> | null = null;
+
+export function getReceptionModule(): ReturnType<typeof createReceptionModule> {
+  receptionModule ??= createReceptionModule(getSupabaseClient());
+  return receptionModule;
 }

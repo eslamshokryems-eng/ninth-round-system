@@ -48,9 +48,9 @@ All five new tables have RLS enabled. Access is branch-scoped via `is_branch_sta
 | `branches` / `members` / `memberships` / `membership_payments` / `membership_alerts` tables + RLS | ✅ Done, tested |
 | `reception_dashboard_stats` view | ✅ Done, tested |
 | `generate_membership_alerts()` | ✅ Done, tested — **not yet scheduled** (needs pg_cron or an Edge Function cron, a later ops step) |
-| Reception Dashboard screen (app) | 📋 Not started — next slice |
+| `packages/reception` bounded context (Clean Architecture — domain/application/infrastructure) | ✅ Done — `GetDashboardStatsUseCase` + `SupabaseDashboardRepository`, 3 tests |
+| Reception Dashboard screen (app) | ✅ Done — `app/(reception)/index.tsx`, the 7 stats as `StatCard` tiles (new shared `packages/ui/native/stat-card.tsx`), pull-to-refresh, sign-out. Staff roles (reception/branch_manager/super_admin) route here instead of the member tabs — `app/index.tsx`'s routing gate and `useAuthStore` now carry `role`. |
 | Member CRUD screens (app) | 📋 Not started — next slice |
 | One-click renewal use case | 📋 Not started — depends on Member CRUD existing first |
-| `packages/reception` bounded context (Clean Architecture — domain/application/infrastructure) | 📋 Not started — next slice builds this alongside the Dashboard/CRUD screens |
 
-Per the project's phased-delivery instruction, this slice stops here (database schema, tables, RLS — steps 1-3) for review before building the Reception Dashboard and Member CRUD UI (steps 4-5).
+Per the project's phased-delivery instruction, this slice (Reception Dashboard) is done and ready for you to run/test before the next slice (Member CRUD).

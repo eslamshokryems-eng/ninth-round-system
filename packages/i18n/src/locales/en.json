@@ -135,6 +135,20 @@
       "profile": "Profile"
     }
   },
+  "reception": {
+    "dashboard": {
+      "title": "Reception Dashboard",
+      "activeMembers": "Active Members",
+      "newMembersToday": "New Today",
+      "expiringToday": "Expiring Today",
+      "expiringThisWeek": "Expiring This Week",
+      "expiredMemberships": "Expired",
+      "dailyRevenue": "Today's Revenue",
+      "monthlyRevenue": "This Month",
+      "loadError": "Couldn't load the dashboard.",
+      "refresh": "Refresh"
+    }
+  },
   "comingSoon": {
     "train": {
       "title": "Your programs are on their way",

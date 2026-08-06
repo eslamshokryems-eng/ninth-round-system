@@ -17,6 +17,7 @@
     "@9thround/supabase-client": "workspace:*",
     "@9thround/i18n": "workspace:*",
     "@9thround/identity": "workspace:*",
+    "@9thround/reception": "workspace:*",
     "@9thround/training": "workspace:*",
     "@9thround/nutrition": "workspace:*",
     "@9thround/tracking": "workspace:*",
