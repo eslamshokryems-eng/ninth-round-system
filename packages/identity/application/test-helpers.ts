@@ -14,7 +14,7 @@ export function buildProfile(overrides: Partial<ProfileProps> = {}): Profile {
     id: "profile-1",
     fullName: "Test User",
     avatarUrl: null,
-    role: "client",
+    role: "member",
     preferredLocale: "en",
     gender: null,
     dateOfBirth: null,

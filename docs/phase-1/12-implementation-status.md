@@ -75,7 +75,11 @@ This does not replace running against a real Supabase project (Supabase's actual
 
 ## 12.6 Next Slice (proposed)
 
-1. Follow [Local Setup](13-local-setup.md): create a real Supabase project, push the migrations for real, fill in `.env`, and run the app on a physical iPhone via Expo Go — the first real visual/interaction verification this project will have had.
-2. Once running, revisit the RTL caveats above (Arabic welcome-carousel scroll direction, restart-to-apply flow) with the real device in hand.
-3. Run `pnpm db:types` against the real project and replace the hand-authored `packages/database-types` placeholder with genuinely generated types.
-4. Build out the `training` context for real (Program/Workout/Exercise entities, the `TimerSession` aggregate, and the actual 9-Round Timer UI) — the natural next feature given Dashboard Home already has a "your first program is on its way" placeholder waiting for it.
+The product has pivoted from a public consumer app to a private club-management platform — see [Reception & Membership System](14-reception-membership.md) for the full picture. That slice's database work (role model v2, `branches`/`members`/`memberships`/`membership_payments`/`membership_alerts`, RLS, the dashboard view) is done and tested; the remaining Reception & Membership work is next:
+
+1. Push the two new migrations (`20260806000001_role_model_v2.sql`, `20260806000002_reception_membership.sql`) to the real Supabase project via `supabase db push`.
+2. Build the `packages/reception` bounded context (Clean Architecture — domain/application/infrastructure), the Reception Dashboard screen, and Member CRUD screens.
+3. Build the one-click renewal use case.
+4. Wire up `generate_membership_alerts()` to a daily schedule (pg_cron or an Edge Function cron) — written to be idempotent, not yet scheduled.
+5. Run `pnpm db:types` against the real project and replace the hand-authored `packages/database-types` placeholder with genuinely generated types (now includes the Reception & Membership tables too).
+6. Once the Reception module is complete, revisit the consumer-app RTL caveats above and the `training` context (Program/Workout/Exercise entities, the `TimerSession` aggregate, the 9-Round Timer UI) as later phases.

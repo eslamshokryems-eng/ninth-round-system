@@ -11,8 +11,8 @@
  * like these rows.
  */
 
-export type UserRole = "client" | "trainer" | "nutritionist" | "reception" | "admin" | "super_admin";
-export type StaffRole = "trainer" | "nutritionist" | "reception";
+export type UserRole = "member" | "coach" | "reception" | "branch_manager" | "super_admin";
+export type StaffRole = "coach" | "reception";
 export type AssignmentContext = "training" | "nutrition";
 export type LocaleCode = "en" | "ar";
 export type FitnessGoal = "weight_loss" | "muscle_gain" | "general_fitness" | "athletic_performance";
@@ -35,6 +35,7 @@ export interface ProfileRow {
   onboarding_completed_at: string | null;
   referral_code: string;
   referred_by: string | null;
+  branch_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +60,92 @@ export interface StaffClientAssignmentRow {
   context: AssignmentContext;
   status: TrainerClientStatus;
   assigned_at: string;
+}
+
+// --- 9th Round Reception & Membership System (docs/phase-1/14-reception-membership.md) ---
+
+export type MembershipType = "monthly" | "quarterly" | "semi_annual" | "annual" | "custom";
+export type MembershipStatus = "active" | "expired" | "cancelled";
+export type MembershipPaymentStatus = "paid" | "partial" | "unpaid";
+export type MembershipPaymentMethod = "cash" | "visa" | "instapay" | "vodafone_cash";
+export type MembershipAlertType = "expiring_7_days" | "expiring_3_days" | "expiring_today" | "expired";
+
+export interface BranchRow {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MemberRow {
+  id: string;
+  branch_id: string;
+  member_code: string;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  gender: Gender | null;
+  date_of_birth: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  address: string | null;
+  notes: string | null;
+  profile_image_url: string | null;
+  linked_profile_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MembershipRow {
+  id: string;
+  member_id: string;
+  branch_id: string;
+  membership_type: MembershipType;
+  start_date: string;
+  end_date: string;
+  price: number;
+  discount: number;
+  final_price: number;
+  payment_status: MembershipPaymentStatus;
+  status: MembershipStatus;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MembershipPaymentRow {
+  id: string;
+  membership_id: string;
+  payment_date: string;
+  amount: number;
+  payment_method: MembershipPaymentMethod;
+  reference_number: string | null;
+  notes: string | null;
+  received_by: string | null;
+  created_at: string;
+}
+
+export interface MembershipAlertRow {
+  id: string;
+  membership_id: string;
+  alert_type: MembershipAlertType;
+  alert_date: string;
+  is_acknowledged: boolean;
+  created_at: string;
+}
+
+export interface ReceptionDashboardStatsRow {
+  active_members: number;
+  new_members_today: number;
+  expiring_today: number;
+  expiring_this_week: number;
+  expired_memberships: number;
+  daily_revenue: number;
+  monthly_revenue: number;
 }
 
 // Shape (Tables/Views/Functions/Enums/CompositeTypes, and Relationships per
@@ -86,8 +173,46 @@ export interface Database {
         Update: Partial<StaffClientAssignmentRow>;
         Relationships: [];
       };
+      branches: {
+        Row: BranchRow;
+        Insert: Partial<BranchRow> & Pick<BranchRow, "name">;
+        Update: Partial<BranchRow>;
+        Relationships: [];
+      };
+      members: {
+        Row: MemberRow;
+        Insert: Partial<MemberRow> & Pick<MemberRow, "branch_id" | "full_name" | "phone">;
+        Update: Partial<MemberRow>;
+        Relationships: [];
+      };
+      memberships: {
+        Row: MembershipRow;
+        Insert: Partial<MembershipRow> &
+          Pick<MembershipRow, "member_id" | "branch_id" | "membership_type" | "start_date" | "end_date" | "price">;
+        Update: Partial<MembershipRow>;
+        Relationships: [];
+      };
+      membership_payments: {
+        Row: MembershipPaymentRow;
+        Insert: Partial<MembershipPaymentRow> &
+          Pick<MembershipPaymentRow, "membership_id" | "amount" | "payment_method">;
+        Update: Partial<MembershipPaymentRow>;
+        Relationships: [];
+      };
+      membership_alerts: {
+        Row: MembershipAlertRow;
+        Insert: Partial<MembershipAlertRow> &
+          Pick<MembershipAlertRow, "membership_id" | "alert_type" | "alert_date">;
+        Update: Partial<MembershipAlertRow>;
+        Relationships: [];
+      };
     };
-    Views: Record<string, never>;
+    Views: {
+      reception_dashboard_stats: {
+        Row: ReceptionDashboardStatsRow;
+        Relationships: [];
+      };
+    };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -5,7 +5,7 @@ import { InMemoryProfileRepository, buildProfile } from "./test-helpers";
 describe("GetCurrentProfileUseCase", () => {
   it("returns a plain DTO reflecting the profile's current state", async () => {
     const repo = new InMemoryProfileRepository();
-    repo.seed(buildProfile({ id: "profile-1", role: "trainer", preferredLocale: "ar" }));
+    repo.seed(buildProfile({ id: "profile-1", role: "coach", preferredLocale: "ar" }));
     const useCase = new GetCurrentProfileUseCase(repo);
 
     const result = await useCase.execute({ profileId: "profile-1" });
@@ -14,7 +14,7 @@ describe("GetCurrentProfileUseCase", () => {
     expect(result.isOk && result.value).toEqual({
       profileId: "profile-1",
       fullName: "Test User",
-      role: "trainer",
+      role: "coach",
       preferredLocale: "ar",
       isOnboarded: false,
     });

@@ -1,5 +1,7 @@
 # 12. Roles & Permissions
 
+> **Superseded role list, kept for historical/rationale context.** As of the Reception & Membership System slice, the platform is a private club-management product and the role model is **Member, Coach, Reception, Branch Manager, Super Admin** — see [`docs/phase-1/14-reception-membership.md §14.1`](phase-1/14-reception-membership.md#141-role-model-v2) for the authoritative current mapping and rationale (`client`→`member`, `trainer`+`nutritionist`→`coach`, `admin`→`branch_manager`). The *shared-staff-model rationale* (§12.2) and the *two-tier-admin-split rationale* (§12.3) below still apply exactly as written, just under the new names — that reasoning didn't change, only the labels did.
+
 9th Round is multi-role from day one: **Client, Trainer, Nutritionist, Reception, Admin, Super Admin**. This document is the authoritative permission matrix; RLS policies (`supabase/migrations/`) and the `Role` domain value object (`packages/identity/domain/role.ts`) are both implementations of what's specified here — neither is the source of truth on its own.
 
 ## 12.1 The Six Roles

@@ -6,7 +6,7 @@ const row: ProfileRow = {
   id: "profile-1",
   full_name: "Eslam Shokry",
   avatar_url: null,
-  role: "client",
+  role: "member",
   preferred_locale: "ar",
   gender: "male",
   date_of_birth: "1998-03-15",
@@ -17,6 +17,7 @@ const row: ProfileRow = {
   onboarding_completed_at: "2026-07-28T10:00:00.000Z",
   referral_code: "abc123",
   referred_by: null,
+  branch_id: null,
   created_at: "2026-07-01T00:00:00.000Z",
   updated_at: "2026-07-28T10:00:00.000Z",
 };

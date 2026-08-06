@@ -8,7 +8,7 @@ function buildProfile() {
     id: "profile-1",
     fullName: null,
     avatarUrl: null,
-    role: "client",
+    role: "member",
     preferredLocale: "en",
     gender: null,
     dateOfBirth: null,
@@ -83,9 +83,9 @@ describe("Profile", () => {
 
   it("assignRole delegates to the acting Role's canAssignRole rule", () => {
     const profile = buildProfile();
-    expect(() => profile.assignRole("admin", Role.of("admin"))).toThrow();
+    expect(() => profile.assignRole("branch_manager", Role.of("branch_manager"))).toThrow();
 
-    profile.assignRole("trainer", Role.of("admin"));
-    expect(profile.role.name).toBe("trainer");
+    profile.assignRole("coach", Role.of("branch_manager"));
+    expect(profile.role.name).toBe("coach");
   });
 });

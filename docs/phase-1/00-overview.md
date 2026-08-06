@@ -26,6 +26,7 @@ This folder is the implementation-ready architecture for **Phase 1: MVP — Core
 | 11 | [Coding Standards](11-coding-standards.md) | Lint/format/test/commit/PR rules |
 | 12 | [Implementation Status](12-implementation-status.md) | What's real, tested, and pending — right now |
 | 13 | [Local Setup](13-local-setup.md) | Run the app on a real iPhone via Expo Go, step by step |
+| 14 | [Reception & Membership System](14-reception-membership.md) | The private club-management pivot: role model v2, members/memberships/payments schema |
 
 **Explicitly out of scope for this pass** (per the phase plan): AI Coach endpoints, community feed, challenges/leaderboard, chat-with-coach, QR check-in, referral program, and the full Trainer/Admin dashboards. Their folders exist in the skeleton (marked with their target phase) but are not designed in implementation detail here — that happens when their phase starts, per [`docs/09-development-phases.md`](../09-development-phases.md).
 
