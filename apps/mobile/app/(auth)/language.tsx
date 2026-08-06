@@ -2,7 +2,7 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
-import { ScreenContainer, Text, Button, OptionCard } from "@9thround/ui/native";
+import { ScreenContainer, Text, Button, OptionCard, Logo } from "@9thround/ui/native";
 import type { LocaleCode } from "@9thround/shared-kernel";
 import { useLocaleStore } from "../../src/lib/locale-store";
 import { applyRtlForLocale } from "../../src/lib/apply-rtl";
@@ -36,8 +36,8 @@ export default function LanguageScreen() {
   return (
     <ScreenContainer>
       <View className="flex-1 justify-center gap-8">
-        <View className="items-center gap-2">
-          <Text variant="display">{t("common.appName")}</Text>
+        <View className="items-center">
+          <Logo width={260} />
           <Text variant="body" color="muted">
             {t("onboarding.languagePicker.title")}
           </Text>

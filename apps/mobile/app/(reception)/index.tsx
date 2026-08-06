@@ -3,8 +3,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
 import type { DashboardStats } from "@9thround/reception";
-import { Button, IconButton, Text } from "@9thround/ui/native";
-import { StatCard } from "@9thround/ui/native";
+import { Button, IconButton, Logo, StatCard, Text } from "@9thround/ui/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthStore } from "../../src/features/auth/store";
 import { getIdentityModule, getReceptionModule } from "../../src/lib/composition-root";
@@ -65,7 +64,10 @@ export default function ReceptionDashboardScreen() {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void handleRefresh()} />}
       >
         <View className="flex-row items-center justify-between">
-          <Text variant="display">{t("reception.dashboard.title")}</Text>
+          <View className="flex-row items-center gap-3">
+            <Logo variant="emblem" width={36} />
+            <Text variant="display">{t("reception.dashboard.title")}</Text>
+          </View>
           <IconButton name="log-out-outline" onPress={() => void handleSignOut()} disabled={isSigningOut} />
         </View>
 

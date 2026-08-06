@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Dimensions, Pressable, ScrollView, View, type NativeSyntheticEvent, type NativeScrollEvent } from "react-native";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
-import { Button, ProgressDots, ScreenContainer, Text } from "@9thround/ui/native";
+import { Button, Logo, ProgressDots, ScreenContainer, Text } from "@9thround/ui/native";
 
 const { width } = Dimensions.get("window");
 
@@ -94,9 +94,7 @@ function Slide({
   return (
     <View style={{ width }} className="items-center justify-center gap-4 px-6">
       <Animated.View style={animatedStyle} className="items-center gap-4">
-        <View className="h-24 w-24 items-center justify-center rounded-pill bg-gold/10 border border-gold/30">
-          <Text style={{ fontSize: 40 }}>🥊</Text>
-        </View>
+        <Logo variant="emblem" width={96} />
         <Text variant="display" style={{ textAlign: "center" }}>
           {t(titleKey)}
         </Text>

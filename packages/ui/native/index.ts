@@ -3,6 +3,7 @@ export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from ".
 export { TextField, type TextFieldProps } from "./text-field";
 export { Card, type CardProps } from "./card";
 export { StatCard, type StatCardProps } from "./stat-card";
+export { Logo, type LogoProps } from "./logo";
 export { ScreenContainer, type ScreenContainerProps } from "./screen-container";
 export { ProgressDots, type ProgressDotsProps } from "./progress-dots";
 export { OptionCard, type OptionCardProps } from "./option-card";
