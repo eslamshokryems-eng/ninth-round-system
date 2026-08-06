@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, ScrollView, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import type { MemberSearchResult } from "@9thround/reception";
 import { BackButton, Button, Card, IconButton, Text, TextField } from "@9thround/ui/native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,8 +10,9 @@ import { getReceptionModule } from "../../src/lib/composition-root";
 /**
  * "Membership Registration" (docs/phase-1/14-reception-membership.md §14.5)
  * — search by member ID/phone/name, and the entry point to "+ New
- * Membership". Search is live against the real database (no mock data);
- * results are read-only here — a member-detail/edit screen is a later slice.
+ * Membership". Search is live against the real database (no mock data); a
+ * result card opens the member detail/edit screen, and its renew icon
+ * jumps straight to the one-click renewal flow.
  */
 export default function MembershipScreen() {
   const { t } = useTranslation();
@@ -87,30 +88,39 @@ function MemberResultCard({ member }: { member: MemberSearchResult }) {
   const statusLabel = deriveStatusLabel(member.activeMembershipStatus, member.activeMembershipEndDate, t);
 
   return (
-    <Card className="gap-1">
-      <View className="flex-row items-center justify-between">
-        <Text variant="title">{member.fullName}</Text>
-        <Text variant="caption" className={statusLabel.className}>
-          {statusLabel.text}
-        </Text>
-      </View>
-      <View className="flex-row items-center justify-between">
-        <Text variant="body" color="muted">
-          {member.phone} · {member.memberCode}
-        </Text>
-        <IconButton
-          name="refresh"
-          size={18}
-          accessibilityLabel={t("reception.membership.renewAction")}
-          onPress={() =>
-            router.push({
-              pathname: "/(reception)/renew-membership",
-              params: { memberId: member.memberId, fullName: member.fullName },
-            })
-          }
-        />
-      </View>
-    </Card>
+    <Pressable
+      onPress={() =>
+        router.push({
+          pathname: "/(reception)/member-detail",
+          params: { memberId: member.memberId },
+        })
+      }
+    >
+      <Card className="gap-1">
+        <View className="flex-row items-center justify-between">
+          <Text variant="title">{member.fullName}</Text>
+          <Text variant="caption" className={statusLabel.className}>
+            {statusLabel.text}
+          </Text>
+        </View>
+        <View className="flex-row items-center justify-between">
+          <Text variant="body" color="muted">
+            {member.phone} · {member.memberCode}
+          </Text>
+          <IconButton
+            name="refresh"
+            size={18}
+            accessibilityLabel={t("reception.membership.renewAction")}
+            onPress={() =>
+              router.push({
+                pathname: "/(reception)/renew-membership",
+                params: { memberId: member.memberId, fullName: member.fullName },
+              })
+            }
+          />
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 

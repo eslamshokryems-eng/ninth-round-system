@@ -157,6 +157,7 @@
       "statusActive": "نشطة",
       "statusExpiringSoon": "تنتهي قريبًا",
       "statusExpired": "منتهية",
+      "statusCancelled": "ملغاة",
       "statusNoMembership": "لا توجد عضوية بعد",
       "section": {
         "member": "بيانات العضو",
@@ -166,8 +167,12 @@
       "receiptNumberLabel": "رقم الإيصال",
       "fullNameLabel": "الاسم الكامل",
       "phoneLabel": "رقم الهاتف",
+      "emailLabel": "البريد الإلكتروني (اختياري)",
       "dateOfBirthLabel": "تاريخ الميلاد",
       "nationalIdLabel": "الرقم القومي (اختياري)",
+      "emergencyContactNameLabel": "اسم جهة الاتصال في حالات الطوارئ",
+      "emergencyContactPhoneLabel": "هاتف جهة الاتصال في حالات الطوارئ",
+      "addressLabel": "العنوان",
       "membershipTypeLabel": "نوع العضوية",
       "priceLabel": "السعر",
       "discountLabel": "الخصم",
@@ -187,6 +192,10 @@
       "renewAction": "تجديد",
       "renewSuccessTitle": "تم تجديد العضوية",
       "renewSuccessSubtitle": "العضوية الجديدة سارية حتى {{date}}.",
+      "memberDetailTitle": "بيانات العضو",
+      "memberDetailSaved": "تم حفظ التغييرات.",
+      "membershipHistoryTitle": "سجل العضويات",
+      "membershipHistoryEmpty": "لا يوجد سجل عضويات بعد.",
       "error": {
         "fullNameRequired": "أدخل الاسم الكامل للعضو.",
         "phoneRequired": "أدخل رقم الهاتف.",
@@ -194,7 +203,8 @@
         "invalidPrice": "لا يمكن أن يكون السعر بالسالب.",
         "invalidDiscount": "يجب أن يكون الخصم بين 0 والسعر.",
         "phoneAlreadyRegistered": "رقم الهاتف هذا مسجل بالفعل لعضو آخر.",
-        "receiptNumberTaken": "تم استخدام رقم الإيصال هذا من قبل."
+        "receiptNumberTaken": "تم استخدام رقم الإيصال هذا من قبل.",
+        "memberNotFound": "العضو غير موجود."
       }
     }
   },

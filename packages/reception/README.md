@@ -28,11 +28,13 @@ members-vs-profiles split).
   row, inserts the new period (extending from the current end date if it
   hasn't lapsed yet, or from today otherwise), and records the payment,
   atomically. Reached from a member's search result.
+- **Member Detail / Edit** (`GetMemberDetailUseCase`, `UpdateMemberUseCase`)
+  — a member's full profile plus their complete membership history (every
+  period, not just the current one search surfaces), and an edit form for
+  the profile fields. Reached by tapping a member's search result.
 
 ## What's planned next
 
-- A member detail/edit screen and its backing use cases
-  (`UpdateMemberUseCase`, full membership history for one member).
 - A `Member`/`Membership` domain entity once there's real behavior to model
   beyond what the database already enforces via constraints — the current
   use cases are thin validate-then-delegate layers, matching

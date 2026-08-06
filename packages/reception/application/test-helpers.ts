@@ -8,6 +8,10 @@ import type { MemberSearchRepository } from "../domain/member-search-repository"
 import type { MemberSearchResult } from "../domain/member-search-result";
 import type { RenewalRepository } from "../domain/renewal-repository";
 import type { RenewMembershipInput, RenewMembershipOutput } from "../domain/renewal";
+import type { MemberDetailRepository } from "../domain/member-detail-repository";
+import type { MemberDetail } from "../domain/member-detail";
+import type { UpdateMemberRepository } from "../domain/update-member-repository";
+import type { UpdateMemberInput } from "../domain/update-member";
 
 export function buildDashboardStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
@@ -123,4 +127,64 @@ export function fakeRenewalRepository(output: Partial<RenewMembershipOutput> = {
       ...output,
     }),
   );
+}
+
+export function buildMemberDetail(overrides: Partial<MemberDetail> = {}): MemberDetail {
+  return {
+    memberId: "member-1",
+    memberCode: "9RA1B2C3",
+    fullName: "Ahmed Test",
+    phone: "+201000000001",
+    email: null,
+    gender: "male",
+    dateOfBirth: "1995-01-01",
+    nationalId: null,
+    emergencyContactName: null,
+    emergencyContactPhone: null,
+    address: null,
+    notes: null,
+    membershipHistory: [],
+    ...overrides,
+  };
+}
+
+export class FakeMemberDetailRepository implements MemberDetailRepository {
+  public lastMemberId: string | null = null;
+  constructor(private result: Result<MemberDetail>) {}
+
+  async getById(memberId: string): Promise<Result<MemberDetail>> {
+    this.lastMemberId = memberId;
+    return this.result;
+  }
+}
+
+export function fakeMemberDetailRepository(overrides: Partial<MemberDetail> = {}): FakeMemberDetailRepository {
+  return new FakeMemberDetailRepository(ok(buildMemberDetail(overrides)));
+}
+
+export function buildUpdateMemberInput(overrides: Partial<UpdateMemberInput> = {}): UpdateMemberInput {
+  return {
+    memberId: "member-1",
+    fullName: "Ahmed Test",
+    phone: "+201000000001",
+    email: null,
+    gender: "male",
+    dateOfBirth: "1995-01-01",
+    nationalId: null,
+    emergencyContactName: null,
+    emergencyContactPhone: null,
+    address: null,
+    notes: null,
+    ...overrides,
+  };
+}
+
+export class FakeUpdateMemberRepository implements UpdateMemberRepository {
+  public lastInput: UpdateMemberInput | null = null;
+  constructor(private result: Result<void> = ok(undefined)) {}
+
+  async update(input: UpdateMemberInput): Promise<Result<void>> {
+    this.lastInput = input;
+    return this.result;
+  }
 }

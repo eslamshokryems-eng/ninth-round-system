@@ -21,6 +21,7 @@ const ERROR_CODE_TO_I18N_KEY: Record<string, string> = {
   INVALID_DISCOUNT: "reception.membership.error.invalidDiscount",
   PHONE_ALREADY_REGISTERED: "reception.membership.error.phoneAlreadyRegistered",
   RECEIPT_NUMBER_TAKEN: "reception.membership.error.receiptNumberTaken",
+  MEMBER_NOT_FOUND: "reception.membership.error.memberNotFound",
 };
 
 export function translateErrorCode(code: string): string {

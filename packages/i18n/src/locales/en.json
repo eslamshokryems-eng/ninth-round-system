@@ -157,6 +157,7 @@
       "statusActive": "Active",
       "statusExpiringSoon": "Expiring Soon",
       "statusExpired": "Expired",
+      "statusCancelled": "Cancelled",
       "statusNoMembership": "No membership yet",
       "section": {
         "member": "Member Details",
@@ -166,8 +167,12 @@
       "receiptNumberLabel": "Receipt Number",
       "fullNameLabel": "Full Name",
       "phoneLabel": "Mobile Number",
+      "emailLabel": "Email (optional)",
       "dateOfBirthLabel": "Date of Birth",
       "nationalIdLabel": "National ID (optional)",
+      "emergencyContactNameLabel": "Emergency Contact Name",
+      "emergencyContactPhoneLabel": "Emergency Contact Phone",
+      "addressLabel": "Address",
       "membershipTypeLabel": "Membership Type",
       "priceLabel": "Price",
       "discountLabel": "Discount",
@@ -187,6 +192,10 @@
       "renewAction": "Renew",
       "renewSuccessTitle": "Membership Renewed",
       "renewSuccessSubtitle": "New membership runs until {{date}}.",
+      "memberDetailTitle": "Member Details",
+      "memberDetailSaved": "Changes saved.",
+      "membershipHistoryTitle": "Membership History",
+      "membershipHistoryEmpty": "No membership history yet.",
       "error": {
         "fullNameRequired": "Enter the member's full name.",
         "phoneRequired": "Enter a mobile number.",
@@ -194,7 +203,8 @@
         "invalidPrice": "Price cannot be negative.",
         "invalidDiscount": "Discount must be between 0 and the price.",
         "phoneAlreadyRegistered": "This phone number is already registered to another member.",
-        "receiptNumberTaken": "This receipt number has already been used."
+        "receiptNumberTaken": "This receipt number has already been used.",
+        "memberNotFound": "Member not found."
       }
     }
   },
