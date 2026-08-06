@@ -23,12 +23,14 @@ members-vs-profiles split).
 - **Member Search** (`SearchMembersUseCase`) — live lookup by name, phone,
   or member code (no mock data — a query under 2 characters returns empty
   rather than an unscoped scan).
+- **Membership Renewal** (`RenewMembershipUseCase`) — one-click renewal via
+  the `renew_membership()` RPC: closes out the member's current `active`
+  row, inserts the new period (extending from the current end date if it
+  hasn't lapsed yet, or from today otherwise), and records the payment,
+  atomically. Reached from a member's search result.
 
 ## What's planned next
 
-- `RenewMembershipUseCase` (one-click renewal — computes the new period
-  from the membership type, closes out the old `active` row, inserts the
-  new one, and records the payment atomically).
 - A member detail/edit screen and its backing use cases
   (`UpdateMemberUseCase`, full membership history for one member).
 - A `Member`/`Membership` domain entity once there's real behavior to model

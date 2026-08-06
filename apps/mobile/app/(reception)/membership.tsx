@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, View } from "react-native";
 import type { MemberSearchResult } from "@9thround/reception";
-import { BackButton, Button, Card, Text, TextField } from "@9thround/ui/native";
+import { BackButton, Button, Card, IconButton, Text, TextField } from "@9thround/ui/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getReceptionModule } from "../../src/lib/composition-root";
 
@@ -94,9 +94,22 @@ function MemberResultCard({ member }: { member: MemberSearchResult }) {
           {statusLabel.text}
         </Text>
       </View>
-      <Text variant="body" color="muted">
-        {member.phone} · {member.memberCode}
-      </Text>
+      <View className="flex-row items-center justify-between">
+        <Text variant="body" color="muted">
+          {member.phone} · {member.memberCode}
+        </Text>
+        <IconButton
+          name="refresh"
+          size={18}
+          accessibilityLabel={t("reception.membership.renewAction")}
+          onPress={() =>
+            router.push({
+              pathname: "/(reception)/renew-membership",
+              params: { memberId: member.memberId, fullName: member.fullName },
+            })
+          }
+        />
+      </View>
     </Card>
   );
 }

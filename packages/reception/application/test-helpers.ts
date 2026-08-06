@@ -6,6 +6,8 @@ import type { RegistrationRepository } from "../domain/registration-repository";
 import type { RegisterMembershipInput, RegisterMembershipOutput } from "../domain/registration";
 import type { MemberSearchRepository } from "../domain/member-search-repository";
 import type { MemberSearchResult } from "../domain/member-search-result";
+import type { RenewalRepository } from "../domain/renewal-repository";
+import type { RenewMembershipInput, RenewMembershipOutput } from "../domain/renewal";
 
 export function buildDashboardStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
@@ -86,4 +88,39 @@ export class FakeMemberSearchRepository implements MemberSearchRepository {
 
 export function fakeMemberSearchRepository(results: MemberSearchResult[] = []): FakeMemberSearchRepository {
   return new FakeMemberSearchRepository(ok(results));
+}
+
+export function buildRenewMembershipInput(overrides: Partial<RenewMembershipInput> = {}): RenewMembershipInput {
+  return {
+    memberId: "member-1",
+    membershipTypeId: "type-1",
+    receiptNumber: "RCPT-0002",
+    price: 500,
+    discount: 0,
+    paymentMethod: "cash",
+    notes: null,
+    ...overrides,
+  };
+}
+
+export class FakeRenewalRepository implements RenewalRepository {
+  public lastInput: RenewMembershipInput | null = null;
+  constructor(private result: Result<RenewMembershipOutput>) {}
+
+  async renew(input: RenewMembershipInput): Promise<Result<RenewMembershipOutput>> {
+    this.lastInput = input;
+    return this.result;
+  }
+}
+
+export function fakeRenewalRepository(output: Partial<RenewMembershipOutput> = {}): FakeRenewalRepository {
+  return new FakeRenewalRepository(
+    ok({
+      membershipId: "membership-2",
+      membershipNumber: "9R-000002",
+      startDate: "2026-08-06",
+      endDate: "2026-09-05",
+      ...output,
+    }),
+  );
 }

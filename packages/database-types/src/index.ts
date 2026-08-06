@@ -261,6 +261,18 @@ export interface Database {
         };
         Returns: { member_id: string; membership_id: string; membership_number: string }[];
       };
+      renew_membership: {
+        Args: {
+          p_member_id: string;
+          p_membership_type_id: string;
+          p_receipt_number: string;
+          p_price: number;
+          p_discount: number;
+          p_payment_method: MembershipPaymentMethod;
+          p_notes: string | null;
+        };
+        Returns: { membership_id: string; membership_number: string; start_date: string; end_date: string }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

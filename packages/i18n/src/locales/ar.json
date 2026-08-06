@@ -183,6 +183,10 @@
       "save": "حفظ العضوية",
       "successTitle": "تم إنشاء العضوية",
       "successSubtitle": "عضوية {{name}} نشطة الآن.",
+      "renewTitle": "تجديد العضوية",
+      "renewAction": "تجديد",
+      "renewSuccessTitle": "تم تجديد العضوية",
+      "renewSuccessSubtitle": "العضوية الجديدة سارية حتى {{date}}.",
       "error": {
         "fullNameRequired": "أدخل الاسم الكامل للعضو.",
         "phoneRequired": "أدخل رقم الهاتف.",

@@ -183,6 +183,10 @@
       "save": "Save Membership",
       "successTitle": "Membership Created",
       "successSubtitle": "{{name}}'s membership is active.",
+      "renewTitle": "Renew Membership",
+      "renewAction": "Renew",
+      "renewSuccessTitle": "Membership Renewed",
+      "renewSuccessSubtitle": "New membership runs until {{date}}.",
       "error": {
         "fullNameRequired": "Enter the member's full name.",
         "phoneRequired": "Enter a mobile number.",
