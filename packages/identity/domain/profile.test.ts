@@ -18,6 +18,7 @@ function buildProfile() {
     experienceLevel: null,
     onboardingCompletedAt: null,
     referralCode: "abc123",
+    branchId: null,
   });
 }
 

@@ -13,6 +13,7 @@ export interface GetCurrentProfileOutput {
   role: UserRoleName;
   preferredLocale: LocaleCode;
   isOnboarded: boolean;
+  branchId: string | null;
 }
 
 /**
@@ -41,6 +42,7 @@ export class GetCurrentProfileUseCase
       role: profile.role.name,
       preferredLocale: profile.preferredLocale,
       isOnboarded: profile.isOnboarded,
+      branchId: profile.branchId,
     });
   }
 }

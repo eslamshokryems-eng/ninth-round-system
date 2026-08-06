@@ -17,6 +17,7 @@ describe("GetCurrentProfileUseCase", () => {
       role: "coach",
       preferredLocale: "ar",
       isOnboarded: false,
+      branchId: null,
     });
   });
 

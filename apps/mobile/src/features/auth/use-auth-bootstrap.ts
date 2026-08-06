@@ -42,6 +42,7 @@ export function useAuthBootstrap(): void {
         profileId: result.value.profileId,
         fullName: result.value.fullName,
         role: result.value.role,
+        branchId: result.value.branchId,
         isOnboarded: result.value.isOnboarded,
       });
       setLocale(result.value.preferredLocale);

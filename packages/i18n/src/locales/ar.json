@@ -147,6 +147,51 @@
       "monthlyRevenue": "هذا الشهر",
       "loadError": "تعذر تحميل لوحة التحكم.",
       "refresh": "تحديث"
+    },
+    "membership": {
+      "title": "تسجيل عضوية",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "ابحث بالاسم أو الهاتف أو رقم العضوية",
+      "newMembership": "+ عضوية جديدة",
+      "noResults": "لم يتم العثور على أعضاء.",
+      "statusActive": "نشطة",
+      "statusExpiringSoon": "تنتهي قريبًا",
+      "statusExpired": "منتهية",
+      "statusNoMembership": "لا توجد عضوية بعد",
+      "section": {
+        "member": "بيانات العضو",
+        "membershipInfo": "معلومات العضوية",
+        "payment": "الدفع"
+      },
+      "receiptNumberLabel": "رقم الإيصال",
+      "fullNameLabel": "الاسم الكامل",
+      "phoneLabel": "رقم الهاتف",
+      "dateOfBirthLabel": "تاريخ الميلاد",
+      "nationalIdLabel": "الرقم القومي (اختياري)",
+      "membershipTypeLabel": "نوع العضوية",
+      "priceLabel": "السعر",
+      "discountLabel": "الخصم",
+      "finalPriceLabel": "السعر النهائي",
+      "startDateLabel": "تاريخ البدء",
+      "endDateLabel": "تاريخ الانتهاء",
+      "endDatePending": "اختر نوع العضوية",
+      "paymentCash": "نقدًا",
+      "paymentVisa": "فيزا",
+      "paymentInstapay": "إنستاباي",
+      "paymentVodafoneCash": "فودافون كاش",
+      "notesLabel": "ملاحظات",
+      "save": "حفظ العضوية",
+      "successTitle": "تم إنشاء العضوية",
+      "successSubtitle": "عضوية {{name}} نشطة الآن.",
+      "error": {
+        "fullNameRequired": "أدخل الاسم الكامل للعضو.",
+        "phoneRequired": "أدخل رقم الهاتف.",
+        "receiptNumberRequired": "أدخل رقم الإيصال.",
+        "invalidPrice": "لا يمكن أن يكون السعر بالسالب.",
+        "invalidDiscount": "يجب أن يكون الخصم بين 0 والسعر.",
+        "phoneAlreadyRegistered": "رقم الهاتف هذا مسجل بالفعل لعضو آخر.",
+        "receiptNumberTaken": "تم استخدام رقم الإيصال هذا من قبل."
+      }
     }
   },
   "comingSoon": {

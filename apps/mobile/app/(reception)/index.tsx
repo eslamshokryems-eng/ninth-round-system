@@ -68,7 +68,10 @@ export default function ReceptionDashboardScreen() {
             <Logo variant="emblem" width={36} />
             <Text variant="display">{t("reception.dashboard.title")}</Text>
           </View>
-          <IconButton name="log-out-outline" onPress={() => void handleSignOut()} disabled={isSigningOut} />
+          <View className="flex-row items-center gap-2">
+            <IconButton name="people-outline" onPress={() => router.push("/(reception)/membership")} />
+            <IconButton name="log-out-outline" onPress={() => void handleSignOut()} disabled={isSigningOut} />
+          </View>
         </View>
 
         {isLoading ? (

@@ -22,6 +22,7 @@ export function rowToProfile(row: ProfileRow): Profile {
     experienceLevel: row.experience_level,
     onboardingCompletedAt: row.onboarding_completed_at ? new Date(row.onboarding_completed_at) : null,
     referralCode: row.referral_code,
+    branchId: row.branch_id,
   });
 }
 

@@ -14,6 +14,13 @@ const ERROR_CODE_TO_I18N_KEY: Record<string, string> = {
   INVALID_AGE: "common.error.invalidAge",
   INVALID_HEIGHT: "common.error.invalidHeight",
   INVALID_WEIGHT: "common.error.invalidWeight",
+  FULL_NAME_REQUIRED: "reception.membership.error.fullNameRequired",
+  PHONE_REQUIRED: "reception.membership.error.phoneRequired",
+  RECEIPT_NUMBER_REQUIRED: "reception.membership.error.receiptNumberRequired",
+  INVALID_PRICE: "reception.membership.error.invalidPrice",
+  INVALID_DISCOUNT: "reception.membership.error.invalidDiscount",
+  PHONE_ALREADY_REGISTERED: "reception.membership.error.phoneAlreadyRegistered",
+  RECEIPT_NUMBER_TAKEN: "reception.membership.error.receiptNumberTaken",
 };
 
 export function translateErrorCode(code: string): string {

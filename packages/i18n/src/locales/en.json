@@ -147,6 +147,51 @@
       "monthlyRevenue": "This Month",
       "loadError": "Couldn't load the dashboard.",
       "refresh": "Refresh"
+    },
+    "membership": {
+      "title": "Membership Registration",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by name, phone, or member ID",
+      "newMembership": "+ New Membership",
+      "noResults": "No members found.",
+      "statusActive": "Active",
+      "statusExpiringSoon": "Expiring Soon",
+      "statusExpired": "Expired",
+      "statusNoMembership": "No membership yet",
+      "section": {
+        "member": "Member Details",
+        "membershipInfo": "Membership Information",
+        "payment": "Payment"
+      },
+      "receiptNumberLabel": "Receipt Number",
+      "fullNameLabel": "Full Name",
+      "phoneLabel": "Mobile Number",
+      "dateOfBirthLabel": "Date of Birth",
+      "nationalIdLabel": "National ID (optional)",
+      "membershipTypeLabel": "Membership Type",
+      "priceLabel": "Price",
+      "discountLabel": "Discount",
+      "finalPriceLabel": "Final Price",
+      "startDateLabel": "Start Date",
+      "endDateLabel": "End Date",
+      "endDatePending": "Select a membership type",
+      "paymentCash": "Cash",
+      "paymentVisa": "Visa",
+      "paymentInstapay": "Instapay",
+      "paymentVodafoneCash": "Vodafone Cash",
+      "notesLabel": "Notes",
+      "save": "Save Membership",
+      "successTitle": "Membership Created",
+      "successSubtitle": "{{name}}'s membership is active.",
+      "error": {
+        "fullNameRequired": "Enter the member's full name.",
+        "phoneRequired": "Enter a mobile number.",
+        "receiptNumberRequired": "Enter the receipt number.",
+        "invalidPrice": "Price cannot be negative.",
+        "invalidDiscount": "Discount must be between 0 and the price.",
+        "phoneAlreadyRegistered": "This phone number is already registered to another member.",
+        "receiptNumberTaken": "This receipt number has already been used."
+      }
     }
   },
   "comingSoon": {

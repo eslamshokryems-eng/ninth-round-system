@@ -8,11 +8,13 @@ interface AuthState {
   profileId: string | null;
   fullName: string | null;
   role: UserRoleName | null;
+  branchId: string | null;
   isOnboarded: boolean;
   setSignedIn: (params: {
     profileId: string;
     fullName: string | null;
     role: UserRoleName;
+    branchId: string | null;
     isOnboarded: boolean;
   }) => void;
   setSignedOut: () => void;
@@ -24,17 +26,28 @@ interface AuthState {
  * Supabase Auth's own SecureStore-backed storage
  * (src/lib/secure-store-adapter.ts) and is never duplicated here. This is
  * the "useAuthStore" from docs/phase-1/08-state-management.md §8.2. `role`
- * was added for the Reception & Membership pivot (docs/phase-1/14-reception-membership.md):
- * staff roles (reception/branch_manager/super_admin) route to `/(reception)`
- * instead of the member-facing `/(tabs)`.
+ * and `branchId` were added for the Reception & Membership pivot
+ * (docs/phase-1/14-reception-membership.md): staff roles
+ * (reception/branch_manager/super_admin) route to `/(reception)` instead of
+ * the member-facing `/(tabs)`, and `branchId` scopes their reads/writes
+ * there (a `member` has none).
  */
 export const useAuthStore = create<AuthState>((set) => ({
   status: "hydrating",
   profileId: null,
   fullName: null,
   role: null,
+  branchId: null,
   isOnboarded: false,
-  setSignedIn: ({ profileId, fullName, role, isOnboarded }) =>
-    set({ status: "signedIn", profileId, fullName, role, isOnboarded }),
-  setSignedOut: () => set({ status: "signedOut", profileId: null, fullName: null, role: null, isOnboarded: false }),
+  setSignedIn: ({ profileId, fullName, role, branchId, isOnboarded }) =>
+    set({ status: "signedIn", profileId, fullName, role, branchId, isOnboarded }),
+  setSignedOut: () =>
+    set({
+      status: "signedOut",
+      profileId: null,
+      fullName: null,
+      role: null,
+      branchId: null,
+      isOnboarded: false,
+    }),
 }));

@@ -40,17 +40,36 @@ All five new tables have RLS enabled. Access is branch-scoped via `is_branch_sta
 
 **Verified** against a real Postgres engine (pglite, same methodology as docs/phase-1/12-implementation-status.md §12.5) — all 9 migrations + seed apply cleanly, and a dedicated functional test confirmed, under a genuinely non-superuser Postgres role (matching Supabase's real `authenticated` role, not the session default which silently bypasses RLS): cross-branch member reads are blocked, the one-active-membership constraint is enforced, payment rows cannot be edited after creation (0 rows affected, not an error — RLS makes the row invisible to `UPDATE` rather than raising), the dashboard view computes correctly, and `generate_membership_alerts()` both raises the right alerts and auto-expires overdue memberships.
 
-## 14.4 What's Built vs. Pending
+## 14.5 Membership Registration
+
+Migration: `supabase/migrations/20260806000003_membership_registration.sql`. Refines the schema above once the real reception-desk workflow was specified in more detail:
+
+- **`membership_types`** — a real table (`id`, `name`, `duration_days`, `price`, `is_active`), replacing the fixed `membership_type` enum, so a branch_manager can add/reprice a type without a code deploy. Seeded with the 6 named types (One Month/Three Months/Six Months/Annual/Personal Training/VIP) and their durations — **price is left at 0, deliberately**: a fabricated real-looking price would be exactly the "mock data" the product rules out, so Reception always confirms the real price per registration (the type's price is only a pre-fill convenience).
+- **`memberships.membership_number`** — a formatted sequential ID (`9R-000001`, `9R-000002`, ...), generated via a Postgres sequence in the column default, not app code (guarantees no gaps/races). **Real bug caught in testing**: the `authenticated` role needs an explicit `grant usage on sequence ...` — sequences aren't covered by table-level grants, so without it every real insert would fail with "permission denied for sequence."
+- **`memberships.receipt_number`** — required, unique (`uq_memberships_receipt_number`). **`members.phone`** — now unique (`uq_members_phone`). Both business rules ("cannot be duplicated") are enforced at the database level, not just in application code.
+- **`members.national_id`** — added, optional.
+- **`memberships.payment_method`** — captured directly on the row (the common case: one payment at registration) as a convenience alongside the permanent `membership_payments` ledger from §14.3, which remains the source of truth for revenue reporting.
+- **`register_membership()`** — the "+ New Membership" form's single write: creates the member, membership, and payment rows together in one function body (`security invoker`, so every RLS insert policy still applies exactly as if the client had inserted each row itself — this is atomicity, not a privilege escalation). Computes `end_date` from the selected type's `duration_days` server-side.
+
+**Verified** the same way as §14.3 (pglite, non-superuser `authenticated` role): `membership_number` generates correctly and sequentially, `register_membership()` creates all three rows atomically with the right computed values, duplicate phone/receipt are both rejected at the DB level, and the dashboard view reflects new registrations correctly.
+
+**App layer**: `packages/reception` gained `RegisterMembershipUseCase`, `ListMembershipTypesUseCase`, `SearchMembersUseCase` (12 tests total). Mobile UI: `app/(reception)/membership.tsx` (live search by name/phone/member code — no mock data) and `app/(reception)/new-membership.tsx` (the full registration form — receipt number, member details, membership type picker, live-computed final price and end date, payment method, notes; on success shows the generated membership number before returning to the Dashboard). Date-of-birth is a plain `YYYY-MM-DD` text field for now — a native date picker is a small follow-up, not blocking.
+
+## 14.6 What's Built vs. Pending
 
 | Item | Status |
 |---|---|
 | Role model v2 (migration + `packages/identity` + `packages/database-types`) | ✅ Done, tested |
 | `branches` / `members` / `memberships` / `membership_payments` / `membership_alerts` tables + RLS | ✅ Done, tested |
+| `membership_types` table + `register_membership()` RPC | ✅ Done, tested |
 | `reception_dashboard_stats` view | ✅ Done, tested |
 | `generate_membership_alerts()` | ✅ Done, tested — **not yet scheduled** (needs pg_cron or an Edge Function cron, a later ops step) |
-| `packages/reception` bounded context (Clean Architecture — domain/application/infrastructure) | ✅ Done — `GetDashboardStatsUseCase` + `SupabaseDashboardRepository`, 3 tests |
-| Reception Dashboard screen (app) | ✅ Done — `app/(reception)/index.tsx`, the 7 stats as `StatCard` tiles (new shared `packages/ui/native/stat-card.tsx`), pull-to-refresh, sign-out. Staff roles (reception/branch_manager/super_admin) route here instead of the member tabs — `app/index.tsx`'s routing gate and `useAuthStore` now carry `role`. |
-| Member CRUD screens (app) | 📋 Not started — next slice |
-| One-click renewal use case | 📋 Not started — depends on Member CRUD existing first |
+| `packages/reception` bounded context (Clean Architecture — domain/application/infrastructure) | ✅ Done — Dashboard, Registration, Membership Types, Member Search — 12 tests |
+| Reception Dashboard screen (app) | ✅ Done — `app/(reception)/index.tsx` |
+| Membership Registration screen (search) + New Membership form (app) | ✅ Done — `app/(reception)/membership.tsx`, `app/(reception)/new-membership.tsx` |
+| One-click renewal use case | 📋 Not started — next slice |
+| Member detail/edit screen | 📋 Not started |
+| Native date picker for Date of Birth | 📋 Not started — plain text field for now |
+| `generate_membership_alerts()` scheduling | 📋 Not started — ops step (pg_cron / Edge Function cron) |
 
-Per the project's phased-delivery instruction, this slice (Reception Dashboard) is done and ready for you to run/test before the next slice (Member CRUD).
+Per the project's phased-delivery instruction, this slice (Membership Registration) is done and ready for you to run/test before the next slice.

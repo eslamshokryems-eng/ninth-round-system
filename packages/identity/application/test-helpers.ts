@@ -24,6 +24,7 @@ export function buildProfile(overrides: Partial<ProfileProps> = {}): Profile {
     experienceLevel: null,
     onboardingCompletedAt: null,
     referralCode: "abc123",
+    branchId: null,
     ...overrides,
   });
 }

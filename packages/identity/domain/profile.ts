@@ -20,6 +20,8 @@ export interface ProfileProps {
   experienceLevel: ExperienceLevel | null;
   onboardingCompletedAt: Date | null;
   referralCode: string;
+  /** A staff member's home location — see docs/phase-1/14-reception-membership.md §14.1. null for a `member`. */
+  branchId: string | null;
 }
 
 /**
@@ -79,6 +81,10 @@ export class Profile extends AggregateRoot<string> {
 
   get weightKg(): number | null {
     return this.props.weightKg;
+  }
+
+  get branchId(): string | null {
+    return this.props.branchId;
   }
 
   /** Snapshot for persistence mapping — infrastructure only, never UI. */

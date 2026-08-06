@@ -64,7 +64,6 @@ export interface StaffClientAssignmentRow {
 
 // --- 9th Round Reception & Membership System (docs/phase-1/14-reception-membership.md) ---
 
-export type MembershipType = "monthly" | "quarterly" | "semi_annual" | "annual" | "custom";
 export type MembershipStatus = "active" | "expired" | "cancelled";
 export type MembershipPaymentStatus = "paid" | "partial" | "unpaid";
 export type MembershipPaymentMethod = "cash" | "visa" | "instapay" | "vodafone_cash";
@@ -88,6 +87,7 @@ export interface MemberRow {
   email: string | null;
   gender: Gender | null;
   date_of_birth: string | null;
+  national_id: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   address: string | null;
@@ -99,17 +99,30 @@ export interface MemberRow {
   updated_at: string;
 }
 
+export interface MembershipTypeRow {
+  id: string;
+  name: string;
+  duration_days: number;
+  price: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MembershipRow {
   id: string;
   member_id: string;
   branch_id: string;
-  membership_type: MembershipType;
+  membership_type_id: string;
+  membership_number: string;
+  receipt_number: string;
   start_date: string;
   end_date: string;
   price: number;
   discount: number;
   final_price: number;
   payment_status: MembershipPaymentStatus;
+  payment_method: MembershipPaymentMethod;
   status: MembershipStatus;
   notes: string | null;
   created_by: string | null;
@@ -185,10 +198,26 @@ export interface Database {
         Update: Partial<MemberRow>;
         Relationships: [];
       };
+      membership_types: {
+        Row: MembershipTypeRow;
+        Insert: Partial<MembershipTypeRow> & Pick<MembershipTypeRow, "name" | "duration_days">;
+        Update: Partial<MembershipTypeRow>;
+        Relationships: [];
+      };
       memberships: {
         Row: MembershipRow;
         Insert: Partial<MembershipRow> &
-          Pick<MembershipRow, "member_id" | "branch_id" | "membership_type" | "start_date" | "end_date" | "price">;
+          Pick<
+            MembershipRow,
+            | "member_id"
+            | "branch_id"
+            | "membership_type_id"
+            | "receipt_number"
+            | "start_date"
+            | "end_date"
+            | "price"
+            | "payment_method"
+          >;
         Update: Partial<MembershipRow>;
         Relationships: [];
       };
@@ -213,7 +242,26 @@ export interface Database {
         Relationships: [];
       };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      register_membership: {
+        Args: {
+          p_branch_id: string;
+          p_full_name: string;
+          p_phone: string;
+          p_gender: Gender | null;
+          p_date_of_birth: string | null;
+          p_national_id: string | null;
+          p_membership_type_id: string;
+          p_receipt_number: string;
+          p_price: number;
+          p_discount: number;
+          p_start_date: string;
+          p_payment_method: MembershipPaymentMethod;
+          p_notes: string | null;
+        };
+        Returns: { member_id: string; membership_id: string; membership_number: string }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
