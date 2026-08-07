@@ -38,6 +38,18 @@ members-vs-profiles split).
   writes to `check_ins`, an append-only attendance log (no update/delete
   RLS, same principle as `membership_payments`). Reached from a member's
   search result or their detail screen.
+- **Member Photo** (`UploadMemberPhotoUseCase`) — uploads an already-read
+  image (camera or gallery, cropped and compressed on the mobile side) to
+  the private `member-photos` Supabase Storage bucket and returns a
+  long-lived signed URL, which the registration form then passes to
+  `register_membership()` to store on the member. RLS on
+  `storage.objects` scopes uploads to `reception`/`branch_manager`/
+  `super_admin`.
+- **Member QR Identity** — every member gets a permanent, unique
+  `qr_code` (a separate, revocable token, not their row `id`) the moment
+  they're registered, returned by `register_membership()` and rendered
+  client-side (no QR image is stored — just the value it encodes). This
+  is what the future Check-In system will scan.
 
 ## What's planned next
 

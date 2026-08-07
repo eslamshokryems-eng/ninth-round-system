@@ -26,6 +26,10 @@ export class SupabaseRegistrationRepository implements RegistrationRepository {
         p_start_date: input.startDate,
         p_payment_method: input.paymentMethod,
         p_notes: input.notes,
+        p_address: input.address,
+        p_emergency_contact_name: input.emergencyContactName,
+        p_emergency_contact_phone: input.emergencyContactPhone,
+        p_photo_url: input.photoUrl,
       })
       .single();
 
@@ -43,11 +47,17 @@ export class SupabaseRegistrationRepository implements RegistrationRepository {
     // result doesn't narrow cleanly against a hand-authored Database type
     // (no issue against a real `supabase gen types` output) — the runtime
     // shape is exactly Fn['Returns'][number], asserted explicitly here.
-    const row = data as { member_id: string; membership_id: string; membership_number: string };
+    const row = data as {
+      member_id: string;
+      membership_id: string;
+      membership_number: string;
+      member_qr_code: string;
+    };
     return ok({
       memberId: row.member_id,
       membershipId: row.membership_id,
       membershipNumber: row.membership_number,
+      memberQrCode: row.member_qr_code,
     });
   }
 }

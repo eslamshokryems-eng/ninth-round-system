@@ -11,7 +11,7 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
     const { data, error } = await this.client
       .from("members")
       .select(
-        `id, member_code, full_name, phone, email, gender, date_of_birth, national_id,
+        `id, member_code, qr_code, profile_image_url, full_name, phone, email, gender, date_of_birth, national_id,
          emergency_contact_name, emergency_contact_phone, address, notes,
          memberships (
            id, membership_number, start_date, end_date, price, discount, final_price,
@@ -32,6 +32,8 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
     return ok({
       memberId: data.id,
       memberCode: data.member_code,
+      qrCode: data.qr_code,
+      photoUrl: data.profile_image_url,
       fullName: data.full_name,
       phone: data.phone,
       email: data.email,

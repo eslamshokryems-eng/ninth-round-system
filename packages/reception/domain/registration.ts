@@ -15,10 +15,15 @@ export interface RegisterMembershipInput {
   startDate: string;
   paymentMethod: PaymentMethod;
   notes: string | null;
+  address: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  photoUrl: string | null;
 }
 
 export interface RegisterMembershipOutput {
   memberId: string;
   membershipId: string;
   membershipNumber: string;
+  memberQrCode: string;
 }

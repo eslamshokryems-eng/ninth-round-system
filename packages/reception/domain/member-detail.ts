@@ -17,6 +17,8 @@ export interface MembershipHistoryEntry {
 export interface MemberDetail {
   memberId: string;
   memberCode: string;
+  qrCode: string;
+  photoUrl: string | null;
   fullName: string;
   phone: string;
   email: string | null;

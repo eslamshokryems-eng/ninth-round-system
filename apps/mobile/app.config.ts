@@ -33,6 +33,13 @@ const config: ExpoConfig = {
         backgroundColor: "#0B0B0C",
       },
     ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "9th Round needs access to your photo library to attach a member's profile photo.",
+        cameraPermission: "9th Round needs access to your camera to take a member's profile photo.",
+      },
+    ],
   ],
   extra: {
     eas: {

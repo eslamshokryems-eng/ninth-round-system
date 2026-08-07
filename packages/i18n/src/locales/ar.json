@@ -198,6 +198,12 @@
       "membershipHistoryEmpty": "لا يوجد سجل عضويات بعد.",
       "checkInAction": "تسجيل حضور",
       "checkInSuccess": "تم تسجيل الحضور.",
+      "photoNone": "لا توجد صورة",
+      "takePhoto": "التقاط صورة",
+      "chooseFromGallery": "اختيار من المعرض",
+      "qrCodeHint": "هذا الرمز يحدد هوية العضو لتسجيل الحضور.",
+      "showQrCode": "إظهار رمز QR",
+      "hideQrCode": "إخفاء رمز QR",
       "error": {
         "fullNameRequired": "أدخل الاسم الكامل للعضو.",
         "phoneRequired": "أدخل رقم الهاتف.",
@@ -207,7 +213,9 @@
         "phoneAlreadyRegistered": "رقم الهاتف هذا مسجل بالفعل لعضو آخر.",
         "receiptNumberTaken": "تم استخدام رقم الإيصال هذا من قبل.",
         "memberNotFound": "العضو غير موجود.",
-        "noActiveMembership": "هذا العضو ليس لديه عضوية نشطة."
+        "noActiveMembership": "هذا العضو ليس لديه عضوية نشطة.",
+        "emptyPhoto": "تعذّرت قراءة الصورة المحددة. حاول مرة أخرى.",
+        "photoUploadFailed": "تعذّر رفع الصورة. حاول مرة أخرى."
       }
     }
   },

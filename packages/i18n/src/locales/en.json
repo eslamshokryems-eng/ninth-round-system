@@ -198,6 +198,12 @@
       "membershipHistoryEmpty": "No membership history yet.",
       "checkInAction": "Check In",
       "checkInSuccess": "Checked in.",
+      "photoNone": "No Photo",
+      "takePhoto": "Take Photo",
+      "chooseFromGallery": "Choose from Gallery",
+      "qrCodeHint": "This code identifies the member for Check-In.",
+      "showQrCode": "Show QR Code",
+      "hideQrCode": "Hide QR Code",
       "error": {
         "fullNameRequired": "Enter the member's full name.",
         "phoneRequired": "Enter a mobile number.",
@@ -207,7 +213,9 @@
         "phoneAlreadyRegistered": "This phone number is already registered to another member.",
         "receiptNumberTaken": "This receipt number has already been used.",
         "memberNotFound": "Member not found.",
-        "noActiveMembership": "This member has no active membership."
+        "noActiveMembership": "This member has no active membership.",
+        "emptyPhoto": "The selected photo could not be read. Please try again.",
+        "photoUploadFailed": "Could not upload the photo. Please try again."
       }
     }
   },

@@ -14,6 +14,8 @@ import type { UpdateMemberRepository } from "../domain/update-member-repository"
 import type { UpdateMemberInput } from "../domain/update-member";
 import type { CheckInRepository } from "../domain/check-in-repository";
 import type { CheckInMemberOutput } from "../domain/check-in";
+import type { MemberPhotoRepository } from "../domain/member-photo-repository";
+import type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "../domain/member-photo";
 
 export function buildDashboardStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
@@ -57,6 +59,10 @@ export function buildRegisterMembershipInput(
     startDate: "2026-08-06",
     paymentMethod: "cash",
     notes: null,
+    address: null,
+    emergencyContactName: null,
+    emergencyContactPhone: null,
+    photoUrl: null,
     ...overrides,
   };
 }
@@ -79,6 +85,7 @@ export function fakeRegistrationRepository(
       memberId: "member-1",
       membershipId: "membership-1",
       membershipNumber: "9R-000001",
+      memberQrCode: "qr-code-1",
       ...output,
     }),
   );
@@ -134,7 +141,9 @@ export function fakeRenewalRepository(output: Partial<RenewMembershipOutput> = {
 export function buildMemberDetail(overrides: Partial<MemberDetail> = {}): MemberDetail {
   return {
     memberId: "member-1",
-    memberCode: "9RA1B2C3",
+    memberCode: "01",
+    qrCode: "qr-code-1",
+    photoUrl: null,
     fullName: "Ahmed Test",
     phone: "+201000000001",
     email: null,
@@ -206,6 +215,40 @@ export function fakeCheckInRepository(overrides: Partial<CheckInMemberOutput> = 
     ok({
       checkInId: "check-in-1",
       checkedInAt: "2026-08-06T10:00:00.000Z",
+      ...overrides,
+    }),
+  );
+}
+
+export function buildUploadMemberPhotoInput(
+  overrides: Partial<UploadMemberPhotoInput> = {},
+): UploadMemberPhotoInput {
+  return {
+    branchId: "branch-1",
+    data: new ArrayBuffer(4),
+    contentType: "image/jpeg",
+    fileExtension: "jpg",
+    ...overrides,
+  };
+}
+
+export class FakeMemberPhotoRepository implements MemberPhotoRepository {
+  public lastInput: UploadMemberPhotoInput | null = null;
+  constructor(private result: Result<UploadMemberPhotoOutput>) {}
+
+  async upload(input: UploadMemberPhotoInput): Promise<Result<UploadMemberPhotoOutput>> {
+    this.lastInput = input;
+    return this.result;
+  }
+}
+
+export function fakeMemberPhotoRepository(
+  overrides: Partial<UploadMemberPhotoOutput> = {},
+): FakeMemberPhotoRepository {
+  return new FakeMemberPhotoRepository(
+    ok({
+      path: "branch-1/some-photo.jpg",
+      signedUrl: "https://example.supabase.co/storage/v1/object/sign/member-photos/branch-1/some-photo.jpg?token=abc",
       ...overrides,
     }),
   );

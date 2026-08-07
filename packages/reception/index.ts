@@ -7,6 +7,7 @@ import { RenewMembershipUseCase } from "./application/renew-membership";
 import { GetMemberDetailUseCase } from "./application/get-member-detail";
 import { UpdateMemberUseCase } from "./application/update-member";
 import { CheckInMemberUseCase } from "./application/check-in-member";
+import { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 import { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 import { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 import { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -15,6 +16,7 @@ import { SupabaseRenewalRepository } from "./infrastructure/supabase-renewal-rep
 import { SupabaseMemberDetailRepository } from "./infrastructure/supabase-member-detail-repository";
 import { SupabaseUpdateMemberRepository } from "./infrastructure/supabase-update-member-repository";
 import { SupabaseCheckInRepository } from "./infrastructure/supabase-check-in-repository";
+import { SupabaseMemberPhotoRepository } from "./infrastructure/supabase-member-photo-repository";
 
 export type { DashboardStats } from "./domain/dashboard-stats";
 export type { DashboardRepository } from "./domain/dashboard-repository";
@@ -30,6 +32,7 @@ export type { RenewMembershipInput, RenewMembershipOutput } from "./domain/renew
 export type { MemberDetail, MembershipHistoryEntry } from "./domain/member-detail";
 export type { UpdateMemberInput } from "./domain/update-member";
 export type { CheckInMemberOutput } from "./domain/check-in";
+export type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "./domain/member-photo";
 export {
   GetDashboardStatsUseCase,
   type GetDashboardStatsOutput,
@@ -41,6 +44,7 @@ export { RenewMembershipUseCase } from "./application/renew-membership";
 export { GetMemberDetailUseCase } from "./application/get-member-detail";
 export { UpdateMemberUseCase } from "./application/update-member";
 export { CheckInMemberUseCase } from "./application/check-in-member";
+export { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 export { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 export { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 export { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -49,12 +53,13 @@ export { SupabaseRenewalRepository } from "./infrastructure/supabase-renewal-rep
 export { SupabaseMemberDetailRepository } from "./infrastructure/supabase-member-detail-repository";
 export { SupabaseUpdateMemberRepository } from "./infrastructure/supabase-update-member-repository";
 export { SupabaseCheckInRepository } from "./infrastructure/supabase-check-in-repository";
+export { SupabaseMemberPhotoRepository } from "./infrastructure/supabase-member-photo-repository";
 
 /**
  * The Reception context's composition root — mirrors
  * packages/identity/index.ts's createIdentityModule(). Covers the
- * Dashboard, Membership Registration, Renewal, member detail/edit, and
- * Attendance Check-in.
+ * Dashboard, Membership Registration (with photo + QR identity), Renewal,
+ * member detail/edit, and Attendance Check-in.
  */
 export function createReceptionModule(client: TypedSupabaseClient) {
   const dashboardRepository = new SupabaseDashboardRepository(client);
@@ -65,6 +70,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
   const memberDetailRepository = new SupabaseMemberDetailRepository(client);
   const updateMemberRepository = new SupabaseUpdateMemberRepository(client);
   const checkInRepository = new SupabaseCheckInRepository(client);
+  const memberPhotoRepository = new SupabaseMemberPhotoRepository(client);
   return {
     getDashboardStats: new GetDashboardStatsUseCase(dashboardRepository),
     registerMembership: new RegisterMembershipUseCase(registrationRepository),
@@ -74,5 +80,6 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     getMemberDetail: new GetMemberDetailUseCase(memberDetailRepository),
     updateMember: new UpdateMemberUseCase(updateMemberRepository),
     checkInMember: new CheckInMemberUseCase(checkInRepository),
+    uploadMemberPhoto: new UploadMemberPhotoUseCase(memberPhotoRepository),
   };
 }

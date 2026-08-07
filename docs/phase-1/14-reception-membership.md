@@ -53,7 +53,17 @@ Migration: `supabase/migrations/20260806000003_membership_registration.sql`. Ref
 
 **Verified** the same way as §14.3 (pglite, non-superuser `authenticated` role): `membership_number` generates correctly and sequentially, `register_membership()` creates all three rows atomically with the right computed values, duplicate phone/receipt are both rejected at the DB level, and the dashboard view reflects new registrations correctly.
 
-**App layer**: `packages/reception` gained `RegisterMembershipUseCase`, `ListMembershipTypesUseCase`, `SearchMembersUseCase` (12 tests total). Mobile UI: `app/(reception)/membership.tsx` (live search by name/phone/member code — no mock data) and `app/(reception)/new-membership.tsx` (the full registration form — receipt number, member details, membership type picker, live-computed final price and end date, payment method, notes; on success shows the generated membership number before returning to the Dashboard). Date-of-birth is a plain `YYYY-MM-DD` text field for now — a native date picker is a small follow-up, not blocking.
+**App layer**: `packages/reception` gained `RegisterMembershipUseCase`, `ListMembershipTypesUseCase`, `SearchMembersUseCase`. Mobile UI: `app/(reception)/membership.tsx` (live search by name/phone/member code — no mock data) and `app/(reception)/new-membership.tsx` (the full registration form — receipt number, member details, membership type picker, live-computed final price and end date, payment method, notes; on success shows the generated membership number before returning to the Dashboard). Date-of-birth is a plain `YYYY-MM-DD` text field for now — a native date picker is a small follow-up, not blocking.
+
+## 14.7 Member Photo + QR Identity
+
+Migration: `supabase/migrations/20260806000008_member_photo_and_qr.sql`. Adds the two pieces the New Member Registration screen still needed, plus wiring for `address`/emergency-contact fields (columns that existed on `members` since §14.3 but were never exposed through `register_membership()` or the form):
+
+- **`members.qr_code`** — a permanent, unique token per member (`default gen_random_uuid()::text`), deliberately a separate column from the member's own `id` rather than reusing it: reissuing a lost/damaged member card just means regenerating this one column, without touching the row's real primary key or anything that references it. Returned by `register_membership()` as `member_qr_code` and rendered client-side with `react-native-qrcode-svg` — no QR *image* is generated or stored, only the value it encodes, which is what the future Check-In system will scan and look up.
+- **`member-photos` Storage bucket** — private (`public: false`), not public: these are real people's photos tied to a private club roster, matching the app's staff-only posture everywhere else. RLS on `storage.objects` scopes reads to any signed-in staff member and inserts/updates to `reception`/`branch_manager`/`super_admin`, mirroring the pattern already used for `members`/`memberships`.
+- **`register_membership()` extended** — four new trailing, all-`default null` parameters (`p_address`, `p_emergency_contact_name`, `p_emergency_contact_phone`, `p_photo_url`), plus `member_qr_code` added to its return row. **Real bug caught in testing**: `create or replace function` with new trailing parameters does *not* do an in-place replace here — Postgres matches functions by name *and* full argument-type list, so it registered a second overload alongside the original 13-param version, leaving any 13-arg call ambiguous ("could not choose a best candidate function"). Fixed by dropping the old signature explicitly before creating the new one — verified against pglite both ways (old-style 13-arg calls still work, and the new fields round-trip correctly).
+
+**App layer**: `packages/reception` gained `UploadMemberPhotoUseCase`/`SupabaseMemberPhotoRepository` (reads already-picked image bytes, uploads to `member-photos`, returns a signed URL valid ~10 years — a private bucket needs *some* signed access, and this is a pragmatic stand-in for "permanent" rather than building a resigning mechanism; see docs/phase-1/12-implementation-status.md §12.3). Mobile UI: `app/(reception)/new-membership.tsx` gained a photo step (`expo-image-picker`'s native crop UI + `expo-image-manipulator` resize/compress before upload) and an animated QR success screen that auto-returns to the Dashboard; `app/(reception)/member-detail.tsx` gained a photo thumbnail and a toggleable QR view (for reprinting a lost card); the Reception Dashboard gained a `(+)` button as a second entry point into "+ New Membership" and now reloads its stats on every focus (via `useFocusEffect`), not just on mount/pull-to-refresh, so counters reflect a just-created member immediately.
 
 ## 14.6 What's Built vs. Pending
 
@@ -64,12 +74,15 @@ Migration: `supabase/migrations/20260806000003_membership_registration.sql`. Ref
 | `membership_types` table + `register_membership()` RPC | ✅ Done, tested |
 | `reception_dashboard_stats` view | ✅ Done, tested |
 | `generate_membership_alerts()` | ✅ Done, tested — **not yet scheduled** (needs pg_cron or an Edge Function cron, a later ops step) |
-| `packages/reception` bounded context (Clean Architecture — domain/application/infrastructure) | ✅ Done — Dashboard, Registration, Membership Types, Member Search — 12 tests |
-| Reception Dashboard screen (app) | ✅ Done — `app/(reception)/index.tsx` |
-| Membership Registration screen (search) + New Membership form (app) | ✅ Done — `app/(reception)/membership.tsx`, `app/(reception)/new-membership.tsx` |
-| One-click renewal use case | 📋 Not started — next slice |
-| Member detail/edit screen | 📋 Not started |
+| `renew_membership()` RPC + one-click renewal screen | ✅ Done, tested |
+| `check_in_member()` RPC + Attendance Check-in | ✅ Done, tested — manual tap only; no QR-scanning camera flow yet |
+| Member detail/edit screen + full membership history | ✅ Done, tested |
+| Member photo (capture/crop/compress/upload) + QR identity | ✅ Done, tested |
+| `packages/reception` bounded context (Clean Architecture — domain/application/infrastructure) | ✅ Done — Dashboard, Registration, Renewal, Member Detail/Edit, Check-in, Photo upload — 32 tests |
+| Reception Dashboard screen (app) | ✅ Done — `app/(reception)/index.tsx`, auto-refreshes on focus |
+| Membership Registration, Renewal, Member Detail, Check-in screens (app) | ✅ Done |
 | Native date picker for Date of Birth | 📋 Not started — plain text field for now |
 | `generate_membership_alerts()` scheduling | 📋 Not started — ops step (pg_cron / Edge Function cron) |
+| QR-code camera scanning for Check-In | 📋 Not started — today's Check-In is a manual tap; the QR identity and RPC it needs already exist |
 
-Per the project's phased-delivery instruction, this slice (Membership Registration) is done and ready for you to run/test before the next slice.
+Per the project's phased-delivery instruction, this slice (Membership Registration, including photo + QR identity) is done and ready for you to run/test before the next slice.

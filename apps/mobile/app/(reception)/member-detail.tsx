@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Image, View } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import type { Gender, MemberDetail, MembershipHistoryEntry } from "@9thround/reception";
 import { BackButton, Button, Card, OptionCard, ScreenContainer, Text, TextField } from "@9thround/ui/native";
 import { getReceptionModule } from "../../src/lib/composition-root";
@@ -44,6 +45,7 @@ export default function MemberDetailScreen() {
 
   const [checkInFeedback, setCheckInFeedback] = useState<{ text: string; isError: boolean } | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isQrVisible, setIsQrVisible] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!memberId) return;
@@ -159,6 +161,15 @@ export default function MemberDetailScreen() {
       <View className="gap-6">
         <View className="flex-row items-center gap-3">
           <BackButton onPress={() => router.back()} />
+          <View className="h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white/[0.06]">
+            {detail.photoUrl ? (
+              <Image source={{ uri: detail.photoUrl }} style={{ width: 56, height: 56 }} />
+            ) : (
+              <Text variant="caption" color="muted">
+                {detail.memberCode}
+              </Text>
+            )}
+          </View>
           <View>
             <Text variant="display">{detail.fullName}</Text>
             <Text variant="caption" color="muted">
@@ -168,12 +179,23 @@ export default function MemberDetailScreen() {
         </View>
 
         <View className="gap-2">
-          <Button
-            label={t("reception.membership.checkInAction")}
-            variant="secondary"
-            onPress={() => void handleCheckIn()}
-            isLoading={isCheckingIn}
-          />
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <Button
+                label={t("reception.membership.checkInAction")}
+                variant="secondary"
+                onPress={() => void handleCheckIn()}
+                isLoading={isCheckingIn}
+              />
+            </View>
+            <View className="flex-1">
+              <Button
+                label={t(isQrVisible ? "reception.membership.hideQrCode" : "reception.membership.showQrCode")}
+                variant="secondary"
+                onPress={() => setIsQrVisible((visible) => !visible)}
+              />
+            </View>
+          </View>
           {checkInFeedback ? (
             <Text
               variant="caption"
@@ -182,6 +204,16 @@ export default function MemberDetailScreen() {
             >
               {checkInFeedback.text}
             </Text>
+          ) : null}
+          {isQrVisible ? (
+            <View className="items-center gap-2 py-2">
+              <View className="rounded-card bg-white p-4">
+                <QRCode value={detail.qrCode} size={160} backgroundColor="#FFFFFF" color="#0B0B0C" />
+              </View>
+              <Text variant="caption" color="muted">
+                {t("reception.membership.qrCodeHint")}
+              </Text>
+            </View>
           ) : null}
         </View>
 

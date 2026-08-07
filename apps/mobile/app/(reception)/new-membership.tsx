@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
+import { Image, View } from "react-native";
+import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import QRCode from "react-native-qrcode-svg";
 import type { Gender, MembershipType, PaymentMethod } from "@9thround/reception";
 import { BackButton, Button, Card, OptionCard, ScreenContainer, Text, TextField } from "@9thround/ui/native";
 import { useAuthStore } from "../../src/features/auth/store";
 import { getReceptionModule } from "../../src/lib/composition-root";
 import { translateErrorCode } from "../../src/lib/translate-error";
+import {
+  pickMemberPhotoFromCamera,
+  pickMemberPhotoFromGallery,
+  readFileAsArrayBuffer,
+  type PickedMemberPhoto,
+} from "../../src/lib/member-photo";
 
 const GENDERS: { value: Gender; labelKey: string }[] = [
   { value: "female", labelKey: "onboarding.bodyMetrics.genderFemale" },
@@ -21,6 +29,9 @@ const PAYMENT_METHODS: { value: PaymentMethod; labelKey: string }[] = [
   { value: "vodafone_cash", labelKey: "reception.membership.paymentVodafoneCash" },
 ];
 
+/** Return to the Dashboard automatically once the success screen has had a moment to register, per the spec's "Return automatically to Reception Dashboard." */
+const AUTO_RETURN_DELAY_MS = 2500;
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -32,11 +43,17 @@ function addDaysIso(dateIso: string, days: number): string | null {
   return base.toISOString().slice(0, 10);
 }
 
+interface SuccessState {
+  membershipNumber: string;
+  qrCode: string;
+}
+
 /**
  * "+ New Membership" (docs/phase-1/14-reception-membership.md §14.5) — one
- * form creating a member, their first membership, and its payment record
- * together, via the register_membership() RPC (atomic, RLS-enforced).
- * Membership Number/End Date/Final Price are never typed by Reception —
+ * form creating a member (with an optional profile photo and a permanent
+ * QR identity), their first membership, and its payment record together,
+ * via the register_membership() RPC (atomic, RLS-enforced). Membership
+ * Number/QR Code/End Date/Final Price are never typed by Reception —
  * generated (server-side) or computed (client-side, for live preview) —
  * matching "Automatically calculate" in the spec.
  */
@@ -47,12 +64,16 @@ export default function NewMembershipScreen() {
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [isLoadingTypes, setIsLoadingTypes] = useState(true);
 
+  const [photo, setPhoto] = useState<PickedMemberPhoto | null>(null);
   const [receiptNumber, setReceiptNumber] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [nationalId, setNationalId] = useState("");
+  const [address, setAddress] = useState("");
+  const [emergencyContactName, setEmergencyContactName] = useState("");
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
 
   const [membershipTypeId, setMembershipTypeId] = useState<string | null>(null);
   const [priceText, setPriceText] = useState("");
@@ -63,7 +84,7 @@ export default function NewMembershipScreen() {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [successNumber, setSuccessNumber] = useState<string | null>(null);
+  const [success, setSuccess] = useState<SuccessState | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -73,6 +94,12 @@ export default function NewMembershipScreen() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => router.replace("/(reception)"), AUTO_RETURN_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [success]);
+
   const selectedType = membershipTypes.find((type) => type.id === membershipTypeId) ?? null;
 
   function selectType(type: MembershipType) {
@@ -80,6 +107,16 @@ export default function NewMembershipScreen() {
     if (!priceText && type.price > 0) {
       setPriceText(String(type.price));
     }
+  }
+
+  async function handleTakePhoto() {
+    const picked = await pickMemberPhotoFromCamera();
+    if (picked) setPhoto(picked);
+  }
+
+  async function handleChoosePhoto() {
+    const picked = await pickMemberPhotoFromGallery();
+    if (picked) setPhoto(picked);
   }
 
   const price = Number(priceText) || 0;
@@ -104,6 +141,23 @@ export default function NewMembershipScreen() {
     setErrorMessage(null);
     setIsSaving(true);
 
+    let photoUrl: string | null = null;
+    if (photo) {
+      const data = await readFileAsArrayBuffer(photo.uri);
+      const uploadResult = await getReceptionModule().uploadMemberPhoto.execute({
+        branchId,
+        data,
+        contentType: "image/jpeg",
+        fileExtension: "jpg",
+      });
+      if (uploadResult.isErr) {
+        setIsSaving(false);
+        setErrorMessage(t(translateErrorCode(uploadResult.error.code)));
+        return;
+      }
+      photoUrl = uploadResult.value.signedUrl;
+    }
+
     const result = await getReceptionModule().registerMembership.execute({
       branchId,
       fullName: fullName.trim(),
@@ -118,6 +172,10 @@ export default function NewMembershipScreen() {
       startDate,
       paymentMethod,
       notes: notes.trim() || null,
+      address: address.trim() || null,
+      emergencyContactName: emergencyContactName.trim() || null,
+      emergencyContactPhone: emergencyContactPhone.trim() || null,
+      photoUrl,
     });
 
     setIsSaving(false);
@@ -127,26 +185,11 @@ export default function NewMembershipScreen() {
       return;
     }
 
-    setSuccessNumber(result.value.membershipNumber);
+    setSuccess({ membershipNumber: result.value.membershipNumber, qrCode: result.value.memberQrCode });
   }
 
-  if (successNumber) {
-    return (
-      <ScreenContainer>
-        <View className="flex-1 items-center justify-center gap-4">
-          <Text variant="display" color="gold" style={{ textAlign: "center" }}>
-            {t("reception.membership.successTitle")}
-          </Text>
-          <Text variant="title" style={{ textAlign: "center" }}>
-            {successNumber}
-          </Text>
-          <Text variant="body" color="muted" style={{ textAlign: "center" }}>
-            {t("reception.membership.successSubtitle", { name: fullName })}
-          </Text>
-        </View>
-        <Button label={t("common.done")} onPress={() => router.replace("/(reception)")} />
-      </ScreenContainer>
-    );
+  if (success) {
+    return <RegistrationSuccess membershipNumber={success.membershipNumber} qrCode={success.qrCode} fullName={fullName} />;
   }
 
   return (
@@ -155,6 +198,27 @@ export default function NewMembershipScreen() {
         <View className="flex-row items-center gap-3">
           <BackButton onPress={() => router.back()} />
           <Text variant="display">{t("reception.membership.newMembership")}</Text>
+        </View>
+
+        <View className="items-center gap-3">
+          <View className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white/[0.06]">
+            {photo ? (
+              <Image source={{ uri: photo.uri }} style={{ width: 96, height: 96 }} />
+            ) : (
+              <Text variant="caption" color="muted">
+                {t("reception.membership.photoNone")}
+              </Text>
+            )}
+          </View>
+          <View className="flex-row gap-3">
+            <Button label={t("reception.membership.takePhoto")} variant="secondary" size="md" onPress={() => void handleTakePhoto()} />
+            <Button
+              label={t("reception.membership.chooseFromGallery")}
+              variant="secondary"
+              size="md"
+              onPress={() => void handleChoosePhoto()}
+            />
+          </View>
         </View>
 
         <View className="gap-3">
@@ -199,6 +263,18 @@ export default function NewMembershipScreen() {
             value={nationalId}
             onChangeText={setNationalId}
             keyboardType="number-pad"
+          />
+          <TextField label={t("reception.membership.addressLabel")} value={address} onChangeText={setAddress} />
+          <TextField
+            label={t("reception.membership.emergencyContactNameLabel")}
+            value={emergencyContactName}
+            onChangeText={setEmergencyContactName}
+          />
+          <TextField
+            label={t("reception.membership.emergencyContactPhoneLabel")}
+            value={emergencyContactPhone}
+            onChangeText={setEmergencyContactPhone}
+            keyboardType="phone-pad"
           />
         </View>
 
@@ -310,6 +386,51 @@ export default function NewMembershipScreen() {
         />
         <Button label={t("common.cancel")} onPress={() => router.back()} variant="secondary" />
       </View>
+    </ScreenContainer>
+  );
+}
+
+function RegistrationSuccess({
+  membershipNumber,
+  qrCode,
+  fullName,
+}: {
+  membershipNumber: string;
+  qrCode: string;
+  fullName: string;
+}) {
+  const { t } = useTranslation();
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(1, { duration: 420 }),
+    transform: [{ scale: withTiming(1, { duration: 420 }) }],
+  }));
+
+  return (
+    <ScreenContainer>
+      <View className="flex-1 items-center justify-center gap-4">
+        <Animated.View
+          style={[{ opacity: 0, transform: [{ scale: 0.8 }] }, animatedStyle]}
+          className="items-center gap-4"
+        >
+          <Text variant="display" color="gold" style={{ textAlign: "center" }}>
+            {t("reception.membership.successTitle")}
+          </Text>
+          <Text variant="title" style={{ textAlign: "center" }}>
+            {membershipNumber}
+          </Text>
+          <Text variant="body" color="muted" style={{ textAlign: "center" }}>
+            {t("reception.membership.successSubtitle", { name: fullName })}
+          </Text>
+          <View className="rounded-card bg-white p-4">
+            <QRCode value={qrCode} size={180} backgroundColor="#FFFFFF" color="#0B0B0C" />
+          </View>
+          <Text variant="caption" color="muted" style={{ textAlign: "center" }}>
+            {t("reception.membership.qrCodeHint")}
+          </Text>
+        </Animated.View>
+      </View>
+      <Button label={t("common.done")} onPress={() => router.replace("/(reception)")} />
     </ScreenContainer>
   );
 }

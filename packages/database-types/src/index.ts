@@ -93,6 +93,7 @@ export interface MemberRow {
   address: string | null;
   notes: string | null;
   profile_image_url: string | null;
+  qr_code: string;
   linked_profile_id: string | null;
   created_by: string | null;
   created_at: string;
@@ -273,8 +274,17 @@ export interface Database {
           p_start_date: string;
           p_payment_method: MembershipPaymentMethod;
           p_notes: string | null;
+          p_address?: string | null;
+          p_emergency_contact_name?: string | null;
+          p_emergency_contact_phone?: string | null;
+          p_photo_url?: string | null;
         };
-        Returns: { member_id: string; membership_id: string; membership_number: string }[];
+        Returns: {
+          member_id: string;
+          membership_id: string;
+          membership_number: string;
+          member_qr_code: string;
+        }[];
       };
       renew_membership: {
         Args: {
