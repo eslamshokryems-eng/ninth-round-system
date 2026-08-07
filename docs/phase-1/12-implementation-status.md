@@ -15,7 +15,7 @@ Maintained continuously as code lands, per the requirement to generate technical
 | `packages/ui` — `web/` | 📋 Not started | — |
 | `packages/config` | ✅ Implemented | — |
 | **`packages/identity`** | ✅ Implemented — the reference bounded context, now covering registration, login, forgot-password, onboarding (name/goal/experience/body-metrics), and role assignment against the 5-role model (member/coach/reception/branch_manager/super_admin) | **39 passing** (domain, application, and infrastructure-mapping tests, all using in-memory fakes — zero database) |
-| **`packages/reception`** | ✅ Dashboard + Membership Registration (with photo + QR identity) + Renewal + member detail/edit + Attendance Check-in done — see [§14](14-reception-membership.md) | 32 passing |
+| **`packages/reception`** | ✅ Dashboard + Membership Registration (with photo + QR identity) + Renewal + member detail/edit + Attendance Check-in + Expenses + Other Sales + Receipts done — see [§14](14-reception-membership.md) | 42 passing |
 | **`packages/training`** | 🟡 Partially prepared — see [§12.2](#122-9th-round-timer-architecture-prep) | 5 passing (`RoundPlan` value object) |
 | `packages/nutrition`, `packages/tracking`, `packages/billing`, `packages/notifications` | 📋 Skeleton only | — |
 | `packages/ai` | 📋 Skeleton only (Phase 3) | — |
@@ -23,7 +23,7 @@ Maintained continuously as code lands, per the requirement to generate technical
 | `apps/web` | 📋 Not started — zero `.tsx` files | — |
 | `supabase/functions/*` | 📋 Contract documented in each function's README; zero `index.ts` implementations | — |
 
-**Total: 85 automated tests, all passing** (`pnpm test` via Turborepo). **10 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
+**Total: 95 automated tests, all passing** (`pnpm test` via Turborepo). **10 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
 
 ## 12.1 Mobile Screens Shipped
 

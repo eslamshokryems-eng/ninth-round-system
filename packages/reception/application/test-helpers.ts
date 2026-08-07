@@ -16,6 +16,10 @@ import type { CheckInRepository } from "../domain/check-in-repository";
 import type { CheckInMemberOutput } from "../domain/check-in";
 import type { MemberPhotoRepository } from "../domain/member-photo-repository";
 import type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "../domain/member-photo";
+import type { ExpenseRepository } from "../domain/expense-repository";
+import type { Expense, RecordExpenseInput } from "../domain/expense";
+import type { EquipmentSaleRepository } from "../domain/equipment-sale-repository";
+import type { EquipmentSale, RecordEquipmentSaleInput } from "../domain/equipment-sale";
 
 export function buildDashboardStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
@@ -252,4 +256,101 @@ export function fakeMemberPhotoRepository(
       ...overrides,
     }),
   );
+}
+
+export function buildRecordExpenseInput(overrides: Partial<RecordExpenseInput> = {}): RecordExpenseInput {
+  return {
+    branchId: "branch-1",
+    category: "utilities",
+    description: null,
+    amount: 1500,
+    expenseDate: "2026-08-06",
+    paymentMethod: "cash",
+    receiptReference: null,
+    notes: null,
+    ...overrides,
+  };
+}
+
+export class FakeExpenseRepository implements ExpenseRepository {
+  public lastInput: RecordExpenseInput | null = null;
+  constructor(private result: Result<Expense> = ok(buildExpense())) {}
+
+  async record(input: RecordExpenseInput): Promise<Result<Expense>> {
+    this.lastInput = input;
+    return this.result;
+  }
+
+  async list(): Promise<Result<Expense[]>> {
+    return ok([]);
+  }
+}
+
+export function buildExpense(overrides: Partial<Expense> = {}): Expense {
+  return {
+    id: "expense-1",
+    category: "utilities",
+    description: null,
+    amount: 1500,
+    expenseDate: "2026-08-06",
+    paymentMethod: "cash",
+    receiptReference: null,
+    notes: null,
+    createdAt: "2026-08-06T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
+export function fakeExpenseRepository(overrides: Partial<Expense> = {}): FakeExpenseRepository {
+  return new FakeExpenseRepository(ok(buildExpense(overrides)));
+}
+
+export function buildRecordEquipmentSaleInput(
+  overrides: Partial<RecordEquipmentSaleInput> = {},
+): RecordEquipmentSaleInput {
+  return {
+    branchId: "branch-1",
+    itemName: "Boxing Gloves",
+    quantity: 1,
+    unitPrice: 350,
+    paymentMethod: "cash",
+    buyerName: null,
+    buyerPhone: null,
+    notes: null,
+    ...overrides,
+  };
+}
+
+export class FakeEquipmentSaleRepository implements EquipmentSaleRepository {
+  public lastInput: RecordEquipmentSaleInput | null = null;
+  constructor(private result: Result<EquipmentSale> = ok(buildEquipmentSale())) {}
+
+  async record(input: RecordEquipmentSaleInput): Promise<Result<EquipmentSale>> {
+    this.lastInput = input;
+    return this.result;
+  }
+
+  async list(): Promise<Result<EquipmentSale[]>> {
+    return ok([]);
+  }
+}
+
+export function buildEquipmentSale(overrides: Partial<EquipmentSale> = {}): EquipmentSale {
+  return {
+    id: "sale-1",
+    itemName: "Boxing Gloves",
+    quantity: 1,
+    unitPrice: 350,
+    totalPrice: 350,
+    paymentMethod: "cash",
+    buyerName: null,
+    buyerPhone: null,
+    notes: null,
+    createdAt: "2026-08-06T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
+export function fakeEquipmentSaleRepository(overrides: Partial<EquipmentSale> = {}): FakeEquipmentSaleRepository {
+  return new FakeEquipmentSaleRepository(ok(buildEquipmentSale(overrides)));
 }

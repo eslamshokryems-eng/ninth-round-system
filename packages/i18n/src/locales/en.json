@@ -204,6 +204,7 @@
       "qrCodeHint": "This code identifies the member for Check-In.",
       "showQrCode": "Show QR Code",
       "hideQrCode": "Hide QR Code",
+      "membershipNumberPreviewLabel": "Membership Number",
       "error": {
         "fullNameRequired": "Enter the member's full name.",
         "phoneRequired": "Enter a mobile number.",
@@ -216,6 +217,55 @@
         "noActiveMembership": "This member has no active membership.",
         "emptyPhoto": "The selected photo could not be read. Please try again.",
         "photoUploadFailed": "Could not upload the photo. Please try again."
+      }
+    },
+    "sideMenu": {
+      "title": "Menu",
+      "memberships": "Memberships",
+      "receipts": "Receipts",
+      "expenses": "Expenses",
+      "equipmentSales": "Other Sales"
+    },
+    "receipts": {
+      "title": "Receipts",
+      "empty": "No receipts yet.",
+      "receiptNumber": "Receipt"
+    },
+    "expenses": {
+      "title": "Expenses",
+      "recordAction": "Record Expense",
+      "empty": "No expenses recorded yet.",
+      "categoryLabel": "Category",
+      "categoryRent": "Rent",
+      "categoryUtilities": "Utilities",
+      "categorySalaries": "Salaries",
+      "categoryMaintenance": "Maintenance",
+      "categorySupplies": "Supplies",
+      "categoryMarketing": "Marketing",
+      "categoryOther": "Other",
+      "descriptionLabel": "Description (optional)",
+      "amountLabel": "Amount",
+      "dateLabel": "Date",
+      "receiptReferenceLabel": "Receipt Reference (optional)",
+      "save": "Save Expense",
+      "error": {
+        "invalidAmount": "Amount must be greater than zero."
+      }
+    },
+    "equipmentSales": {
+      "title": "Other Sales",
+      "recordAction": "Record Sale",
+      "empty": "No sales recorded yet.",
+      "itemNameLabel": "Item Name",
+      "quantityLabel": "Quantity",
+      "unitPriceLabel": "Unit Price",
+      "totalPriceLabel": "Total",
+      "buyerNameLabel": "Buyer Name (optional)",
+      "buyerPhoneLabel": "Buyer Phone (optional)",
+      "save": "Save Sale",
+      "error": {
+        "itemNameRequired": "Enter the item name.",
+        "invalidQuantity": "Quantity must be at least 1."
       }
     }
   },

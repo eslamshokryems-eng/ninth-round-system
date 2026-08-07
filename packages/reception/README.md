@@ -50,6 +50,23 @@ members-vs-profiles split).
   they're registered, returned by `register_membership()` and rendered
   client-side (no QR image is stored — just the value it encodes). This
   is what the future Check-In system will scan.
+- **Next Membership Number Preview** (`GetNextMembershipNumberUseCase`) —
+  a non-consuming read of `membership_number_seq`'s current position, so
+  the New Membership form can show what the number *will* be before
+  saving, without burning a real number (and leaving a permanent gap)
+  just from opening the form.
+- **Expenses** (`RecordExpenseUseCase`, `ListExpensesUseCase`) — branch-
+  scoped expense tracking (category/amount/date/payment method), reachable
+  from the Reception side menu.
+- **Other Sales** (`RecordEquipmentSaleUseCase`, `ListEquipmentSalesUseCase`)
+  — walk-in sales of sports equipment/gear. `item_name` is free text, not
+  a managed product/inventory catalog with stock levels — a deliberate v1
+  scope (see `supabase/migrations/20260806000009`'s comment), not a
+  shortcut standing in for real inventory management.
+- **Receipts** (`ListReceiptsUseCase`) — a read-only, chronological view
+  of every membership payment for the branch, joined back to the member
+  and membership it belongs to. No new table — reads the existing
+  `membership_payments` ledger.
 
 ## What's planned next
 

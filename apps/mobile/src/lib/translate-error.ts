@@ -25,6 +25,9 @@ const ERROR_CODE_TO_I18N_KEY: Record<string, string> = {
   NO_ACTIVE_MEMBERSHIP: "reception.membership.error.noActiveMembership",
   EMPTY_PHOTO: "reception.membership.error.emptyPhoto",
   PHOTO_UPLOAD_FAILED: "reception.membership.error.photoUploadFailed",
+  INVALID_AMOUNT: "reception.expenses.error.invalidAmount",
+  ITEM_NAME_REQUIRED: "reception.equipmentSales.error.itemNameRequired",
+  INVALID_QUANTITY: "reception.equipmentSales.error.invalidQuantity",
 };
 
 export function translateErrorCode(code: string): string {

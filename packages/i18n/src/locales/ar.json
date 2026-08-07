@@ -204,6 +204,7 @@
       "qrCodeHint": "هذا الرمز يحدد هوية العضو لتسجيل الحضور.",
       "showQrCode": "إظهار رمز QR",
       "hideQrCode": "إخفاء رمز QR",
+      "membershipNumberPreviewLabel": "رقم العضوية",
       "error": {
         "fullNameRequired": "أدخل الاسم الكامل للعضو.",
         "phoneRequired": "أدخل رقم الهاتف.",
@@ -216,6 +217,55 @@
         "noActiveMembership": "هذا العضو ليس لديه عضوية نشطة.",
         "emptyPhoto": "تعذّرت قراءة الصورة المحددة. حاول مرة أخرى.",
         "photoUploadFailed": "تعذّر رفع الصورة. حاول مرة أخرى."
+      }
+    },
+    "sideMenu": {
+      "title": "القائمة",
+      "memberships": "العضويات",
+      "receipts": "الإيصالات",
+      "expenses": "المصروفات",
+      "equipmentSales": "مبيعات أخرى"
+    },
+    "receipts": {
+      "title": "الإيصالات",
+      "empty": "لا توجد إيصالات بعد.",
+      "receiptNumber": "إيصال"
+    },
+    "expenses": {
+      "title": "المصروفات",
+      "recordAction": "تسجيل مصروف",
+      "empty": "لا توجد مصروفات مسجلة بعد.",
+      "categoryLabel": "الفئة",
+      "categoryRent": "الإيجار",
+      "categoryUtilities": "المرافق",
+      "categorySalaries": "الرواتب",
+      "categoryMaintenance": "الصيانة",
+      "categorySupplies": "المستلزمات",
+      "categoryMarketing": "التسويق",
+      "categoryOther": "أخرى",
+      "descriptionLabel": "الوصف (اختياري)",
+      "amountLabel": "المبلغ",
+      "dateLabel": "التاريخ",
+      "receiptReferenceLabel": "رقم إيصال المورد (اختياري)",
+      "save": "حفظ المصروف",
+      "error": {
+        "invalidAmount": "يجب أن يكون المبلغ أكبر من صفر."
+      }
+    },
+    "equipmentSales": {
+      "title": "مبيعات أخرى",
+      "recordAction": "تسجيل عملية بيع",
+      "empty": "لا توجد مبيعات مسجلة بعد.",
+      "itemNameLabel": "اسم الصنف",
+      "quantityLabel": "الكمية",
+      "unitPriceLabel": "سعر الوحدة",
+      "totalPriceLabel": "الإجمالي",
+      "buyerNameLabel": "اسم المشتري (اختياري)",
+      "buyerPhoneLabel": "هاتف المشتري (اختياري)",
+      "save": "حفظ عملية البيع",
+      "error": {
+        "itemNameRequired": "أدخل اسم الصنف.",
+        "invalidQuantity": "يجب أن تكون الكمية 1 على الأقل."
       }
     }
   },

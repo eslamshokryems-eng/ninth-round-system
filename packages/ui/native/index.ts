@@ -9,3 +9,4 @@ export { ProgressDots, type ProgressDotsProps } from "./progress-dots";
 export { OptionCard, type OptionCardProps } from "./option-card";
 export { Divider, type DividerProps } from "./divider";
 export { IconButton, BackButton, type IconButtonProps } from "./icon-button";
+export { SideMenu, type SideMenuProps, type SideMenuItem } from "./side-menu";

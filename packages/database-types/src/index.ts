@@ -68,6 +68,7 @@ export type MembershipStatus = "active" | "expired" | "cancelled";
 export type MembershipPaymentStatus = "paid" | "partial" | "unpaid";
 export type MembershipPaymentMethod = "cash" | "visa" | "instapay" | "vodafone_cash";
 export type MembershipAlertType = "expiring_7_days" | "expiring_3_days" | "expiring_today" | "expired";
+export type ExpenseCategory = "rent" | "utilities" | "salaries" | "maintenance" | "supplies" | "marketing" | "other";
 
 export interface BranchRow {
   id: string;
@@ -161,6 +162,37 @@ export interface CheckInRow {
   created_at: string;
 }
 
+export interface ExpenseRow {
+  id: string;
+  branch_id: string;
+  category: ExpenseCategory;
+  description: string | null;
+  amount: number;
+  expense_date: string;
+  payment_method: MembershipPaymentMethod;
+  receipt_reference: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OtherSaleRow {
+  id: string;
+  branch_id: string;
+  item_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  payment_method: MembershipPaymentMethod;
+  buyer_name: string | null;
+  buyer_phone: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ReceptionDashboardStatsRow {
   active_members: number;
   new_members_today: number;
@@ -251,6 +283,19 @@ export interface Database {
         Update: Partial<CheckInRow>;
         Relationships: [];
       };
+      expenses: {
+        Row: ExpenseRow;
+        Insert: Partial<ExpenseRow> & Pick<ExpenseRow, "branch_id" | "category" | "amount" | "payment_method">;
+        Update: Partial<ExpenseRow>;
+        Relationships: [];
+      };
+      other_sales: {
+        Row: OtherSaleRow;
+        Insert: Partial<OtherSaleRow> &
+          Pick<OtherSaleRow, "branch_id" | "item_name" | "unit_price" | "payment_method">;
+        Update: Partial<OtherSaleRow>;
+        Relationships: [];
+      };
     };
     Views: {
       reception_dashboard_stats: {
@@ -301,6 +346,10 @@ export interface Database {
       check_in_member: {
         Args: { p_member_id: string };
         Returns: { check_in_id: string; checked_in_at: string }[];
+      };
+      next_membership_number: {
+        Args: Record<string, never>;
+        Returns: string;
       };
     };
     Enums: Record<string, never>;

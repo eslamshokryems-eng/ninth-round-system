@@ -7,6 +7,7 @@ import { Button, IconButton, Logo, StatCard, Text } from "@9thround/ui/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthStore } from "../../src/features/auth/store";
 import { getIdentityModule, getReceptionModule } from "../../src/lib/composition-root";
+import { ReceptionSideMenu } from "../../src/components/reception-side-menu";
 
 /**
  * The Reception Dashboard (docs/phase-1/14-reception-membership.md §14.4,
@@ -25,6 +26,7 @@ export default function ReceptionDashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   // A ref, not state: read inside the useFocusEffect callback below to decide
   // spinner-vs-silent without making that callback (and thus the effect) depend on `stats`
@@ -75,6 +77,11 @@ export default function ReceptionDashboardScreen() {
       >
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center gap-3">
+            <IconButton
+              name="menu"
+              accessibilityLabel={t("reception.sideMenu.title")}
+              onPress={() => setIsMenuVisible(true)}
+            />
             <Logo variant="emblem" width={36} />
             <Text variant="display">{t("reception.dashboard.title")}</Text>
           </View>
@@ -124,6 +131,8 @@ export default function ReceptionDashboardScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <ReceptionSideMenu visible={isMenuVisible} onClose={() => setIsMenuVisible(false)} />
     </SafeAreaView>
   );
 }

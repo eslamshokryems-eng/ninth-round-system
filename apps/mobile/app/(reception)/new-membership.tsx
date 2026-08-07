@@ -63,6 +63,7 @@ export default function NewMembershipScreen() {
 
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [isLoadingTypes, setIsLoadingTypes] = useState(true);
+  const [previewMembershipNumber, setPreviewMembershipNumber] = useState<string | null>(null);
 
   const [photo, setPhoto] = useState<PickedMemberPhoto | null>(null);
   const [receiptNumber, setReceiptNumber] = useState("");
@@ -91,6 +92,13 @@ export default function NewMembershipScreen() {
       const result = await getReceptionModule().listMembershipTypes.execute();
       setIsLoadingTypes(false);
       if (result.isOk) setMembershipTypes(result.value);
+    })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      const result = await getReceptionModule().getNextMembershipNumber.execute();
+      if (result.isOk) setPreviewMembershipNumber(result.value);
     })();
   }, []);
 
@@ -199,6 +207,15 @@ export default function NewMembershipScreen() {
           <BackButton onPress={() => router.back()} />
           <Text variant="display">{t("reception.membership.newMembership")}</Text>
         </View>
+
+        <Card className="flex-row items-center justify-between">
+          <Text variant="body" color="muted">
+            {t("reception.membership.membershipNumberPreviewLabel")}
+          </Text>
+          <Text variant="title" color="gold">
+            {previewMembershipNumber ?? t("common.loading")}
+          </Text>
+        </Card>
 
         <View className="items-center gap-3">
           <View className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white/[0.06]">
