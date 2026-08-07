@@ -6,6 +6,7 @@ import type { MemberSearchResult } from "@9thround/reception";
 import { BackButton, Button, Card, IconButton, Text, TextField } from "@9thround/ui/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getReceptionModule } from "../../src/lib/composition-root";
+import { translateErrorCode } from "../../src/lib/translate-error";
 
 /**
  * "Membership Registration" (docs/phase-1/14-reception-membership.md §14.5)
@@ -84,8 +85,22 @@ export default function MembershipScreen() {
 
 function MemberResultCard({ member }: { member: MemberSearchResult }) {
   const { t } = useTranslation();
+  const [checkInFeedback, setCheckInFeedback] = useState<{ text: string; isError: boolean } | null>(null);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
 
   const statusLabel = deriveStatusLabel(member.activeMembershipStatus, member.activeMembershipEndDate, t);
+
+  async function handleCheckIn() {
+    setIsCheckingIn(true);
+    setCheckInFeedback(null);
+    const result = await getReceptionModule().checkInMember.execute(member.memberId);
+    setIsCheckingIn(false);
+    if (result.isErr) {
+      setCheckInFeedback({ text: t(translateErrorCode(result.error.code)), isError: true });
+      return;
+    }
+    setCheckInFeedback({ text: t("reception.membership.checkInSuccess"), isError: false });
+  }
 
   return (
     <Pressable
@@ -107,18 +122,35 @@ function MemberResultCard({ member }: { member: MemberSearchResult }) {
           <Text variant="body" color="muted">
             {member.phone} · {member.memberCode}
           </Text>
-          <IconButton
-            name="refresh"
-            size={18}
-            accessibilityLabel={t("reception.membership.renewAction")}
-            onPress={() =>
-              router.push({
-                pathname: "/(reception)/renew-membership",
-                params: { memberId: member.memberId, fullName: member.fullName },
-              })
-            }
-          />
+          <View className="flex-row items-center gap-2">
+            {isCheckingIn ? (
+              <ActivityIndicator size="small" color="#C9A227" />
+            ) : (
+              <IconButton
+                name="checkmark-circle-outline"
+                size={18}
+                accessibilityLabel={t("reception.membership.checkInAction")}
+                onPress={() => void handleCheckIn()}
+              />
+            )}
+            <IconButton
+              name="refresh"
+              size={18}
+              accessibilityLabel={t("reception.membership.renewAction")}
+              onPress={() =>
+                router.push({
+                  pathname: "/(reception)/renew-membership",
+                  params: { memberId: member.memberId, fullName: member.fullName },
+                })
+              }
+            />
+          </View>
         </View>
+        {checkInFeedback ? (
+          <Text variant="caption" className={checkInFeedback.isError ? "text-red-400" : "text-gold"}>
+            {checkInFeedback.text}
+          </Text>
+        ) : null}
       </Card>
     </Pressable>
   );

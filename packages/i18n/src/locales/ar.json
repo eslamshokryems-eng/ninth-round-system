@@ -196,6 +196,8 @@
       "memberDetailSaved": "تم حفظ التغييرات.",
       "membershipHistoryTitle": "سجل العضويات",
       "membershipHistoryEmpty": "لا يوجد سجل عضويات بعد.",
+      "checkInAction": "تسجيل حضور",
+      "checkInSuccess": "تم تسجيل الحضور.",
       "error": {
         "fullNameRequired": "أدخل الاسم الكامل للعضو.",
         "phoneRequired": "أدخل رقم الهاتف.",
@@ -204,7 +206,8 @@
         "invalidDiscount": "يجب أن يكون الخصم بين 0 والسعر.",
         "phoneAlreadyRegistered": "رقم الهاتف هذا مسجل بالفعل لعضو آخر.",
         "receiptNumberTaken": "تم استخدام رقم الإيصال هذا من قبل.",
-        "memberNotFound": "العضو غير موجود."
+        "memberNotFound": "العضو غير موجود.",
+        "noActiveMembership": "هذا العضو ليس لديه عضوية نشطة."
       }
     }
   },

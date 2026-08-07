@@ -12,6 +12,8 @@ import type { MemberDetailRepository } from "../domain/member-detail-repository"
 import type { MemberDetail } from "../domain/member-detail";
 import type { UpdateMemberRepository } from "../domain/update-member-repository";
 import type { UpdateMemberInput } from "../domain/update-member";
+import type { CheckInRepository } from "../domain/check-in-repository";
+import type { CheckInMemberOutput } from "../domain/check-in";
 
 export function buildDashboardStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
@@ -187,4 +189,24 @@ export class FakeUpdateMemberRepository implements UpdateMemberRepository {
     this.lastInput = input;
     return this.result;
   }
+}
+
+export class FakeCheckInRepository implements CheckInRepository {
+  public lastMemberId: string | null = null;
+  constructor(private result: Result<CheckInMemberOutput>) {}
+
+  async checkIn(memberId: string): Promise<Result<CheckInMemberOutput>> {
+    this.lastMemberId = memberId;
+    return this.result;
+  }
+}
+
+export function fakeCheckInRepository(overrides: Partial<CheckInMemberOutput> = {}): FakeCheckInRepository {
+  return new FakeCheckInRepository(
+    ok({
+      checkInId: "check-in-1",
+      checkedInAt: "2026-08-06T10:00:00.000Z",
+      ...overrides,
+    }),
+  );
 }

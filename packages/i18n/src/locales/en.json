@@ -196,6 +196,8 @@
       "memberDetailSaved": "Changes saved.",
       "membershipHistoryTitle": "Membership History",
       "membershipHistoryEmpty": "No membership history yet.",
+      "checkInAction": "Check In",
+      "checkInSuccess": "Checked in.",
       "error": {
         "fullNameRequired": "Enter the member's full name.",
         "phoneRequired": "Enter a mobile number.",
@@ -204,7 +206,8 @@
         "invalidDiscount": "Discount must be between 0 and the price.",
         "phoneAlreadyRegistered": "This phone number is already registered to another member.",
         "receiptNumberTaken": "This receipt number has already been used.",
-        "memberNotFound": "Member not found."
+        "memberNotFound": "Member not found.",
+        "noActiveMembership": "This member has no active membership."
       }
     }
   },

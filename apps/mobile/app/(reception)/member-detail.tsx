@@ -42,6 +42,9 @@ export default function MemberDetailScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
+  const [checkInFeedback, setCheckInFeedback] = useState<{ text: string; isError: boolean } | null>(null);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+
   const loadDetail = useCallback(async () => {
     if (!memberId) return;
     setIsLoading(true);
@@ -109,6 +112,24 @@ export default function MemberDetailScreen() {
     setSavedAt(Date.now());
   }
 
+  async function handleCheckIn() {
+    if (!memberId) return;
+
+    setCheckInFeedback(null);
+    setIsCheckingIn(true);
+
+    const result = await getReceptionModule().checkInMember.execute(memberId);
+
+    setIsCheckingIn(false);
+
+    if (result.isErr) {
+      setCheckInFeedback({ text: t(translateErrorCode(result.error.code)), isError: true });
+      return;
+    }
+
+    setCheckInFeedback({ text: t("reception.membership.checkInSuccess"), isError: false });
+  }
+
   if (isLoading) {
     return (
       <ScreenContainer>
@@ -144,6 +165,24 @@ export default function MemberDetailScreen() {
               {detail.memberCode}
             </Text>
           </View>
+        </View>
+
+        <View className="gap-2">
+          <Button
+            label={t("reception.membership.checkInAction")}
+            variant="secondary"
+            onPress={() => void handleCheckIn()}
+            isLoading={isCheckingIn}
+          />
+          {checkInFeedback ? (
+            <Text
+              variant="caption"
+              className={checkInFeedback.isError ? "text-red-400" : "text-gold"}
+              style={{ textAlign: "center" }}
+            >
+              {checkInFeedback.text}
+            </Text>
+          ) : null}
         </View>
 
         <View className="gap-3">

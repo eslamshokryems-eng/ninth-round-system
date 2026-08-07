@@ -32,6 +32,12 @@ members-vs-profiles split).
   — a member's full profile plus their complete membership history (every
   period, not just the current one search surfaces), and an edit form for
   the profile fields. Reached by tapping a member's search result.
+- **Attendance Check-in** (`CheckInMemberUseCase`) — one-tap check-in via
+  the `check_in_member()` RPC, which enforces the one real business rule
+  (a member must have an active, unexpired membership to check in) and
+  writes to `check_ins`, an append-only attendance log (no update/delete
+  RLS, same principle as `membership_payments`). Reached from a member's
+  search result or their detail screen.
 
 ## What's planned next
 

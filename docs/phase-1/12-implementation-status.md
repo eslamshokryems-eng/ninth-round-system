@@ -15,7 +15,7 @@ Maintained continuously as code lands, per the requirement to generate technical
 | `packages/ui` — `web/` | 📋 Not started | — |
 | `packages/config` | ✅ Implemented | — |
 | **`packages/identity`** | ✅ Implemented — the reference bounded context, now covering registration, login, forgot-password, onboarding (name/goal/experience/body-metrics), and role assignment against the 5-role model (member/coach/reception/branch_manager/super_admin) | **39 passing** (domain, application, and infrastructure-mapping tests, all using in-memory fakes — zero database) |
-| **`packages/reception`** | ✅ Dashboard + Membership Registration + Renewal + member detail/edit done — see [§14](14-reception-membership.md) | 26 passing |
+| **`packages/reception`** | ✅ Dashboard + Membership Registration + Renewal + member detail/edit + Attendance Check-in done — see [§14](14-reception-membership.md) | 29 passing |
 | **`packages/training`** | 🟡 Partially prepared — see [§12.2](#122-9th-round-timer-architecture-prep) | 5 passing (`RoundPlan` value object) |
 | `packages/nutrition`, `packages/tracking`, `packages/billing`, `packages/notifications` | 📋 Skeleton only | — |
 | `packages/ai` | 📋 Skeleton only (Phase 3) | — |
@@ -23,7 +23,7 @@ Maintained continuously as code lands, per the requirement to generate technical
 | `apps/web` | 📋 Not started — zero `.tsx` files | — |
 | `supabase/functions/*` | 📋 Contract documented in each function's README; zero `index.ts` implementations | — |
 
-**Total: 79 automated tests, all passing** (`pnpm test` via Turborepo). **10 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
+**Total: 82 automated tests, all passing** (`pnpm test` via Turborepo). **10 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.
 
 ## 12.1 Mobile Screens Shipped
 
@@ -77,11 +77,11 @@ This does not replace running against a real Supabase project (Supabase's actual
 
 ## 12.6 Next Slice (proposed)
 
-The product has pivoted from a public consumer app to a private club-management platform — see [Reception & Membership System](14-reception-membership.md) for the full picture. The Dashboard, Membership Registration, Membership Renewal, and Member Detail/Edit are done and tested — the core Reception workflow is now complete end to end (search → register → renew → view/edit a member's full history). Remaining:
+The product has pivoted from a public consumer app to a private club-management platform — see [Reception & Membership System](14-reception-membership.md) for the full picture. The Dashboard, Membership Registration, Membership Renewal, Member Detail/Edit, and Attendance Check-in are done and tested — the core Reception + front-desk workflow is now complete end to end (search → register → renew → view/edit a member → check them in). Remaining:
 
-1. Push the five new migrations (`20260806000001_role_model_v2.sql` through `20260806000005_renew_membership.sql`) to the real Supabase project via `supabase db push`. `20260806000004_fix_auth_role.sql` in particular fixes a real bug blocking Save Membership on a live session — see its migration comment for the root cause (RLS self-recursion through `auth_role()`).
+1. Push the six new migrations (`20260806000001_role_model_v2.sql` through `20260806000006_check_ins.sql`) to the real Supabase project via `supabase db push`. `20260806000004_fix_auth_role.sql` in particular fixes a real bug blocking Save Membership on a live session — see its migration comment for the root cause (RLS self-recursion through `auth_role()`).
 2. Wire up `generate_membership_alerts()` to a daily schedule (pg_cron or an Edge Function cron) — written to be idempotent, not yet scheduled.
 3. Replace the plain-text Date of Birth field with a native date picker.
 4. Run `pnpm db:types` against the real project and replace the hand-authored `packages/database-types` placeholder with genuinely generated types (now includes the Reception & Membership tables too).
-5. Move on to the next area of the product roadmap: Attendance Check-in, a Payments screen (the `membership_payments` ledger and `payment_method` capture already exist; no dedicated UI yet), or the Coach Dashboard.
+5. Move on to the next area of the product roadmap: a Payments screen/report (the `membership_payments` ledger and `payment_method` capture already exist; no dedicated UI yet — e.g. a daily/monthly transaction list), or the Coach Dashboard.
 6. Once Reception's remaining polish items are done, revisit the consumer-app RTL caveats above and the `training` context (Program/Workout/Exercise entities, the `TimerSession` aggregate, the 9-Round Timer UI) as later phases.

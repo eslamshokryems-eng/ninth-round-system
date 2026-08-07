@@ -151,6 +151,15 @@ export interface MembershipAlertRow {
   created_at: string;
 }
 
+export interface CheckInRow {
+  id: string;
+  member_id: string;
+  branch_id: string;
+  checked_in_at: string;
+  checked_in_by: string | null;
+  created_at: string;
+}
+
 export interface ReceptionDashboardStatsRow {
   active_members: number;
   new_members_today: number;
@@ -235,6 +244,12 @@ export interface Database {
         Update: Partial<MembershipAlertRow>;
         Relationships: [];
       };
+      check_ins: {
+        Row: CheckInRow;
+        Insert: Partial<CheckInRow> & Pick<CheckInRow, "member_id" | "branch_id">;
+        Update: Partial<CheckInRow>;
+        Relationships: [];
+      };
     };
     Views: {
       reception_dashboard_stats: {
@@ -272,6 +287,10 @@ export interface Database {
           p_notes: string | null;
         };
         Returns: { membership_id: string; membership_number: string; start_date: string; end_date: string }[];
+      };
+      check_in_member: {
+        Args: { p_member_id: string };
+        Returns: { check_in_id: string; checked_in_at: string }[];
       };
     };
     Enums: Record<string, never>;
