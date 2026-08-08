@@ -24,6 +24,16 @@ export function getSupabaseClient(): TypedSupabaseClient {
     );
   }
 
+  try {
+    new URL(env.supabaseUrl);
+  } catch {
+    throw new Error(
+      `Invalid NEXT_PUBLIC_SUPABASE_URL: "${env.supabaseUrl}" is not a well-formed absolute URL. ` +
+        'It must look like "https://xxxxx.supabase.co" — no quotes, no surrounding whitespace, ' +
+        "and it must include the https:// scheme.",
+    );
+  }
+
   client = createSupabaseClient({
     url: env.supabaseUrl,
     anonKey: env.supabaseAnonKey,
