@@ -14,6 +14,7 @@ import { RecordEquipmentSaleUseCase } from "./application/record-equipment-sale"
 import { ListEquipmentSalesUseCase } from "./application/list-equipment-sales";
 import { ListReceiptsUseCase } from "./application/list-receipts";
 import { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
+import { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 import { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 import { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 import { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -27,6 +28,7 @@ import { SupabaseExpenseRepository } from "./infrastructure/supabase-expense-rep
 import { SupabaseEquipmentSaleRepository } from "./infrastructure/supabase-equipment-sale-repository";
 import { SupabaseReceiptRepository } from "./infrastructure/supabase-receipt-repository";
 import { SupabaseMembershipNumberRepository } from "./infrastructure/supabase-membership-number-repository";
+import { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-expiring-membership-repository";
 
 export type { DashboardStats } from "./domain/dashboard-stats";
 export type { DashboardRepository } from "./domain/dashboard-repository";
@@ -46,6 +48,7 @@ export type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "./domain/m
 export type { Expense, ExpenseCategory, RecordExpenseInput } from "./domain/expense";
 export type { EquipmentSale, RecordEquipmentSaleInput } from "./domain/equipment-sale";
 export type { Receipt } from "./domain/receipt";
+export type { ExpiringMembership } from "./domain/expiring-membership";
 export {
   GetDashboardStatsUseCase,
   type GetDashboardStatsOutput,
@@ -64,6 +67,7 @@ export { RecordEquipmentSaleUseCase } from "./application/record-equipment-sale"
 export { ListEquipmentSalesUseCase } from "./application/list-equipment-sales";
 export { ListReceiptsUseCase } from "./application/list-receipts";
 export { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
+export { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 export { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 export { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 export { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -77,6 +81,7 @@ export { SupabaseExpenseRepository } from "./infrastructure/supabase-expense-rep
 export { SupabaseEquipmentSaleRepository } from "./infrastructure/supabase-equipment-sale-repository";
 export { SupabaseReceiptRepository } from "./infrastructure/supabase-receipt-repository";
 export { SupabaseMembershipNumberRepository } from "./infrastructure/supabase-membership-number-repository";
+export { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-expiring-membership-repository";
 
 /**
  * The Reception context's composition root — mirrors
@@ -99,6 +104,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
   const equipmentSaleRepository = new SupabaseEquipmentSaleRepository(client);
   const receiptRepository = new SupabaseReceiptRepository(client);
   const membershipNumberRepository = new SupabaseMembershipNumberRepository(client);
+  const expiringMembershipRepository = new SupabaseExpiringMembershipRepository(client);
   return {
     getDashboardStats: new GetDashboardStatsUseCase(dashboardRepository),
     registerMembership: new RegisterMembershipUseCase(registrationRepository),
@@ -115,5 +121,6 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listEquipmentSales: new ListEquipmentSalesUseCase(equipmentSaleRepository),
     listReceipts: new ListReceiptsUseCase(receiptRepository),
     getNextMembershipNumber: new GetNextMembershipNumberUseCase(membershipNumberRepository),
+    listExpiringMemberships: new ListExpiringMembershipsUseCase(expiringMembershipRepository),
   };
 }

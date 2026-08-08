@@ -1,6 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // tsconfig.base.json's "lib" is ES2022-only (correct for React
+    // Native, which has no DOM) — web needs the browser globals
+    // (window, HTMLInputElement, etc.) that mobile deliberately omits,
+    // so this is added here rather than in the shared base.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
     "module": "ESNext",
     "moduleResolution": "Bundler",

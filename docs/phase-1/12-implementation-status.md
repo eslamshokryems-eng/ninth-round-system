@@ -12,7 +12,7 @@ Maintained continuously as code lands, per the requirement to generate technical
 | `packages/supabase-client` | ✅ Implemented | — |
 | `packages/ui` — `tokens/` | ✅ Implemented | — |
 | `packages/ui` — `native/` | ✅ Implemented — `Text`, `Button`, `TextField`, `Card`, `ScreenContainer`, `ProgressDots`, `OptionCard`, `Divider`, `IconButton`/`BackButton` | — (presentational; exercised via the mobile app's bundle-level smoke test, see below) |
-| `packages/ui` — `web/` | 📋 Not started | — |
+| `packages/ui` — `web/` | 📋 Not populated (deliberately — see [§15.1](15-reception-web-app.md#151-what-it-reuses-vs-whats-new)) | — |
 | `packages/config` | ✅ Implemented | — |
 | **`packages/identity`** | ✅ Implemented — the reference bounded context, now covering registration, login, forgot-password, onboarding (name/goal/experience/body-metrics), and role assignment against the 5-role model (member/coach/reception/branch_manager/super_admin) | **39 passing** (domain, application, and infrastructure-mapping tests, all using in-memory fakes — zero database) |
 | **`packages/reception`** | ✅ Dashboard + Membership Registration (with photo + QR identity) + Renewal + member detail/edit + Attendance Check-in + Expenses + Other Sales + Receipts done — see [§14](14-reception-membership.md) | 42 passing |
@@ -20,7 +20,7 @@ Maintained continuously as code lands, per the requirement to generate technical
 | `packages/nutrition`, `packages/tracking`, `packages/billing`, `packages/notifications` | 📋 Skeleton only | — |
 | `packages/ai` | 📋 Skeleton only (Phase 3) | — |
 | **`apps/mobile`** | ✅ 16 member-facing screens + the Reception Dashboard — see [§12.1](#121-mobile-screens-shipped) and [§14](14-reception-membership.md) | Typechecks + lints clean; verified with a real `expo export` bundle (see below) |
-| `apps/web` | 📋 Not started — zero `.tsx` files | — |
+| **`apps/web`** | ✅ Reception Web App — desktop login, Dashboard, Members search/detail/edit, Add Member (photo + QR), Memberships, Renewal, Check-in, Receipts, Expiring, Profile; Reports is an honest placeholder — see [§15](15-reception-web-app.md) | Typechecks + lints clean; verified with a real `next build` + `next start` (see §15.4) |
 | `supabase/functions/*` | 📋 Contract documented in each function's README; zero `index.ts` implementations | — |
 
 **Total: 95 automated tests, all passing** (`pnpm test` via Turborepo). **10 typecheck targets, all passing** (`pnpm typecheck`). **Lint clean across the entire repository** (`pnpm lint`), including type-aware rules (`@typescript-eslint/no-floating-promises`) via typescript-eslint's Project Service.

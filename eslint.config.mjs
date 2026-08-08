@@ -13,6 +13,16 @@ export default [
     },
   },
   {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { console: "readonly", process: "readonly" },
+    },
+    rules: {
+      // A postinstall/build script reporting its own progress is exactly what console.log is for.
+      "no-console": "off",
+    },
+  },
+  {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {

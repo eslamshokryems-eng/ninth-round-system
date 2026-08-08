@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:migrate": "supabase db push",
-    "db:types": "supabase gen types typescript --local > packages/database-types/src/index.ts"
+    "db:types": "supabase gen types typescript --local > packages/database-types/src/index.ts",
+    "postinstall": "node scripts/fix-next-react-dedup.mjs"
   },
   "devDependencies": {
     "@9thround/config": "workspace:*",
@@ -22,5 +23,10 @@
     "typescript": "^5.5.0",
     "prettier": "^3.3.0",
     "eslint": "^9.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "styled-jsx>react": "18.2.0"
+    }
   }
 }
