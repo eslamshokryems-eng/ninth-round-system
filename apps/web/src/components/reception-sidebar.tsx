@@ -7,19 +7,36 @@ import { useState } from "react";
 import { useAuthStore } from "../features/auth/store";
 import { getIdentityModule } from "../lib/composition-root";
 
-const NAV_ITEMS: { href: string; label: string }[] = [
+/** The Payments/Receipts page is now a daily-income calendar, not just a table — a calendar glyph flags that at a glance. */
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <rect x="2.5" y="3.5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2.5 7.5h15" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6 2v3M14 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon?: () => JSX.Element;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/members", label: "Members" },
   { href: "/members/new", label: "Add Member" },
   { href: "/memberships", label: "Memberships" },
-  { href: "/receipts", label: "Payments / Receipts" },
+  { href: "/receipts", label: "Payments / Receipts", icon: CalendarIcon },
   { href: "/expiring", label: "Expiring" },
   { href: "/reports", label: "Reports" },
   { href: "/profile", label: "Profile" },
 ];
 
 /** Only Branch Manager/Super Admin can approve staff accounts (docs/12-roles-and-permissions.md §12.4) — kept out of the base nav so Reception accounts never see a link they'd be turned away from. */
-const STAFF_MANAGEMENT_NAV_ITEM = { href: "/staff", label: "Manage Staff" };
+const STAFF_MANAGEMENT_NAV_ITEM: NavItem = { href: "/staff", label: "Manage Staff" };
 
 /** The Reception web app's permanent desktop sidebar — see Phase 5 of the reception-web brief. */
 export function ReceptionSidebar() {
@@ -54,14 +71,16 @@ export function ReceptionSidebar() {
           : NAV_ITEMS
         ).map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+          const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive ? "bg-gold/10 text-gold" : "text-muted hover:bg-white/[0.06] hover:text-ink"
               }`}
             >
+              {Icon ? <Icon /> : null}
               {item.label}
             </Link>
           );

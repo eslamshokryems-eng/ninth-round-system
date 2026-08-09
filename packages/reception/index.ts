@@ -14,6 +14,7 @@ import { ListExpensesUseCase } from "./application/list-expenses";
 import { RecordEquipmentSaleUseCase } from "./application/record-equipment-sale";
 import { ListEquipmentSalesUseCase } from "./application/list-equipment-sales";
 import { ListReceiptsUseCase } from "./application/list-receipts";
+import { ListReceiptsByDateRangeUseCase } from "./application/list-receipts-by-date-range";
 import { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
 import { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 import { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
@@ -68,6 +69,10 @@ export { ListExpensesUseCase } from "./application/list-expenses";
 export { RecordEquipmentSaleUseCase } from "./application/record-equipment-sale";
 export { ListEquipmentSalesUseCase } from "./application/list-equipment-sales";
 export { ListReceiptsUseCase } from "./application/list-receipts";
+export {
+  ListReceiptsByDateRangeUseCase,
+  type ListReceiptsByDateRangeInput,
+} from "./application/list-receipts-by-date-range";
 export { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
 export { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 export { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
@@ -123,6 +128,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     recordEquipmentSale: new RecordEquipmentSaleUseCase(equipmentSaleRepository),
     listEquipmentSales: new ListEquipmentSalesUseCase(equipmentSaleRepository),
     listReceipts: new ListReceiptsUseCase(receiptRepository),
+    listReceiptsByDateRange: new ListReceiptsByDateRangeUseCase(receiptRepository),
     getNextMembershipNumber: new GetNextMembershipNumberUseCase(membershipNumberRepository),
     listExpiringMemberships: new ListExpiringMembershipsUseCase(expiringMembershipRepository),
   };
