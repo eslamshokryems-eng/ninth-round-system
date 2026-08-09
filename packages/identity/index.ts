@@ -5,6 +5,7 @@ import { GetCurrentProfileUseCase } from "./application/get-current-profile";
 import { SignUpUseCase } from "./application/sign-up";
 import { SignInUseCase } from "./application/sign-in";
 import { RequestPasswordResetUseCase } from "./application/request-password-reset";
+import { SearchStaffCandidatesUseCase } from "./application/search-staff-candidates";
 import { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
 import { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 
@@ -36,6 +37,11 @@ export {
   RequestPasswordResetUseCase,
   type RequestPasswordResetInput,
 } from "./application/request-password-reset";
+export {
+  SearchStaffCandidatesUseCase,
+  type SearchStaffCandidatesInput,
+  type StaffCandidate,
+} from "./application/search-staff-candidates";
 export { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
 export { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 
@@ -56,6 +62,7 @@ export function createIdentityModule(client: TypedSupabaseClient) {
     completeOnboarding: new CompleteOnboardingUseCase(profileRepository),
     assignStaffRole: new AssignStaffRoleUseCase(profileRepository),
     getCurrentProfile: new GetCurrentProfileUseCase(profileRepository),
+    searchStaffCandidates: new SearchStaffCandidatesUseCase(profileRepository),
     signUp: new SignUpUseCase(authPort),
     signIn: new SignInUseCase(authPort),
     requestPasswordReset: new RequestPasswordResetUseCase(authPort),

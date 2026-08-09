@@ -38,4 +38,18 @@ export class SupabaseProfileRepository implements ProfileRepository {
     }
     return ok(undefined);
   }
+
+  async search(query: string): Promise<Result<Profile[]>> {
+    const { data, error } = await this.client
+      .from("profiles")
+      .select("*")
+      .ilike("full_name", `%${query}%`)
+      .order("full_name", { ascending: true })
+      .limit(25);
+
+    if (error) {
+      return err(domainError("PROFILE_SEARCH_FAILED", error.message));
+    }
+    return ok((data ?? []).map(rowToProfile));
+  }
 }

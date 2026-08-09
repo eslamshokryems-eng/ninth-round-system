@@ -18,6 +18,9 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: "/profile", label: "Profile" },
 ];
 
+/** Only Branch Manager/Super Admin can approve staff accounts (docs/12-roles-and-permissions.md §12.4) — kept out of the base nav so Reception accounts never see a link they'd be turned away from. */
+const STAFF_MANAGEMENT_NAV_ITEM = { href: "/staff", label: "Manage Staff" };
+
 /** The Reception web app's permanent desktop sidebar — see Phase 5 of the reception-web brief. */
 export function ReceptionSidebar() {
   const pathname = usePathname();
@@ -46,7 +49,10 @@ export function ReceptionSidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {NAV_ITEMS.map((item) => {
+        {(role === "branch_manager" || role === "super_admin"
+          ? [...NAV_ITEMS, STAFF_MANAGEMENT_NAV_ITEM]
+          : NAV_ITEMS
+        ).map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           return (
             <Link

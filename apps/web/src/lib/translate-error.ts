@@ -25,6 +25,10 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   INVALID_AMOUNT: "Amount must be greater than zero.",
   ITEM_NAME_REQUIRED: "Enter the item name.",
   INVALID_QUANTITY: "Quantity must be at least 1.",
+  PROFILE_SEARCH_FAILED: "Could not search accounts. Please try again.",
+  ACTOR_NOT_FOUND: "Your account could not be verified. Please sign in again.",
+  TARGET_NOT_FOUND: "That account could not be found.",
+  FORBIDDEN_ROLE_ASSIGNMENT: "Your account is not permitted to assign that role.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";

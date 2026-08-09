@@ -45,6 +45,11 @@ export class InMemoryProfileRepository implements ProfileRepository {
     this.byId.set(profile.id, profile);
     return ok(undefined);
   }
+
+  async search(query: string): Promise<Result<Profile[]>> {
+    const lowered = query.toLowerCase();
+    return ok([...this.byId.values()].filter((p) => p.fullName?.toLowerCase().includes(lowered)));
+  }
 }
 
 /** Test double for AuthPort — records calls so tests can assert on them, per docs/13-ddd-architecture.md. */

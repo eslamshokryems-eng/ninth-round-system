@@ -10,4 +10,6 @@ import type { Profile } from "./profile";
 export interface ProfileRepository {
   findById(id: string): Promise<Result<Profile | null>>;
   save(profile: Profile): Promise<Result<void>>;
+  /** Name search, used by staff role management (admins looking up an account to promote). */
+  search(query: string): Promise<Result<Profile[]>>;
 }
