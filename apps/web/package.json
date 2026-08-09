@@ -13,6 +13,7 @@
     "@9thround/shared-kernel": "workspace:*",
     "@9thround/database-types": "workspace:*",
     "@9thround/supabase-client": "workspace:*",
+    "@supabase/supabase-js": "2.45.4",
     "@9thround/i18n": "workspace:*",
     "@9thround/identity": "workspace:*",
     "@9thround/reception": "workspace:*",

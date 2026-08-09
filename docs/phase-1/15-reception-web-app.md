@@ -65,3 +65,12 @@ Deployment (Vercel, or any Node host) is a normal Next.js app deploy — no Expo
 - Reports (revenue trends, exports) — honest placeholder, see §15.3.
 - A QR-camera-scanning Check-In flow for the web app (mirrors the same gap already documented for mobile in [§14.6](14-reception-membership.md)) — today's web Check-In, like mobile's, is a manual button tap.
 - Expenses / Other Sales screens on the web (they exist on mobile — see §14.7's sibling section once ported; this app's Phase 5 sidebar spec didn't include them, so they were deliberately left out of this slice rather than half-built).
+
+## 15.8 Manage Staff
+
+`app/(reception)/staff/page.tsx` — visible only to `branch_manager`/`super_admin` (hidden from the sidebar for everyone else, and the page itself refuses to render for any other role even if reached directly by URL). Two things live here, both grounded in already-documented rules rather than new ones:
+
+- **Change an existing account's role** — search by name (`SearchStaffCandidatesUseCase` + `ProfileRepository.search()`, new thin additions to `packages/identity`), then assign a role via the existing `AssignStaffRoleUseCase`. The role dropdown is filtered through `Role.canAssignRole` so the UI never offers a grant the backend (and the database — see §12.3) would reject.
+- **Create a new account** — for someone who has never signed in before. `POST /api/staff/create-account` (`apps/web/app/api/staff/create-account/route.ts`) is this app's **first Route Handler and its only use of `SUPABASE_SERVICE_ROLE_KEY`**: a plain server env var (no `NEXT_PUBLIC_` prefix, never bundled to the browser — confirmed by the production build listing this route as `ƒ` server-rendered, `0 B` client bundle). It re-verifies the caller's own identity and role from their access token before doing anything (never trusts a client-supplied "I'm an admin" claim), re-checks `Role.canAssignRole` independently of the UI filter, then uses the Admin API to create the login and set its role/branch. The founder sets a temporary password directly rather than an emailed invite link — simpler, and doesn't depend on Supabase's transactional email being configured.
+
+See [§14.1.1](14-reception-membership.md) for the `sales_employee` role this page can now also grant — same permissions as `reception` except check-in.

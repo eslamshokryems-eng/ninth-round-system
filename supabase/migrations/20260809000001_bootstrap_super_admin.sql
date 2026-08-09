@@ -10,11 +10,11 @@ do $$
 begin
   update profiles
   set role = 'super_admin'
-  where id = 'aaa7db27-3aaa-4701-aed2-f1b49127bdda';
+  where id = 'aea7db27-3aaa-4701-aed2-f1b49127bdda';
 
   if not found then
     raise exception
-      'Bootstrap super_admin: no profile found with id aaa7db27-3aaa-4701-aed2-f1b49127bdda. '
+      'Bootstrap super_admin: no profile found with id aea7db27-3aaa-4701-aed2-f1b49127bdda. '
       'Double-check the Account ID on the Reception Web App Profile screen and update this migration before re-running.';
   end if;
 end $$;

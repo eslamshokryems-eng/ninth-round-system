@@ -1,0 +1,11 @@
+-- Adds a 6th role: sales_employee. A distinct role from reception (not a
+-- relabeling of it) — same operational surface as reception (members,
+-- memberships, receipts, expenses, other sales) except check-ins, which
+-- stays reception/branch_manager/super_admin only. See
+-- docs/12-roles-and-permissions.md §12.4 for the updated matrix.
+--
+-- `alter type ... add value` must be committed before the new value can be
+-- referenced anywhere else (functions, policies, casts) — kept in its own
+-- migration file, same pattern as 20260806000001_role_model_v2.sql's enum
+-- rename, so the next migration file can safely use 'sales_employee'.
+alter type user_role add value if not exists 'sales_employee';

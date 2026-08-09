@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import { useAuthStore } from "../src/features/auth/store";
 import { useLocaleStore } from "../src/lib/locale-store";
 
-const STAFF_ROLES = new Set(["reception", "branch_manager", "super_admin"]);
+const STAFF_ROLES = new Set(["reception", "sales_employee", "branch_manager", "super_admin"]);
 
 /**
  * The routing gate described in docs/phase-1/06-navigation-flow.md §6.1:

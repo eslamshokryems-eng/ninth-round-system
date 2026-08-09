@@ -18,6 +18,12 @@ Migration: `supabase/migrations/20260806000001_role_model_v2.sql`. Existing rows
 
 `packages/identity`'s `Role` value object (`domain/role.ts`) and `packages/database-types`'s `UserRole`/`StaffRole` types are updated to match — see git history for the exact diff. `is_admin()` (the RLS helper — kept under its original name so no other migration's policies need touching) now checks `branch_manager`/`super_admin` instead of `admin`/`super_admin`.
 
+### 14.1.1 A 6th role: `sales_employee`
+
+Added in `supabase/migrations/20260809000002_sales_employee_role.sql` (`alter type user_role add value` — kept in its own migration file, since a new enum value must be committed before it can be referenced elsewhere) and `20260809000003_sales_employee_permissions.sql` (grants). `sales_employee` gets the exact same branch-scoped read/write surface as `reception` — members, memberships, receipts, expenses, other sales — with one deliberate carve-out: **check-in stays reception/branch_manager/super_admin only**, so `"reception/branch_manager insert check-ins"` (`20260806000006_check_ins.sql`) is untouched. `is_branch_staff()` and every reception-write policy this migration touches are dropped and recreated (Postgres has no `alter policy ... add role`), verified against a real Postgres engine (pglite, same methodology as §14.3/§14.5): all migrations apply cleanly, `sales_employee` can write members/memberships and is blocked from check-ins, and `reception`'s existing permissions are unaffected (regression-checked in the same run).
+
+`packages/identity`'s `Role.USER_ROLES`/`STAFF_ROLES` and `packages/database-types`'s `UserRole` are updated to match. Both apps' staff-role allowlists (`apps/web/src/lib/staff-roles.ts`, `apps/mobile/app/index.tsx`) now include `sales_employee` so those accounts can actually sign in and reach the Reception surface.
+
 ## 14.2 Members vs. Profiles — a deliberate split
 
 A **member** (the new `members` table) is a business record Reception creates directly at the front desk — full name, phone, DOB, emergency contact, etc. It does **not** require a Supabase Auth account. A **profile** (`profiles`, extending `auth.users`) is the identity for anyone who actually logs into a 9th Round app — every staff role, always, and a member only if/when they're issued app access.

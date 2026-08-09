@@ -11,7 +11,13 @@
  * like these rows.
  */
 
-export type UserRole = "member" | "coach" | "reception" | "branch_manager" | "super_admin";
+export type UserRole =
+  | "member"
+  | "coach"
+  | "reception"
+  | "sales_employee"
+  | "branch_manager"
+  | "super_admin";
 export type StaffRole = "coach" | "reception";
 export type AssignmentContext = "training" | "nutrition";
 export type LocaleCode = "en" | "ar";

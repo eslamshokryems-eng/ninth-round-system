@@ -29,6 +29,11 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   ACTOR_NOT_FOUND: "Your account could not be verified. Please sign in again.",
   TARGET_NOT_FOUND: "That account could not be found.",
   FORBIDDEN_ROLE_ASSIGNMENT: "Your account is not permitted to assign that role.",
+  INVALID_PASSWORD: "Temporary password must be at least 6 characters.",
+  EMAIL_ALREADY_REGISTERED: "An account with this email already exists.",
+  ACCOUNT_CREATE_FAILED: "Could not create the account. Please try again.",
+  SERVER_MISCONFIGURED: "Server configuration error. Contact support.",
+  UNAUTHORIZED: "Your session has expired. Please sign in again.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";
