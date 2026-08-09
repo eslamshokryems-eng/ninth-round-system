@@ -3,6 +3,7 @@ import { GetDashboardStatsUseCase } from "./application/get-dashboard-stats";
 import { RegisterMembershipUseCase } from "./application/register-membership";
 import { ListMembershipTypesUseCase } from "./application/list-membership-types";
 import { SearchMembersUseCase } from "./application/search-members";
+import { ListMembersUseCase } from "./application/list-members";
 import { RenewMembershipUseCase } from "./application/renew-membership";
 import { GetMemberDetailUseCase } from "./application/get-member-detail";
 import { UpdateMemberUseCase } from "./application/update-member";
@@ -56,6 +57,7 @@ export {
 export { RegisterMembershipUseCase } from "./application/register-membership";
 export { ListMembershipTypesUseCase } from "./application/list-membership-types";
 export { SearchMembersUseCase, type SearchMembersInput } from "./application/search-members";
+export { ListMembersUseCase } from "./application/list-members";
 export { RenewMembershipUseCase } from "./application/renew-membership";
 export { GetMemberDetailUseCase } from "./application/get-member-detail";
 export { UpdateMemberUseCase } from "./application/update-member";
@@ -110,6 +112,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     registerMembership: new RegisterMembershipUseCase(registrationRepository),
     listMembershipTypes: new ListMembershipTypesUseCase(membershipTypesRepository),
     searchMembers: new SearchMembersUseCase(memberSearchRepository),
+    listMembers: new ListMembersUseCase(memberSearchRepository),
     renewMembership: new RenewMembershipUseCase(renewalRepository),
     getMemberDetail: new GetMemberDetailUseCase(memberDetailRepository),
     updateMember: new UpdateMemberUseCase(updateMemberRepository),

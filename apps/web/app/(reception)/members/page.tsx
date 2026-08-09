@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { MemberSearchResult } from "@9thround/reception";
 import { getReceptionModule } from "../../../src/lib/composition-root";
@@ -18,8 +18,11 @@ function deriveStatus(status: MemberSearchResult["activeMembershipStatus"], endD
   return { text: "Active", className: "text-gold" };
 }
 
-/** Members search (Phase 5) — live search by name/phone/member ID, real data only. */
+/** Members (Phase 5) — the full member list by default, live search by name/phone/member ID once you type; real data only. */
 export default function MembersPage() {
+  const [allMembers, setAllMembers] = useState<MemberSearchResult[]>([]);
+  const [isLoadingAll, setIsLoadingAll] = useState(true);
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MemberSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -27,6 +30,14 @@ export default function MembersPage() {
   const [checkInFeedback, setCheckInFeedback] = useState<{ memberId: string; text: string; isError: boolean } | null>(
     null,
   );
+
+  useEffect(() => {
+    void (async () => {
+      const result = await getReceptionModule().listMembers.execute();
+      setIsLoadingAll(false);
+      if (result.isOk) setAllMembers(result.value);
+    })();
+  }, []);
 
   const runSearch = useCallback(async (value: string) => {
     setQuery(value);
@@ -41,6 +52,9 @@ export default function MembersPage() {
     setHasSearched(true);
     if (result.isOk) setResults(result.value);
   }, []);
+
+  const isFiltering = query.trim().length >= 2;
+  const rows = isFiltering ? results : allMembers;
 
   async function handleCheckIn(memberId: string) {
     setCheckInFeedback(null);
@@ -63,15 +77,17 @@ export default function MembersPage() {
 
       <TextField
         label="Search"
-        placeholder="Search by name, phone, or member ID"
+        placeholder="Search by name, phone, or member ID — or leave blank to see everyone"
         value={query}
         onChange={(event) => void runSearch(event.target.value)}
         className="mb-6"
       />
 
-      {isSearching ? (
+      {isFiltering && isSearching ? (
         <p className="text-muted">Searching…</p>
-      ) : results.length > 0 ? (
+      ) : !isFiltering && isLoadingAll ? (
+        <p className="text-muted">Loading…</p>
+      ) : rows.length > 0 ? (
         <div className="overflow-x-auto rounded-card border border-white/5">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface text-xs uppercase text-muted">
@@ -84,7 +100,7 @@ export default function MembersPage() {
               </tr>
             </thead>
             <tbody>
-              {results.map((member) => {
+              {rows.map((member) => {
                 const status = deriveStatus(member.activeMembershipStatus, member.activeMembershipEndDate);
                 const feedback = checkInFeedback?.memberId === member.memberId ? checkInFeedback : null;
                 return (
@@ -125,10 +141,10 @@ export default function MembersPage() {
             </tbody>
           </table>
         </div>
-      ) : hasSearched ? (
+      ) : isFiltering && hasSearched ? (
         <p className="text-muted">No members found.</p>
       ) : (
-        <p className="text-muted">Type at least 2 characters to search.</p>
+        <p className="text-muted">No members yet — click + Add Member to register the first one.</p>
       )}
     </div>
   );

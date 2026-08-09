@@ -101,6 +101,10 @@ export class FakeMemberSearchRepository implements MemberSearchRepository {
   async search(): Promise<Result<MemberSearchResult[]>> {
     return this.result;
   }
+
+  async list(): Promise<Result<MemberSearchResult[]>> {
+    return this.result;
+  }
 }
 
 export function fakeMemberSearchRepository(results: MemberSearchResult[] = []): FakeMemberSearchRepository {
