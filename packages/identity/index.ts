@@ -6,8 +6,11 @@ import { SignUpUseCase } from "./application/sign-up";
 import { SignInUseCase } from "./application/sign-in";
 import { RequestPasswordResetUseCase } from "./application/request-password-reset";
 import { SearchStaffCandidatesUseCase } from "./application/search-staff-candidates";
+import { ListStaffPresenceUseCase } from "./application/list-staff-presence";
+import { RecordHeartbeatUseCase } from "./application/record-heartbeat";
 import { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
 import { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
+import { SupabaseStaffPresenceRepository } from "./infrastructure/supabase-staff-presence-repository";
 
 export { Profile, type ProfileProps, type FitnessGoal, type ExperienceLevel } from "./domain/profile";
 export { Role, USER_ROLES, type UserRoleName } from "./domain/role";
@@ -42,8 +45,13 @@ export {
   type SearchStaffCandidatesInput,
   type StaffCandidate,
 } from "./application/search-staff-candidates";
+export { ListStaffPresenceUseCase } from "./application/list-staff-presence";
+export { RecordHeartbeatUseCase, type RecordHeartbeatInput } from "./application/record-heartbeat";
+export type { StaffPresence } from "./domain/staff-presence";
+export type { StaffPresenceRepository } from "./domain/staff-presence-repository";
 export { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
 export { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
+export { SupabaseStaffPresenceRepository } from "./infrastructure/supabase-staff-presence-repository";
 
 /**
  * The Identity context's composition root: wires the Supabase-backed
@@ -58,11 +66,14 @@ export { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 export function createIdentityModule(client: TypedSupabaseClient) {
   const profileRepository = new SupabaseProfileRepository(client);
   const authPort = new SupabaseAuthPort(client);
+  const staffPresenceRepository = new SupabaseStaffPresenceRepository(client);
   return {
     completeOnboarding: new CompleteOnboardingUseCase(profileRepository),
     assignStaffRole: new AssignStaffRoleUseCase(profileRepository),
     getCurrentProfile: new GetCurrentProfileUseCase(profileRepository),
     searchStaffCandidates: new SearchStaffCandidatesUseCase(profileRepository),
+    listStaffPresence: new ListStaffPresenceUseCase(staffPresenceRepository),
+    recordHeartbeat: new RecordHeartbeatUseCase(staffPresenceRepository),
     signUp: new SignUpUseCase(authPort),
     signIn: new SignInUseCase(authPort),
     requestPasswordReset: new RequestPasswordResetUseCase(authPort),

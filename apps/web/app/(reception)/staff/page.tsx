@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
-import type { StaffCandidate, UserRoleName } from "@9thround/identity";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { StaffCandidate, StaffPresence, UserRoleName } from "@9thround/identity";
 import { Role, USER_ROLES } from "@9thround/identity";
 import { getIdentityModule, getSupabaseClient } from "../../../src/lib/composition-root";
 import { useAuthStore } from "../../../src/features/auth/store";
@@ -14,6 +14,22 @@ import { translateErrorCode } from "../../../src/lib/translate-error";
 interface CreateAccountResponse {
   profileId?: string;
   error?: { code: string; message: string };
+}
+
+// A little over 2x the 45s heartbeat interval (use-heartbeat.ts) — allows
+// for one missed beat (a slow network tick) without flipping to offline.
+const ONLINE_WINDOW_MS = 100_000;
+const ROSTER_REFRESH_MS = 30_000;
+
+function timeAgo(date: Date): string {
+  const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
 }
 
 /**
@@ -31,6 +47,9 @@ export default function StaffPage() {
   const actingProfileId = useAuthStore((state) => state.profileId);
   const actingBranchId = useAuthStore((state) => state.branchId);
 
+  const [roster, setRoster] = useState<StaffPresence[]>([]);
+  const [isLoadingRoster, setIsLoadingRoster] = useState(true);
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StaffCandidate[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -45,6 +64,18 @@ export default function StaffPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+
+  const loadRoster = useCallback(async () => {
+    const result = await getIdentityModule().listStaffPresence.execute();
+    setIsLoadingRoster(false);
+    if (result.isOk) setRoster(result.value);
+  }, []);
+
+  useEffect(() => {
+    void loadRoster();
+    const interval = setInterval(() => void loadRoster(), ROSTER_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [loadRoster]);
 
   const runSearch = useCallback(async (value: string) => {
     setQuery(value);
@@ -148,6 +179,59 @@ export default function StaffPage() {
     <div className="mx-auto max-w-3xl space-y-10">
       <div>
         <h1 className="text-2xl font-semibold text-ink">Manage Staff</h1>
+      </div>
+
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-ink">Staff Roster</h2>
+        <p className="text-sm text-muted">
+          Who&apos;s currently using the system. &quot;Online&quot; means the app has checked in
+          within the last couple of minutes — closing the tab/app will show them as offline shortly
+          after.
+        </p>
+        {isLoadingRoster ? (
+          <p className="text-muted">Loading…</p>
+        ) : roster.length === 0 ? (
+          <p className="text-muted">No staff accounts yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-card border border-white/5">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-surface text-xs uppercase text-muted">
+                <tr>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map((staff) => {
+                  const isOnline = staff.lastSeenAt
+                    ? Date.now() - staff.lastSeenAt.getTime() < ONLINE_WINDOW_MS
+                    : false;
+                  return (
+                    <tr key={staff.profileId} className="border-t border-white/5">
+                      <td className="px-4 py-3 text-ink">{staff.fullName ?? "—"}</td>
+                      <td className="px-4 py-3 capitalize text-muted">{staff.role.replace("_", " ")}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className={`h-2 w-2 rounded-full ${isOnline ? "bg-emerald-400" : "bg-white/20"}`}
+                          />
+                          <span className={isOnline ? "text-emerald-400" : "text-muted"}>
+                            {isOnline
+                              ? "Online"
+                              : staff.lastSeenAt
+                                ? `Last seen ${timeAgo(staff.lastSeenAt)}`
+                                : "Never signed in"}
+                          </span>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">

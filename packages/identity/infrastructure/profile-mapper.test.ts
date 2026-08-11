@@ -18,6 +18,7 @@ const row: ProfileRow = {
   referral_code: "abc123",
   referred_by: null,
   branch_id: null,
+  last_seen_at: null,
   created_at: "2026-07-01T00:00:00.000Z",
   updated_at: "2026-07-28T10:00:00.000Z",
 };

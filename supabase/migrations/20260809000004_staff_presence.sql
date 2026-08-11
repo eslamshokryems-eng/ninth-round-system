@@ -1,0 +1,11 @@
+-- Backs the Manage Staff "who's online" roster. `last_seen_at` is bumped
+-- by a client-side heartbeat (apps/web) while a staff session is open —
+-- no new RLS policy needed: "update own profile" (auth.uid() = id, from
+-- 20260801000002_profiles_and_trainers.sql) already lets any signed-in
+-- account write any column on its own row, and "admins manage all
+-- profiles" already lets branch_manager/super_admin read it. True
+-- real-time presence (a live socket per open tab) is a heavier feature
+-- than this needs; a periodic heartbeat + "seen in the last 2 minutes"
+-- read-side check (packages/identity/application/list-staff-presence.ts)
+-- is enough to answer "who's actively using the system."
+alter table profiles add column last_seen_at timestamptz;

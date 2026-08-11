@@ -42,6 +42,7 @@ export interface ProfileRow {
   referral_code: string;
   referred_by: string | null;
   branch_id: string | null;
+  last_seen_at: string | null;
   created_at: string;
   updated_at: string;
 }
