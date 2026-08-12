@@ -2,12 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { DashboardStats } from "@9thround/reception";
+import { useAuthStore } from "../../../src/features/auth/store";
 import { getReceptionModule } from "../../../src/lib/composition-root";
 import { StatCard } from "../../../src/components/ui/stat-card";
 import { Button } from "../../../src/components/ui/button";
 
-/** The Reception Dashboard (Phase 4) — the seven headline numbers, one query, real data only. */
+const canSeeRevenue = (role: string | null) => role === "branch_manager" || role === "super_admin";
+
+/**
+ * The Dashboard (Phase 4). Revenue figures are restricted to
+ * branch_manager/super_admin — same "owner sees money, front desk doesn't"
+ * split already established for Payroll (§15.9) — Reception/Sales
+ * Employee see the operational counts (active/new/expiring/expired) only,
+ * never daily/monthly revenue. One page, not a separate route: the
+ * underlying query is identical, only which cards render differs.
+ */
 export default function DashboardPage() {
+  const role = useAuthStore((state) => state.role);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -48,8 +59,12 @@ export default function DashboardPage() {
           <StatCard label="Expiring Today" value={stats.expiringToday} tone="warning" />
           <StatCard label="Expiring This Week" value={stats.expiringThisWeek} tone="warning" />
           <StatCard label="Expired Members" value={stats.expiredMemberships} tone="warning" />
-          <StatCard label="Today's Revenue" value={`${stats.dailyRevenue.toLocaleString()} EGP`} />
-          <StatCard label="This Month's Revenue" value={`${stats.monthlyRevenue.toLocaleString()} EGP`} />
+          {canSeeRevenue(role) ? (
+            <>
+              <StatCard label="Today's Revenue" value={`${stats.dailyRevenue.toLocaleString()} EGP`} />
+              <StatCard label="This Month's Revenue" value={`${stats.monthlyRevenue.toLocaleString()} EGP`} />
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
