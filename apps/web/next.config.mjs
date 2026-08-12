@@ -10,6 +10,7 @@ const nextConfig = {
   transpilePackages: [
     "@9thround/ui",
     "@9thround/reception",
+    "@9thround/hr",
     "@9thround/identity",
     "@9thround/supabase-client",
     "@9thround/database-types",

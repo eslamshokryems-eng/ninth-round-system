@@ -34,6 +34,14 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   ACCOUNT_CREATE_FAILED: "Could not create the account. Please try again.",
   SERVER_MISCONFIGURED: "Server configuration error. Contact support.",
   UNAUTHORIZED: "Your session has expired. Please sign in again.",
+  ALREADY_CLOCKED_IN: "Already clocked in — clock out first.",
+  NOT_CLOCKED_IN: "Not currently clocked in.",
+  INVALID_SHIFT_TIME: "Start and end time must be in HH:MM (24-hour) format.",
+  INVALID_SHIFT_RANGE: "Shift end time must be after start time.",
+  LEAVE_REASON_REQUIRED: "Enter a reason for the leave request.",
+  INVALID_LEAVE_RANGE: "End date must be on or after the start date.",
+  INVALID_LEAVE_DECISION: 'Decision must be "approved" or "rejected".',
+  INVALID_SALARY_AMOUNT: "Salary cannot be negative.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";

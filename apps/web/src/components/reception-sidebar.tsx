@@ -18,6 +18,16 @@ function CalendarIcon() {
   );
 }
 
+/** Clock in/out, schedule, leave, payroll — a distinct glyph from the receipts calendar so the two are never confused in the nav. */
+function HrIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <circle cx="10" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M3.5 17c.7-3.5 3.5-5.5 6.5-5.5s5.8 2 6.5 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 interface NavItem {
   href: string;
   label: string;
@@ -31,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/memberships", label: "Memberships" },
   { href: "/receipts", label: "Payments / Receipts", icon: CalendarIcon },
   { href: "/expiring", label: "Expiring" },
+  { href: "/hr", label: "HR", icon: HrIcon },
   { href: "/reports", label: "Reports" },
   { href: "/profile", label: "Profile" },
 ];

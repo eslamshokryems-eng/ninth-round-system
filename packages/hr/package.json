@@ -1,0 +1,21 @@
+{
+  "name": "@9thround/hr",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "main": "./index.ts",
+  "dependencies": {
+    "@9thround/shared-kernel": "workspace:*",
+    "@9thround/database-types": "workspace:*",
+    "@9thround/supabase-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@9thround/config": "workspace:*",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

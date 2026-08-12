@@ -186,6 +186,9 @@ importers:
       '@9thround/database-types':
         specifier: workspace:*
         version: link:../../packages/database-types
+      '@9thround/hr':
+        specifier: workspace:*
+        version: link:../../packages/hr
       '@9thround/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
@@ -315,6 +318,28 @@ importers:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
+
+  packages/hr:
+    dependencies:
+      '@9thround/database-types':
+        specifier: workspace:*
+        version: link:../database-types
+      '@9thround/shared-kernel':
+        specifier: workspace:*
+        version: link:../shared-kernel
+      '@9thround/supabase-client':
+        specifier: workspace:*
+        version: link:../supabase-client
+    devDependencies:
+      '@9thround/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/i18n:
     dependencies:
