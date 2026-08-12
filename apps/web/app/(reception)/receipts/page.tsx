@@ -6,12 +6,14 @@ import { useAuthStore } from "../../../src/features/auth/store";
 import { getReceptionModule } from "../../../src/lib/composition-root";
 import { ReceiptsCalendar, monthRange, toDateKey } from "../../../src/components/receipts-calendar";
 import { Button } from "../../../src/components/ui/button";
+import { Card } from "../../../src/components/ui/card";
 
 const today = new Date();
 
 /** Receipts (Phase 5, "Payments / Receipts") — a calendar of daily income for the displayed month; select one or more days to total just those, and the table below follows the selection. Real data from membership_payments, no mock numbers. */
 export default function ReceiptsPage() {
   const branchId = useAuthStore((state) => state.branchId);
+  const role = useAuthStore((state) => state.role);
 
   const [year, setYear] = useState(today.getUTCFullYear());
   const [month, setMonth] = useState(today.getUTCMonth());
@@ -75,6 +77,18 @@ export default function ReceiptsPage() {
     ? receipts.filter((r) => selectedDates.has(toDateKey(new Date(r.paymentDate))))
     : receipts;
   const totalForView = visibleReceipts.reduce((sum, r) => sum + r.amount, 0);
+
+  if (role !== "branch_manager" && role !== "super_admin") {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card>
+          <p className="text-ink">
+            Payments / Receipts is only available to Branch Manager and Super Admin accounts.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl">

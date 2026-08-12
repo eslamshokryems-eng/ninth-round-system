@@ -39,15 +39,22 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/members", label: "Members" },
   { href: "/members/new", label: "Add Member" },
   { href: "/memberships", label: "Memberships" },
-  { href: "/receipts", label: "Payments / Receipts", icon: CalendarIcon },
   { href: "/expiring", label: "Expiring" },
   { href: "/hr", label: "HR", icon: HrIcon },
   { href: "/reports", label: "Reports" },
   { href: "/profile", label: "Profile" },
 ];
 
-/** Only Branch Manager/Super Admin can approve staff accounts (docs/12-roles-and-permissions.md §12.4) — kept out of the base nav so Reception accounts never see a link they'd be turned away from. */
-const STAFF_MANAGEMENT_NAV_ITEM: NavItem = { href: "/staff", label: "Manage Staff" };
+/**
+ * Money-visibility items — only Branch Manager/Super Admin, same split as
+ * the Dashboard's revenue cards and Payroll (docs/phase-1/15-reception-web-app.md
+ * §15.9). Kept out of the base nav so Reception/Sales Employee accounts
+ * never see a link they'd be turned away from.
+ */
+const OWNER_NAV_ITEMS: NavItem[] = [
+  { href: "/receipts", label: "Payments / Receipts", icon: CalendarIcon },
+  { href: "/staff", label: "Manage Staff" },
+];
 
 /** The Reception web app's permanent desktop sidebar — see Phase 5 of the reception-web brief. */
 export function ReceptionSidebar() {
@@ -78,7 +85,7 @@ export function ReceptionSidebar() {
 
       <nav className="flex-1 space-y-1 px-3">
         {(role === "branch_manager" || role === "super_admin"
-          ? [...NAV_ITEMS, STAFF_MANAGEMENT_NAV_ITEM]
+          ? [...NAV_ITEMS, ...OWNER_NAV_ITEMS]
           : NAV_ITEMS
         ).map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
