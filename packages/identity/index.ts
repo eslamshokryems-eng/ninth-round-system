@@ -8,6 +8,7 @@ import { RequestPasswordResetUseCase } from "./application/request-password-rese
 import { SearchStaffCandidatesUseCase } from "./application/search-staff-candidates";
 import { ListStaffPresenceUseCase } from "./application/list-staff-presence";
 import { RecordHeartbeatUseCase } from "./application/record-heartbeat";
+import { ResolveEmployeeCodeUseCase } from "./application/resolve-employee-code";
 import { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
 import { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 import { SupabaseStaffPresenceRepository } from "./infrastructure/supabase-staff-presence-repository";
@@ -47,6 +48,7 @@ export {
 } from "./application/search-staff-candidates";
 export { ListStaffPresenceUseCase } from "./application/list-staff-presence";
 export { RecordHeartbeatUseCase, type RecordHeartbeatInput } from "./application/record-heartbeat";
+export { ResolveEmployeeCodeUseCase } from "./application/resolve-employee-code";
 export type { StaffPresence } from "./domain/staff-presence";
 export type { StaffPresenceRepository } from "./domain/staff-presence-repository";
 export { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
@@ -74,6 +76,7 @@ export function createIdentityModule(client: TypedSupabaseClient) {
     searchStaffCandidates: new SearchStaffCandidatesUseCase(profileRepository),
     listStaffPresence: new ListStaffPresenceUseCase(staffPresenceRepository),
     recordHeartbeat: new RecordHeartbeatUseCase(staffPresenceRepository),
+    resolveEmployeeCode: new ResolveEmployeeCodeUseCase(authPort),
     signUp: new SignUpUseCase(authPort),
     signIn: new SignInUseCase(authPort),
     requestPasswordReset: new RequestPasswordResetUseCase(authPort),

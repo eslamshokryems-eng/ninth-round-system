@@ -10,7 +10,7 @@
  */
 const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   INVALID_EMAIL: "Enter a valid email address.",
-  SIGN_IN_FAILED: "Incorrect email or password.",
+  SIGN_IN_FAILED: "Incorrect Employee ID or password.",
   FULL_NAME_REQUIRED: "Enter the member's full name.",
   PHONE_REQUIRED: "Enter a mobile number.",
   RECEIPT_NUMBER_REQUIRED: "Enter the receipt number.",

@@ -17,7 +17,7 @@ export default function LoginPage() {
   const status = useAuthStore((state) => state.status);
   const role = useAuthStore((state) => state.role);
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,6 +32,22 @@ export default function LoginPage() {
     event.preventDefault();
     setErrorMessage(null);
     setIsSubmitting(true);
+
+    // Employee ID is the primary login credential now
+    // (docs/phase-1/16-employee-login.md); a literal email still works
+    // invisibly, so no existing account (including one created before this
+    // feature) is ever locked out by this field's relabeling.
+    const trimmed = identifier.trim();
+    let email = trimmed;
+    if (!trimmed.includes("@")) {
+      const resolved = await getIdentityModule().resolveEmployeeCode.execute(trimmed);
+      if (resolved.isErr || !resolved.value) {
+        setIsSubmitting(false);
+        setErrorMessage(translateErrorCode("SIGN_IN_FAILED"));
+        return;
+      }
+      email = resolved.value;
+    }
 
     const result = await getIdentityModule().signIn.execute({ email, password });
 
@@ -58,11 +74,12 @@ export default function LoginPage() {
 
         <form onSubmit={(event) => void handleSubmit(event)} className="flex flex-col gap-4">
           <TextField
-            label="Email"
-            type="email"
+            label="Employee ID"
+            type="text"
             autoComplete="username"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            placeholder="EMP-000001"
+            value={identifier}
+            onChange={(event) => setIdentifier(event.target.value)}
             required
           />
           <TextField

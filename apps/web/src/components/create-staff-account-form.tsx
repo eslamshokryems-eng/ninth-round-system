@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { UserRoleName } from "@9thround/identity";
+import type { StaffCandidate, UserRoleName } from "@9thround/identity";
 import { Role, USER_ROLES } from "@9thround/identity";
 import { useAuthStore } from "../features/auth/store";
 import { getSupabaseClient } from "../lib/composition-root";
@@ -10,29 +10,49 @@ import { Card } from "./ui/card";
 import { TextField } from "./ui/text-field";
 import { SelectField } from "./ui/select-field";
 import { Button } from "./ui/button";
+import { StaffPicker } from "./staff-picker";
 
-interface CreateAccountResponse {
-  profileId?: string;
+interface ApiErrorBody {
   error?: { code: string; message: string };
 }
 
+async function authorizedFetch(path: string, body: unknown): Promise<Response | null> {
+  const { data: sessionData } = await getSupabaseClient().auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) return null;
+  return fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(body),
+  });
+}
+
 /**
- * "Create a new employee login" — extracted so it can be reached both from
- * Manage Staff and HR's Employees tab (both branch_manager/super_admin
- * only) without duplicating the /api/staff/create-account call. See
- * docs/phase-1/15-reception-web-app.md §15.8.
+ * "Add Employee" (docs/phase-1/16-employee-login.md) — two steps, both
+ * branch_manager/super_admin only, both reachable from Manage Staff and
+ * HR's Employees tab. No email/password is ever asked for here: step 1
+ * (this form) collects only name/phone/address/role and returns a real
+ * Employee ID from /api/staff/create-account; step 2 (below) sets a real
+ * password for that ID via /api/staff/set-password, since the account
+ * created in step 1 has only a random, unusable placeholder password.
  */
 export function CreateStaffAccountForm() {
   const actingRole = useAuthStore((state) => state.role);
   const actingBranchId = useAuthStore((state) => state.branchId);
 
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [role, setRole] = useState<UserRoleName>("reception");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [createdEmployeeCode, setCreatedEmployeeCode] = useState<string | null>(null);
+
+  const [passwordTarget, setPasswordTarget] = useState<StaffCandidate | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   if (actingRole !== "branch_manager" && actingRole !== "super_admin") return null;
 
@@ -41,77 +61,134 @@ export function CreateStaffAccountForm() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
-    setSuccessMessage(null);
+    setCreatedEmployeeCode(null);
 
     if (!actingBranchId) {
-      setError("Your own account has no branch assigned — cannot create a staff account.");
+      setError("Your own account has no branch assigned — cannot add an employee.");
       return;
     }
 
     setIsCreating(true);
-    const { data: sessionData } = await getSupabaseClient().auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) {
-      setIsCreating(false);
+    const response = await authorizedFetch("/api/staff/create-account", {
+      fullName,
+      phone,
+      address,
+      role,
+      branchId: actingBranchId,
+    });
+    setIsCreating(false);
+
+    if (!response) {
       setError(translateErrorCode("UNAUTHORIZED"));
       return;
     }
-
-    const response = await fetch("/api/staff/create-account", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ email, password, fullName, role, branchId: actingBranchId }),
-    });
-    const body = (await response.json()) as CreateAccountResponse;
-    setIsCreating(false);
-
-    if (response.ok && body.profileId) {
-      setSuccessMessage(`Account created for ${fullName} (${role.replace("_", " ")}).`);
+    const responseBody = (await response.json()) as { profileId?: string; employeeCode?: string } & ApiErrorBody;
+    if (response.ok && responseBody.employeeCode) {
+      setCreatedEmployeeCode(responseBody.employeeCode);
       setFullName("");
-      setEmail("");
-      setPassword("");
+      setPhone("");
+      setAddress("");
     } else {
-      setError(body.error ? translateErrorCode(body.error.code) : translateErrorCode("ACCOUNT_CREATE_FAILED"));
+      setError(responseBody.error ? translateErrorCode(responseBody.error.code) : translateErrorCode("ACCOUNT_CREATE_FAILED"));
+    }
+  }
+
+  async function handleSetPassword(event: FormEvent) {
+    event.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    if (!passwordTarget) return;
+
+    setIsSettingPassword(true);
+    const response = await authorizedFetch("/api/staff/set-password", {
+      profileId: passwordTarget.profileId,
+      password: newPassword,
+    });
+    setIsSettingPassword(false);
+
+    if (!response) {
+      setPasswordError(translateErrorCode("UNAUTHORIZED"));
+      return;
+    }
+    const responseBody = (await response.json()) as { ok?: boolean } & ApiErrorBody;
+    if (response.ok && responseBody.ok) {
+      setPasswordSuccess(`Password set for ${passwordTarget.fullName ?? "employee"}.`);
+      setPasswordTarget(null);
+      setNewPassword("");
+    } else {
+      setPasswordError(responseBody.error ? translateErrorCode(responseBody.error.code) : translateErrorCode("ACCOUNT_CREATE_FAILED"));
     }
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-ink">Add Employee</h2>
-      <p className="text-sm text-muted">
-        For someone who has never signed in before — sets an email and temporary password they can
-        log in with right away (and change later from their own device).
-      </p>
-      <Card>
-        <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void handleSubmit(event)}>
-          <TextField label="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} required />
-          <TextField label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-          <TextField
-            label="Temporary password"
-            type="text"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={6}
-            required
-          />
-          <SelectField label="Role" value={role} onChange={(event) => setRole(event.target.value as UserRoleName)}>
-            {assignableRoles.map((r) => (
-              <option key={r} value={r}>
-                {r.replace("_", " ")}
-              </option>
-            ))}
-          </SelectField>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-ink">Add Employee</h2>
+        <p className="text-sm text-muted">
+          Just their details — no email or password needed here. They get a real Employee ID right
+          away; use Set Password below (or later) to actually enable their login.
+        </p>
+        <Card>
+          <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void handleSubmit(event)}>
+            <TextField label="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} required />
+            <TextField label="Phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required />
+            <div className="sm:col-span-2">
+              <TextField label="Address (optional)" value={address} onChange={(event) => setAddress(event.target.value)} />
+            </div>
+            <SelectField label="Role" value={role} onChange={(event) => setRole(event.target.value as UserRoleName)}>
+              {assignableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {r.replace("_", " ")}
+                </option>
+              ))}
+            </SelectField>
 
-          {error ? <p className="sm:col-span-2 text-sm text-red-400">{error}</p> : null}
-          {successMessage ? <p className="sm:col-span-2 text-sm text-emerald-400">{successMessage}</p> : null}
+            {error ? <p className="sm:col-span-2 text-sm text-red-400">{error}</p> : null}
+            {createdEmployeeCode ? (
+              <p className="sm:col-span-2 text-sm text-emerald-400">
+                Employee added. Their ID is <span className="font-semibold">{createdEmployeeCode}</span> — use
+                Set Password below to enable their login.
+              </p>
+            ) : null}
 
-          <div className="sm:col-span-2">
-            <Button type="submit" isLoading={isCreating}>
-              Add Employee
-            </Button>
-          </div>
-        </form>
-      </Card>
+            <div className="sm:col-span-2">
+              <Button type="submit" isLoading={isCreating}>
+                Add Employee
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-ink">Set Password</h2>
+        <p className="text-sm text-muted">
+          Enables login for an employee added above (or resets an existing one). Give them their
+          Employee ID and this password to sign in.
+        </p>
+        <Card>
+          <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void handleSetPassword(event)}>
+            <div className="sm:col-span-2">
+              <StaffPicker selected={passwordTarget} onSelect={setPasswordTarget} />
+            </div>
+            <TextField
+              label="New password"
+              type="text"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              minLength={6}
+              required
+            />
+            {passwordError ? <p className="sm:col-span-2 text-sm text-red-400">{passwordError}</p> : null}
+            {passwordSuccess ? <p className="sm:col-span-2 text-sm text-emerald-400">{passwordSuccess}</p> : null}
+            <div className="sm:col-span-2">
+              <Button type="submit" isLoading={isSettingPassword} disabled={!passwordTarget}>
+                Set Password
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

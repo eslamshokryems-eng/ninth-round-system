@@ -43,6 +43,9 @@ export interface ProfileRow {
   referred_by: string | null;
   branch_id: string | null;
   last_seen_at: string | null;
+  phone: string | null;
+  address: string | null;
+  employee_code: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -357,6 +360,14 @@ export interface Database {
       next_membership_number: {
         Args: Record<string, never>;
         Returns: string;
+      };
+      next_employee_code: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      resolve_login_email: {
+        Args: { p_employee_code: string };
+        Returns: string | null;
       };
     };
     Enums: Record<string, never>;

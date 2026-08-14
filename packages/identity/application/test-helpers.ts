@@ -77,4 +77,10 @@ export class FakeAuthPort implements AuthPort {
     this.passwordResetCalls.push({ email, redirectTo });
     return ok(undefined);
   }
+
+  public employeeCodeToEmail = new Map<string, string>();
+
+  async resolveEmployeeCode(employeeCode: string): Promise<Result<string | null>> {
+    return ok(this.employeeCodeToEmail.get(employeeCode) ?? null);
+  }
 }

@@ -54,4 +54,10 @@ export class SupabaseAuthPort implements AuthPort {
     if (error) return err(domainError("PASSWORD_RESET_FAILED", error.message));
     return ok(undefined);
   }
+
+  async resolveEmployeeCode(employeeCode: string): Promise<Result<string | null>> {
+    const { data, error } = await this.client.rpc("resolve_login_email", { p_employee_code: employeeCode });
+    if (error) return err(domainError("RESOLVE_EMPLOYEE_CODE_FAILED", error.message));
+    return ok(data ?? null);
+  }
 }
