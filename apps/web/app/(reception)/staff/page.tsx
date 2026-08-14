@@ -1,20 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { StaffCandidate, StaffPresence, UserRoleName } from "@9thround/identity";
 import { Role, USER_ROLES } from "@9thround/identity";
-import { getIdentityModule, getSupabaseClient } from "../../../src/lib/composition-root";
+import { getIdentityModule } from "../../../src/lib/composition-root";
 import { useAuthStore } from "../../../src/features/auth/store";
 import { Card } from "../../../src/components/ui/card";
 import { TextField } from "../../../src/components/ui/text-field";
 import { SelectField } from "../../../src/components/ui/select-field";
 import { Button } from "../../../src/components/ui/button";
+import { CreateStaffAccountForm } from "../../../src/components/create-staff-account-form";
 import { translateErrorCode } from "../../../src/lib/translate-error";
-
-interface CreateAccountResponse {
-  profileId?: string;
-  error?: { code: string; message: string };
-}
 
 // A little over 2x the 45s heartbeat interval (use-heartbeat.ts) — allows
 // for one missed beat (a slow network tick) without flipping to offline.
@@ -45,7 +41,6 @@ function timeAgo(date: Date): string {
 export default function StaffPage() {
   const actingRole = useAuthStore((state) => state.role);
   const actingProfileId = useAuthStore((state) => state.profileId);
-  const actingBranchId = useAuthStore((state) => state.branchId);
 
   const [roster, setRoster] = useState<StaffPresence[]>([]);
   const [isLoadingRoster, setIsLoadingRoster] = useState(true);
@@ -56,14 +51,6 @@ export default function StaffPage() {
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const [newFullName, setNewFullName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState<UserRoleName>("reception");
-  const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
   const loadRoster = useCallback(async () => {
     const result = await getIdentityModule().listStaffPresence.execute();
@@ -115,49 +102,6 @@ export default function StaffPage() {
       );
     } else {
       setError(translateErrorCode(result.error.code));
-    }
-  }
-
-  async function handleCreateAccount(event: FormEvent) {
-    event.preventDefault();
-    setCreateError(null);
-    setCreateSuccess(null);
-
-    if (!actingBranchId) {
-      setCreateError("Your own account has no branch assigned — cannot create a staff account.");
-      return;
-    }
-
-    setIsCreating(true);
-    const { data: sessionData } = await getSupabaseClient().auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) {
-      setIsCreating(false);
-      setCreateError(translateErrorCode("UNAUTHORIZED"));
-      return;
-    }
-
-    const response = await fetch("/api/staff/create-account", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({
-        email: newEmail,
-        password: newPassword,
-        fullName: newFullName,
-        role: newRole,
-        branchId: actingBranchId,
-      }),
-    });
-    const body = (await response.json()) as CreateAccountResponse;
-    setIsCreating(false);
-
-    if (response.ok && body.profileId) {
-      setCreateSuccess(`Account created for ${newFullName} (${newRole.replace("_", " ")}).`);
-      setNewFullName("");
-      setNewEmail("");
-      setNewPassword("");
-    } else {
-      setCreateError(body.error ? translateErrorCode(body.error.code) : translateErrorCode("ACCOUNT_CREATE_FAILED"));
     }
   }
 
@@ -234,62 +178,7 @@ export default function StaffPage() {
         )}
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-ink">Create New Account</h2>
-        <p className="text-sm text-muted">
-          For someone who has never signed in before — sets an email and temporary password they
-          can log in with right away (and change later from their own device).
-        </p>
-        <Card>
-          <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void handleCreateAccount(event)}>
-            <TextField
-              label="Full name"
-              value={newFullName}
-              onChange={(event) => setNewFullName(event.target.value)}
-              required
-            />
-            <TextField
-              label="Email"
-              type="email"
-              value={newEmail}
-              onChange={(event) => setNewEmail(event.target.value)}
-              required
-            />
-            <TextField
-              label="Temporary password"
-              type="text"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              minLength={6}
-              required
-            />
-            <SelectField
-              label="Role"
-              value={newRole}
-              onChange={(event) => setNewRole(event.target.value as UserRoleName)}
-            >
-              {assignableRoles
-                .filter((role) => role !== "member")
-                .map((role) => (
-                  <option key={role} value={role}>
-                    {role.replace("_", " ")}
-                  </option>
-                ))}
-            </SelectField>
-
-            {createError ? <p className="sm:col-span-2 text-sm text-red-400">{createError}</p> : null}
-            {createSuccess ? (
-              <p className="sm:col-span-2 text-sm text-emerald-400">{createSuccess}</p>
-            ) : null}
-
-            <div className="sm:col-span-2">
-              <Button type="submit" isLoading={isCreating}>
-                Create Account
-              </Button>
-            </div>
-          </form>
-        </Card>
-      </div>
+      <CreateStaffAccountForm />
 
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-ink">Change an Existing Account&apos;s Role</h2>

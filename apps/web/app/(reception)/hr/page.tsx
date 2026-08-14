@@ -2,26 +2,34 @@
 
 import { useState } from "react";
 import { useAuthStore } from "../../../src/features/auth/store";
+import { CreateStaffAccountForm } from "../../../src/components/create-staff-account-form";
 import { AttendanceTab } from "./attendance-tab";
 import { ScheduleTab } from "./schedule-tab";
 import { LeaveTab } from "./leave-tab";
 import { PayrollTab } from "./payroll-tab";
 
-type Tab = "attendance" | "schedule" | "leave" | "payroll";
+type Tab = "attendance" | "schedule" | "leave" | "payroll" | "employees";
+
+const isAdmin = (role: string | null) => role === "branch_manager" || role === "super_admin";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "attendance", label: "Attendance" },
   { id: "schedule", label: "Schedule" },
   { id: "leave", label: "Leave Requests" },
   { id: "payroll", label: "Payroll" },
+  { id: "employees", label: "Employees" },
 ];
 
-/** HR (attendance, schedule, leave, payroll) — one page, tabbed, per docs/phase-1/15-reception-web-app.md §15.9. */
+/** HR (attendance, schedule, leave, payroll, employees) — one page, tabbed, per docs/phase-1/15-reception-web-app.md §15.9. */
 export default function HrPage() {
   const role = useAuthStore((state) => state.role);
   const [tab, setTab] = useState<Tab>("attendance");
 
-  const visibleTabs = TABS.filter((t) => t.id !== "payroll" || role === "super_admin");
+  const visibleTabs = TABS.filter((t) => {
+    if (t.id === "payroll") return role === "super_admin";
+    if (t.id === "employees") return isAdmin(role);
+    return true;
+  });
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -46,6 +54,7 @@ export default function HrPage() {
       {tab === "schedule" ? <ScheduleTab /> : null}
       {tab === "leave" ? <LeaveTab /> : null}
       {tab === "payroll" && role === "super_admin" ? <PayrollTab /> : null}
+      {tab === "employees" && isAdmin(role) ? <CreateStaffAccountForm /> : null}
     </div>
   );
 }
