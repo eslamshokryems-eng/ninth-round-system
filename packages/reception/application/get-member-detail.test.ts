@@ -19,6 +19,8 @@ describe("GetMemberDetailUseCase", () => {
           finalPrice: 500,
           paymentMethod: "cash",
           status: "expired",
+          coachFullName: null,
+          sessionCount: null,
         },
       ],
     });

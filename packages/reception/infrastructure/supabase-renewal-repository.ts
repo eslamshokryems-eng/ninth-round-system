@@ -20,6 +20,8 @@ export class SupabaseRenewalRepository implements RenewalRepository {
         p_discount: input.discount,
         p_payment_method: input.paymentMethod,
         p_notes: input.notes,
+        p_coach_id: input.coachId,
+        p_session_count: input.sessionCount,
       })
       .single();
 

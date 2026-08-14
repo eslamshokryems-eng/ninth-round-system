@@ -137,6 +137,8 @@ export interface MembershipRow {
   payment_method: MembershipPaymentMethod;
   status: MembershipStatus;
   notes: string | null;
+  coach_id: string | null;
+  session_count: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -333,6 +335,8 @@ export interface Database {
           p_emergency_contact_name?: string | null;
           p_emergency_contact_phone?: string | null;
           p_photo_url?: string | null;
+          p_coach_id?: string | null;
+          p_session_count?: number | null;
         };
         Returns: {
           member_id: string;
@@ -350,6 +354,8 @@ export interface Database {
           p_discount: number;
           p_payment_method: MembershipPaymentMethod;
           p_notes: string | null;
+          p_coach_id?: string | null;
+          p_session_count?: number | null;
         };
         Returns: { membership_id: string; membership_number: string; start_date: string; end_date: string }[];
       };

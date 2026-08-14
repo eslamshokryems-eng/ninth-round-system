@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import type { Gender, MemberDetail, MembershipType, PaymentMethod } from "@9thround/reception";
+import type { StaffCandidate } from "@9thround/identity";
 import { getReceptionModule } from "../../../../src/lib/composition-root";
 import { translateErrorCode } from "../../../../src/lib/translate-error";
 import { Button } from "../../../../src/components/ui/button";
@@ -11,6 +12,7 @@ import { TextField, TextAreaField } from "../../../../src/components/ui/text-fie
 import { SelectField } from "../../../../src/components/ui/select-field";
 import { OptionCard } from "../../../../src/components/ui/option-card";
 import { QrCodeImage } from "../../../../src/components/ui/qr-code";
+import { StaffPicker } from "../../../../src/components/staff-picker";
 
 const GENDERS: { value: Gender; label: string }[] = [
   { value: "female", label: "Female" },
@@ -63,6 +65,10 @@ export default function MemberDetailPage() {
   const [renewError, setRenewError] = useState<string | null>(null);
   const [isRenewing, setIsRenewing] = useState(false);
   const [renewSuccess, setRenewSuccess] = useState<string | null>(null);
+
+  const [renewWantsCoach, setRenewWantsCoach] = useState(false);
+  const [renewCoach, setRenewCoach] = useState<StaffCandidate | null>(null);
+  const [renewSessionCountText, setRenewSessionCountText] = useState("");
 
   const loadDetail = useCallback(async () => {
     setIsLoading(true);
@@ -151,6 +157,8 @@ export default function MemberDetailPage() {
       discount: Number(renewDiscountText) || 0,
       paymentMethod: renewPaymentMethod,
       notes: null,
+      coachId: renewWantsCoach ? (renewCoach?.profileId ?? null) : null,
+      sessionCount: renewWantsCoach && renewSessionCountText.trim() ? Number(renewSessionCountText) : null,
     });
 
     setIsRenewing(false);
@@ -162,6 +170,9 @@ export default function MemberDetailPage() {
 
     setRenewSuccess(`Renewed — new membership ${result.value.membershipNumber}, valid until ${result.value.endDate}.`);
     setIsRenewOpen(false);
+    setRenewWantsCoach(false);
+    setRenewCoach(null);
+    setRenewSessionCountText("");
     void loadDetail();
   }
 
@@ -247,6 +258,35 @@ export default function MemberDetailPage() {
               />
             ))}
           </div>
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              checked={renewWantsCoach}
+              onChange={(e) => {
+                setRenewWantsCoach(e.target.checked);
+                if (!e.target.checked) {
+                  setRenewCoach(null);
+                  setRenewSessionCountText("");
+                }
+              }}
+              className="h-4 w-4 accent-gold"
+            />
+            Assign a Coach
+          </label>
+          {renewWantsCoach ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <StaffPicker selected={renewCoach} onSelect={setRenewCoach} roleFilter="coach" label="Coach" />
+              </div>
+              <TextField
+                label="Number of Sessions"
+                type="number"
+                min={1}
+                value={renewSessionCountText}
+                onChange={(e) => setRenewSessionCountText(e.target.value)}
+              />
+            </div>
+          ) : null}
           {renewError ? <p className="text-sm text-red-400">{renewError}</p> : null}
           <Button
             onClick={() => void handleRenew()}
@@ -300,6 +340,7 @@ export default function MemberDetailPage() {
                   <th className="py-2 pr-4">Period</th>
                   <th className="py-2 pr-4">Price</th>
                   <th className="py-2 pr-4">Payment</th>
+                  <th className="py-2 pr-4">Coach</th>
                   <th className="py-2 pr-4">Status</th>
                 </tr>
               </thead>
@@ -313,6 +354,11 @@ export default function MemberDetailPage() {
                     </td>
                     <td className="py-2 pr-4 text-gold">{entry.finalPrice.toLocaleString()} EGP</td>
                     <td className="py-2 pr-4 text-muted capitalize">{entry.paymentMethod.replace("_", " ")}</td>
+                    <td className="py-2 pr-4 text-muted">
+                      {entry.coachFullName
+                        ? `${entry.coachFullName}${entry.sessionCount ? ` (${entry.sessionCount} sessions)` : ""}`
+                        : "—"}
+                    </td>
                     <td
                       className={`py-2 pr-4 font-medium ${
                         entry.status === "active" ? "text-gold" : entry.status === "expired" ? "text-red-400" : "text-muted"

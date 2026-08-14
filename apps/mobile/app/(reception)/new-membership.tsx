@@ -184,6 +184,10 @@ export default function NewMembershipScreen() {
       emergencyContactName: emergencyContactName.trim() || null,
       emergencyContactPhone: emergencyContactPhone.trim() || null,
       photoUrl,
+      // Coach assignment (supabase/migrations/20260812000002) is a
+      // web-only Reception feature for now — no mobile UI for it yet.
+      coachId: null,
+      sessionCount: null,
     });
 
     setIsSaving(false);

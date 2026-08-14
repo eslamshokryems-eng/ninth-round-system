@@ -8,6 +8,8 @@ export interface RenewMembershipInput {
   discount: number;
   paymentMethod: PaymentMethod;
   notes: string | null;
+  coachId: string | null;
+  sessionCount: number | null;
 }
 
 export interface RenewMembershipOutput {

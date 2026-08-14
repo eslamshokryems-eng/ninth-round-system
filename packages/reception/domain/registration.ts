@@ -19,6 +19,9 @@ export interface RegisterMembershipInput {
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   photoUrl: string | null;
+  /** No usage tracking — a plain recorded number, see supabase/migrations/20260812000002_membership_coach_assignment.sql. */
+  coachId: string | null;
+  sessionCount: number | null;
 }
 
 export interface RegisterMembershipOutput {

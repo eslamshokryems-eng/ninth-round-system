@@ -8,25 +8,33 @@ import { TextField } from "./ui/text-field";
 interface StaffPickerProps {
   selected: StaffCandidate | null;
   onSelect: (candidate: StaffCandidate | null) => void;
+  /** Narrows results to a single role — e.g. "coach" when assigning a member's coach at registration/renewal. */
+  roleFilter?: StaffCandidate["role"];
+  label?: string;
 }
 
-/** Search-by-name staff picker, reused by the HR Schedule and Payroll tabs (packages/identity's SearchStaffCandidatesUseCase, same one Manage Staff uses). */
-export function StaffPicker({ selected, onSelect }: StaffPickerProps) {
+/** Search-by-name staff picker, reused by the HR Schedule/Payroll tabs and Add Member/Renew's coach assignment (packages/identity's SearchStaffCandidatesUseCase, same one Manage Staff uses). */
+export function StaffPicker({ selected, onSelect, roleFilter, label = "Employee" }: StaffPickerProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StaffCandidate[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const runSearch = useCallback(async (value: string) => {
-    setQuery(value);
-    if (value.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setIsSearching(true);
-    const result = await getIdentityModule().searchStaffCandidates.execute({ query: value });
-    setIsSearching(false);
-    if (result.isOk) setResults(result.value);
-  }, []);
+  const runSearch = useCallback(
+    async (value: string) => {
+      setQuery(value);
+      if (value.trim().length < 2) {
+        setResults([]);
+        return;
+      }
+      setIsSearching(true);
+      const result = await getIdentityModule().searchStaffCandidates.execute({ query: value });
+      setIsSearching(false);
+      if (result.isOk) {
+        setResults(roleFilter ? result.value.filter((c) => c.role === roleFilter) : result.value);
+      }
+    },
+    [roleFilter],
+  );
 
   if (selected) {
     return (
@@ -44,7 +52,7 @@ export function StaffPicker({ selected, onSelect }: StaffPickerProps) {
   return (
     <div>
       <TextField
-        label="Employee"
+        label={label}
         placeholder="Search by name"
         value={query}
         onChange={(event) => void runSearch(event.target.value)}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import type { Gender, MembershipType, PaymentMethod } from "@9thround/reception";
+import type { StaffCandidate } from "@9thround/identity";
 import { useAuthStore } from "../../../../src/features/auth/store";
 import { getReceptionModule } from "../../../../src/lib/composition-root";
 import { translateErrorCode } from "../../../../src/lib/translate-error";
@@ -11,6 +12,7 @@ import { Card } from "../../../../src/components/ui/card";
 import { TextField, TextAreaField } from "../../../../src/components/ui/text-field";
 import { OptionCard } from "../../../../src/components/ui/option-card";
 import { QrCodeImage } from "../../../../src/components/ui/qr-code";
+import { StaffPicker } from "../../../../src/components/staff-picker";
 
 const GENDERS: { value: Gender; label: string }[] = [
   { value: "female", label: "Female" },
@@ -66,6 +68,10 @@ export default function AddMemberPage() {
   const [startDate, setStartDate] = useState(todayIso());
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [notes, setNotes] = useState("");
+
+  const [wantsCoach, setWantsCoach] = useState(false);
+  const [coach, setCoach] = useState<StaffCandidate | null>(null);
+  const [sessionCountText, setSessionCountText] = useState("");
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -164,6 +170,8 @@ export default function AddMemberPage() {
       emergencyContactName: emergencyContactName.trim() || null,
       emergencyContactPhone: emergencyContactPhone.trim() || null,
       photoUrl,
+      coachId: wantsCoach ? (coach?.profileId ?? null) : null,
+      sessionCount: wantsCoach && sessionCountText.trim() ? Number(sessionCountText) : null,
     });
 
     setIsSaving(false);
@@ -269,6 +277,38 @@ export default function AddMemberPage() {
           <span className="text-sm text-muted">Final Price</span>
           <span className="text-lg font-semibold text-gold">{finalPrice.toLocaleString()} EGP</span>
         </div>
+      </Card>
+
+      <Card className="space-y-4">
+        <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <input
+            type="checkbox"
+            checked={wantsCoach}
+            onChange={(e) => {
+              setWantsCoach(e.target.checked);
+              if (!e.target.checked) {
+                setCoach(null);
+                setSessionCountText("");
+              }
+            }}
+            className="h-4 w-4 accent-gold"
+          />
+          Assign a Coach
+        </label>
+        {wantsCoach ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <StaffPicker selected={coach} onSelect={setCoach} roleFilter="coach" label="Coach" />
+            </div>
+            <TextField
+              label="Number of Sessions"
+              type="number"
+              min={1}
+              value={sessionCountText}
+              onChange={(e) => setSessionCountText(e.target.value)}
+            />
+          </div>
+        ) : null}
       </Card>
 
       <Card className="space-y-4">

@@ -30,6 +30,8 @@ export class SupabaseRegistrationRepository implements RegistrationRepository {
         p_emergency_contact_name: input.emergencyContactName,
         p_emergency_contact_phone: input.emergencyContactPhone,
         p_photo_url: input.photoUrl,
+        p_coach_id: input.coachId,
+        p_session_count: input.sessionCount,
       })
       .single();
 

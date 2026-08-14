@@ -12,6 +12,8 @@ export interface MembershipHistoryEntry {
   finalPrice: number;
   paymentMethod: PaymentMethod;
   status: MembershipStatus;
+  coachFullName: string | null;
+  sessionCount: number | null;
 }
 
 export interface MemberDetail {

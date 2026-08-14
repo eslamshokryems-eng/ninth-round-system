@@ -67,6 +67,8 @@ export function buildRegisterMembershipInput(
     emergencyContactName: null,
     emergencyContactPhone: null,
     photoUrl: null,
+    coachId: null,
+    sessionCount: null,
     ...overrides,
   };
 }
@@ -120,6 +122,8 @@ export function buildRenewMembershipInput(overrides: Partial<RenewMembershipInpu
     discount: 0,
     paymentMethod: "cash",
     notes: null,
+    coachId: null,
+    sessionCount: null,
     ...overrides,
   };
 }
