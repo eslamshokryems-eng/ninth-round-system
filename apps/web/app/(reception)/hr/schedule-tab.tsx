@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { DayOfWeek, Shift } from "@9thround/hr";
-import type { StaffCandidate } from "@9thround/identity";
+import type { DayOfWeek, LeaveRequest, Shift } from "@9thround/hr";
+import type { StaffCandidate, StaffPresence } from "@9thround/identity";
 import { useAuthStore } from "../../../src/features/auth/store";
-import { getHrModule } from "../../../src/lib/composition-root";
+import { getHrModule, getIdentityModule } from "../../../src/lib/composition-root";
 import { translateErrorCode } from "../../../src/lib/translate-error";
 import { Card } from "../../../src/components/ui/card";
 import { Button } from "../../../src/components/ui/button";
@@ -16,9 +16,21 @@ const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Fri
 
 const isAdmin = (role: string | null) => role === "branch_manager" || role === "super_admin";
 
+const today = new Date().toISOString().slice(0, 10);
+
+function isOnLeaveToday(profileId: string, leaveRequests: LeaveRequest[]): boolean {
+  return leaveRequests.some(
+    (r) => r.profileId === profileId && r.status === "approved" && r.startDate <= today && today <= r.endDate,
+  );
+}
+
 export function ScheduleTab() {
   const branchId = useAuthStore((state) => state.branchId);
   const role = useAuthStore((state) => state.role);
+
+  const [roster, setRoster] = useState<StaffPresence[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [isLoadingRoster, setIsLoadingRoster] = useState(true);
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,9 +51,22 @@ export function ScheduleTab() {
     if (result.isOk) setShifts(result.value);
   }, [branchId]);
 
+  const loadRoster = useCallback(async () => {
+    if (!branchId) return;
+    setIsLoadingRoster(true);
+    const [presenceResult, leaveResult] = await Promise.all([
+      getIdentityModule().listStaffPresence.execute(),
+      getHrModule().listLeaveRequests.execute(branchId),
+    ]);
+    setIsLoadingRoster(false);
+    if (presenceResult.isOk) setRoster(presenceResult.value);
+    if (leaveResult.isOk) setLeaveRequests(leaveResult.value);
+  }, [branchId]);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadRoster();
+  }, [load, loadRoster]);
 
   async function handleCreate() {
     if (!branchId || !selectedStaff) return;
@@ -72,6 +97,43 @@ export function ScheduleTab() {
 
   return (
     <div className="space-y-6">
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-ink">All Employees</h2>
+        {isLoadingRoster ? (
+          <p className="text-muted">Loading…</p>
+        ) : roster.length === 0 ? (
+          <p className="text-muted">No employees yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-card border border-white/5">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-surface text-xs uppercase text-muted">
+                <tr>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Position</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map((staff) => {
+                  const onLeave = isOnLeaveToday(staff.profileId, leaveRequests);
+                  return (
+                    <tr key={staff.profileId} className="border-t border-white/5">
+                      <td className="px-4 py-3 text-ink">{staff.fullName ?? "—"}</td>
+                      <td className="px-4 py-3 capitalize text-muted">{staff.role.replace("_", " ")}</td>
+                      <td className="px-4 py-3">
+                        <span className={`font-medium ${onLeave ? "text-gold" : "text-emerald-400"}`}>
+                          {onLeave ? "On Leave" : "Active"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {isAdmin(role) ? (
         <Card>
           <h2 className="mb-3 text-lg font-semibold text-ink">Add a Shift</h2>
