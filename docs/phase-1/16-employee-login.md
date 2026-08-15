@@ -1,6 +1,6 @@
 # 16. Employee ID Login
 
-Add Employee (HR's Employees tab / Manage Staff) no longer asks for an email or password — just name, phone, address, and role. Every staff account now has a real, human-readable **Employee ID** (`EMP-000001`, sequential — mirrors `members.member_code`'s pattern exactly, [§14.3](14-reception-membership.md)), and logging in uses that ID instead of an email address.
+Add Employee (HR's Employees tab / Manage Staff) no longer asks for an email or password — just name, phone, address, and role. Every staff account now has a real, human-readable **Employee ID** — a plain sequential number (`1`, `2`, `3`, ...; see §16.5 for the format change from the original `EMP-000001` scheme), and logging in uses that ID instead of an email address.
 
 ```
 Reception computer → Login screen (Employee ID + password) → resolve ID to the account's real/synthetic email → existing email+password sign-in, unchanged
@@ -16,7 +16,7 @@ Supabase Auth's password sign-in is fundamentally email+password — there's no 
 
 ## 16.2 Two-step account creation
 
-1. **Add Employee** (`POST /api/staff/create-account`) — takes `fullName`, `phone`, `address` (optional), `role`, `branchId`. Generates a real Employee ID (`next_employee_code()`), creates the `auth.users` row behind a synthetic email (`emp-000001@staff.9thround.internal`) and a random 64-character password that is **never shown or logged anywhere** — the account exists (so Schedule/Attendance/Leave/Payroll can reference its `profile_id` immediately) but is not usable to sign in yet.
+1. **Add Employee** (`POST /api/staff/create-account`) — takes `fullName`, `phone`, `address` (optional), `role`, `branchId`. Generates a real Employee ID (`next_employee_code()`), creates the `auth.users` row behind a synthetic email (e.g. `5@staff.9thround.internal`) and a random 64-character password that is **never shown or logged anywhere** — the account exists (so Schedule/Attendance/Leave/Payroll can reference its `profile_id` immediately) but is not usable to sign in yet.
 2. **Set Password** (`POST /api/staff/set-password`) — an admin picks the employee (reusing `StaffPicker`, the same search-by-name component Manage Staff/Payroll use) and sets a real password via the Admin API (`auth.admin.updateUserById`). *This* is what actually enables login. Can be run immediately after step 1, or any time later (also doubles as a password-reset action for an existing employee).
 
 Both routes share `apps/web/src/lib/verify-staff-admin.ts` — the same caller-identity-from-access-token verification pattern as the original single-step `create-account` route, now factored out since two routes need it.
@@ -31,3 +31,23 @@ Verified against a real Postgres engine (pglite, same methodology as §14.3/§16
 
 - No self-service "employee sets their own first password" flow — an admin always runs Set Password.
 - No password-strength requirements beyond the existing 6-character minimum used elsewhere in this app.
+
+## 16.5 Format change: plain numbers, not `EMP-######`
+
+Requested directly ("change id account for employee from 1 to 100 just
+number"): `20260816000001_plain_numeric_employee_ids.sql` dropped the
+`EMP-` prefix and the 6-digit zero-padding — an Employee ID is now just
+whatever number it is (`1`, `2`, `15`, ...). `next_employee_code()` now
+returns `nextval('employee_code_seq')::text` with no formatting.
+
+Confirmed directly with the founder (not assumed): **every existing
+staff account was renumbered too**, not just new ones going forward — so
+every current employee's ID changed as of this migration (their password
+is unaffected; only the ID half of their credentials changed). Renumbered
+in the same relative order the original backfill used (`created_at`), so
+whoever was first is still `1`, and so on — this is a re-presentation of
+that ordering, not a new decision about who gets which number.
+
+Nothing else about the login mechanism changed: `resolve_login_email()`
+and the login page's `@`-detection fallback are format-agnostic, and were
+never touched by this migration.

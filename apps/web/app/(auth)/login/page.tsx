@@ -77,7 +77,7 @@ export default function LoginPage() {
             label="Employee ID"
             type="text"
             autoComplete="username"
-            placeholder="EMP-000001"
+            placeholder="e.g. 1"
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
             required

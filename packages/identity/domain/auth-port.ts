@@ -31,7 +31,7 @@ export interface AuthPort {
   signOut(): Promise<Result<void>>;
   requestPasswordReset(email: string, redirectTo: string): Promise<Result<void>>;
   /**
-   * Resolves an Employee ID ("EMP-000001") to the email its account was
+   * Resolves an Employee ID ("1", "2", ...) to the email its account was
    * created with, via the `resolve_login_email` SQL function — callable
    * pre-auth, since the caller isn't signed in yet at login time. `null`
    * (not an error) for an unknown code, so callers can fold it into the
