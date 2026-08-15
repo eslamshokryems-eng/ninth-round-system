@@ -10,14 +10,26 @@ interface AttendanceRow {
   branch_id: string;
   clock_in: string;
   clock_out: string | null;
-  profiles: { full_name: string | null }[];
+  // `profiles` is a to-one embed (the FK is on attendance_records, pointing
+  // at profiles — "belongs to" from this query's side), so PostgREST
+  // returns a single object, not an array. See docs/phase-1/14-reception-
+  // membership.md's note on this — the same mistake, once copy-pasted into
+  // several repositories, produced blank names on the Expiring page,
+  // Member Detail history, Receipts, and here.
+  // supabase-js's own inferred type for this embed is unreliable
+  // (@9thround/database-types has no `Relationships` metadata for it to
+  // key off — every field resolves to `any` regardless of real
+  // cardinality), so every call site below casts through this
+  // hand-written, correct-by-construction interface rather than trusting
+  // that inference.
+  profiles: { full_name: string | null } | null;
 }
 
 function toRecord(row: AttendanceRow): AttendanceRecord {
   return {
     id: row.id,
     profileId: row.profile_id,
-    profileFullName: row.profiles[0]?.full_name ?? null,
+    profileFullName: row.profiles?.full_name ?? null,
     branchId: row.branch_id,
     clockIn: new Date(row.clock_in),
     clockOut: row.clock_out ? new Date(row.clock_out) : null,
@@ -38,7 +50,7 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
       .maybeSingle();
 
     if (error) return err(domainError("ATTENDANCE_LOOKUP_FAILED", error.message));
-    return ok(data ? toRecord(data) : null);
+    return ok(data ? toRecord(data as unknown as AttendanceRow) : null);
   }
 
   async clockIn(profileId: string, branchId: string): Promise<Result<AttendanceRecord>> {
@@ -49,7 +61,7 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
       .single();
 
     if (error) return err(domainError("CLOCK_IN_FAILED", error.message));
-    return ok(toRecord(data));
+    return ok(toRecord(data as unknown as AttendanceRow));
   }
 
   async clockOut(recordId: string): Promise<Result<AttendanceRecord>> {
@@ -61,7 +73,7 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
       .single();
 
     if (error) return err(domainError("CLOCK_OUT_FAILED", error.message));
-    return ok(toRecord(data));
+    return ok(toRecord(data as unknown as AttendanceRow));
   }
 
   async listForBranch(branchId: string, startDate: string, endDate: string): Promise<Result<AttendanceRecord[]>> {
@@ -74,6 +86,6 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
       .order("clock_in", { ascending: false });
 
     if (error) return err(domainError("LIST_ATTENDANCE_FAILED", error.message));
-    return ok(data.map(toRecord));
+    return ok((data as unknown as AttendanceRow[]).map(toRecord));
   }
 }

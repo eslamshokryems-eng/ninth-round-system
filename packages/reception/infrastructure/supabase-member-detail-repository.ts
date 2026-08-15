@@ -3,6 +3,26 @@ import type { Result } from "@9thround/shared-kernel";
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import type { MemberDetailRepository } from "../domain/member-detail-repository";
 import type { MemberDetail } from "../domain/member-detail";
+import type { PaymentMethod } from "../domain/registration";
+import type { MembershipStatus } from "../domain/member-search-result";
+
+interface MembershipHistoryRow {
+  id: string;
+  membership_number: string;
+  start_date: string;
+  end_date: string;
+  price: number;
+  discount: number;
+  final_price: number;
+  payment_method: PaymentMethod;
+  status: MembershipStatus;
+  session_count: number | null;
+  // Both to-one embeds (the FK is on `memberships`, pointing at
+  // membership_types/profiles) — see the comment at the call site for why
+  // this is cast rather than trusted from supabase-js's own inference.
+  membership_types: { name: string } | null;
+  coach: { full_name: string | null } | null;
+}
 
 export class SupabaseMemberDetailRepository implements MemberDetailRepository {
   constructor(private readonly client: TypedSupabaseClient) {}
@@ -44,13 +64,20 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
       emergencyContactPhone: data.emergency_contact_phone,
       address: data.address,
       notes: data.notes,
-      membershipHistory: data.memberships.map((m) => ({
+      // `membership_types`/`coach`, nested inside each membership row, are
+      // both to-one embeds — real PostgREST returns each as a single
+      // object, not an array. The previous `[0]` indexing on those objects
+      // silently returned undefined for every row — a real production bug
+      // (confirmed live on the Expiring page, which had the same bug for
+      // `members`), not a harmless defensive pattern. supabase-js's own
+      // inferred type here is unreliable (see the cast comment above) —
+      // every field resolves to `any` because @9thround/database-types has
+      // no `Relationships` metadata for it to key off, so this cast isn't
+      // fighting a real type guarantee.
+      membershipHistory: (data.memberships as unknown as MembershipHistoryRow[]).map((m) => ({
         membershipId: m.id,
         membershipNumber: m.membership_number,
-        // Never empty in practice — membership_type_id is `not null` and the FK is never dropped —
-        // but the hand-authored types (no Relationships metadata) infer this as an array rather
-        // than a single embedded row, so index rather than assert.
-        membershipTypeName: m.membership_types[0]?.name ?? "—",
+        membershipTypeName: m.membership_types?.name ?? "—",
         startDate: m.start_date,
         endDate: m.end_date,
         price: m.price,
@@ -58,7 +85,7 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
         finalPrice: m.final_price,
         paymentMethod: m.payment_method,
         status: m.status,
-        coachFullName: m.coach[0]?.full_name ?? null,
+        coachFullName: m.coach?.full_name ?? null,
         sessionCount: m.session_count,
       })),
     });

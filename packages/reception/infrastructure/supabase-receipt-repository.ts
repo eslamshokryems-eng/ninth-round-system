@@ -15,20 +15,24 @@ interface ReceiptRow {
   memberships: {
     receipt_number: string;
     membership_number: string;
-    members: { full_name: string }[];
-  }[];
+    members: { full_name: string };
+  };
 }
 
-// Same hand-authored-types quirk as SupabaseMemberDetailRepository: no
-// Relationships metadata means an embedded (even `!inner`) relation infers
-// as an array, not a single row.
+// `memberships` (FK on membership_payments, even with `!inner`) and the
+// nested `members` (FK on memberships) are both to-one embeds — PostgREST
+// returns each as a single object, not an array. This file previously
+// indexed both with `[0]`, which returns undefined on a plain object and
+// silently produced "—" for every receipt's member name — a real
+// production bug, confirmed live on the Expiring page (same underlying
+// mistake, same "—" symptom) before being traced back here.
 function toReceipt(row: ReceiptRow): Receipt {
-  const membership = row.memberships[0];
+  const membership = row.memberships;
   return {
     paymentId: row.id,
     receiptNumber: membership?.receipt_number ?? "—",
     membershipNumber: membership?.membership_number ?? "—",
-    memberFullName: membership?.members[0]?.full_name ?? "—",
+    memberFullName: membership?.members?.full_name ?? "—",
     amount: row.amount,
     paymentMethod: row.payment_method,
     paymentDate: row.payment_date,
@@ -52,7 +56,13 @@ export class SupabaseReceiptRepository implements ReceiptRepository {
     if (error) {
       return err(domainError("LIST_RECEIPTS_FAILED", error.message));
     }
-    return ok(data.map(toReceipt));
+    // supabase-js's own inferred type for `data` here is unreliable (see
+    // the comment above `toReceipt`) — @9thround/database-types has no
+    // `Relationships` metadata for it to key off, so every embedded field
+    // resolves to `any` regardless of real cardinality; casting to the
+    // hand-written, correct-by-construction ReceiptRow isn't fighting a
+    // real type guarantee.
+    return ok((data as unknown as ReceiptRow[]).map(toReceipt));
   }
 
   async listByDateRange(branchId: string, startDate: string, endDate: string): Promise<Result<Receipt[]>> {
@@ -68,6 +78,12 @@ export class SupabaseReceiptRepository implements ReceiptRepository {
     if (error) {
       return err(domainError("LIST_RECEIPTS_FAILED", error.message));
     }
-    return ok(data.map(toReceipt));
+    // supabase-js's own inferred type for `data` here is unreliable (see
+    // the comment above `toReceipt`) — @9thround/database-types has no
+    // `Relationships` metadata for it to key off, so every embedded field
+    // resolves to `any` regardless of real cardinality; casting to the
+    // hand-written, correct-by-construction ReceiptRow isn't fighting a
+    // real type guarantee.
+    return ok((data as unknown as ReceiptRow[]).map(toReceipt));
   }
 }

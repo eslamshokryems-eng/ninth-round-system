@@ -14,6 +14,21 @@ function addDaysIso(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+interface ExpiringMembershipRow {
+  id: string;
+  member_id: string;
+  membership_number: string;
+  end_date: string;
+  // `members` is a to-one embed (see the comment in `list()` below) —
+  // supabase-js's own inferred type here has no relation to the actual
+  // PostgREST response shape, since @9thround/database-types is
+  // hand-authored with no `Relationships` metadata (the thing supabase-js
+  // needs to correctly tell a to-one embed from a to-many one); every
+  // field it infers resolves to `any`, so casting to this hand-written,
+  // correct-by-construction shape is not fighting a real type guarantee.
+  members: { full_name: string | null; phone: string | null } | null;
+}
+
 export class SupabaseExpiringMembershipRepository implements ExpiringMembershipRepository {
   constructor(private readonly client: TypedSupabaseClient) {}
 
@@ -34,12 +49,18 @@ export class SupabaseExpiringMembershipRepository implements ExpiringMembershipR
       return err(domainError("LIST_EXPIRING_MEMBERSHIPS_FAILED", error.message));
     }
 
+    // `members` is a to-one embed (memberships.member_id -> members.id is a
+    // FK *on* memberships, i.e. "belongs to" from this query's side) — real
+    // PostgREST returns that as a single object, not an array. Indexing
+    // `[0]` on that object silently returned undefined for every row — a
+    // real production bug (confirmed live on the Expiring page), not just
+    // defensive typing.
     return ok(
-      data.map((row) => ({
+      (data as unknown as ExpiringMembershipRow[]).map((row) => ({
         membershipId: row.id,
         memberId: row.member_id,
-        memberFullName: row.members[0]?.full_name ?? "—",
-        memberPhone: row.members[0]?.phone ?? "—",
+        memberFullName: row.members?.full_name ?? "—",
+        memberPhone: row.members?.phone ?? "—",
         membershipNumber: row.membership_number,
         endDate: row.end_date,
       })),

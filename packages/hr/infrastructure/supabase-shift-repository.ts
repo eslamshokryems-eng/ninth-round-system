@@ -11,7 +11,10 @@ interface ShiftRow {
   day_of_week: number;
   start_time: string;
   end_time: string;
-  profiles: { full_name: string | null }[];
+  // `profiles` is a to-one embed (the FK is on staff_shifts, pointing at
+  // profiles), so PostgREST returns a single object, not an array — see
+  // supabase-attendance-repository.ts's comment for the full explanation.
+  profiles: { full_name: string | null } | null;
 }
 
 const SELECT_COLUMNS = "id, profile_id, branch_id, day_of_week, start_time, end_time, profiles (full_name)";
@@ -20,7 +23,7 @@ function toShift(row: ShiftRow): Shift {
   return {
     id: row.id,
     profileId: row.profile_id,
-    profileFullName: row.profiles[0]?.full_name ?? null,
+    profileFullName: row.profiles?.full_name ?? null,
     branchId: row.branch_id,
     dayOfWeek: row.day_of_week as DayOfWeek,
     // Postgres `time` columns round-trip as "HH:MM:SS" — trim to "HH:MM" to match the domain type.
@@ -41,7 +44,9 @@ export class SupabaseShiftRepository implements ShiftRepository {
       .order("start_time", { ascending: true });
 
     if (error) return err(domainError("LIST_SHIFTS_FAILED", error.message));
-    return ok(data.map(toShift));
+    // supabase-js's own inferred type here is unreliable — see
+    // supabase-attendance-repository.ts's comment on ShiftRow's twin.
+    return ok((data as unknown as ShiftRow[]).map(toShift));
   }
 
   async create(input: CreateShiftInput): Promise<Result<Shift>> {
@@ -58,7 +63,7 @@ export class SupabaseShiftRepository implements ShiftRepository {
       .single();
 
     if (error) return err(domainError("CREATE_SHIFT_FAILED", error.message));
-    return ok(toShift(data));
+    return ok(toShift(data as unknown as ShiftRow));
   }
 
   async delete(shiftId: string): Promise<Result<void>> {
