@@ -19,6 +19,7 @@ function buildProfile() {
     onboardingCompletedAt: null,
     referralCode: "abc123",
     branchId: null,
+    isActive: true,
   });
 }
 

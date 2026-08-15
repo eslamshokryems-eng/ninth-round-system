@@ -13,7 +13,7 @@ import { errorResponse, verifyStaffAdmin } from "../../../../src/lib/verify-staf
 export async function POST(request: Request) {
   const verified = await verifyStaffAdmin(request);
   if (verified instanceof Response) return verified;
-  const { serviceRoleKey } = verified;
+  const { callerId, serviceRoleKey } = verified;
 
   let body: { profileId?: unknown; password?: unknown };
   try {
@@ -37,6 +37,13 @@ export async function POST(request: Request) {
   if (error) {
     return errorResponse("ACCOUNT_CREATE_FAILED", error.message, 500);
   }
+
+  await adminClient.rpc("log_audit_event_as", {
+    p_actor_id: callerId,
+    p_action: "password_reset",
+    p_entity_type: "staff",
+    p_entity_id: profileId,
+  });
 
   return Response.json({ ok: true });
 }

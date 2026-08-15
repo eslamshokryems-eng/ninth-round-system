@@ -28,6 +28,29 @@ function HrIcon() {
   );
 }
 
+function AuditLogIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <path d="M5 2.5h7l3 3v12h-10z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M7.5 9h5M7.5 12h5M7.5 15h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PermissionsIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <path
+        d="M10 2.5l6 2.2v4.7c0 4-2.6 6.9-6 8.1-3.4-1.2-6-4.1-6-8.1V4.7z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M7.5 10l1.8 1.8L12.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 interface NavItem {
   href: string;
   label: string;
@@ -54,6 +77,19 @@ const NAV_ITEMS: NavItem[] = [
 const OWNER_NAV_ITEMS: NavItem[] = [
   { href: "/receipts", label: "Payments / Receipts", icon: CalendarIcon },
   { href: "/staff", label: "Manage Staff" },
+];
+
+/**
+ * Super Admin-only — matches the permission matrix exactly (view audit
+ * logs / manage permissions are listed only under SUPER ADMIN, not
+ * MANAGER — see docs/phase-1/17-audit-log-and-permissions.md). Kept out
+ * of OWNER_NAV_ITEMS (branch_manager/super_admin) deliberately: a plain
+ * branch_manager should never see these links, not just be denied at the
+ * database if they somehow reach the page.
+ */
+const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: "/audit-log", label: "Audit Log", icon: AuditLogIcon },
+  { href: "/permissions", label: "Permissions", icon: PermissionsIcon },
 ];
 
 /** The Reception web app's permanent desktop sidebar — see Phase 5 of the reception-web brief. */
@@ -84,9 +120,11 @@ export function ReceptionSidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {(role === "branch_manager" || role === "super_admin"
-          ? [...NAV_ITEMS, ...OWNER_NAV_ITEMS]
-          : NAV_ITEMS
+        {(role === "super_admin"
+          ? [...NAV_ITEMS, ...OWNER_NAV_ITEMS, ...SUPER_ADMIN_NAV_ITEMS]
+          : role === "branch_manager"
+            ? [...NAV_ITEMS, ...OWNER_NAV_ITEMS]
+            : NAV_ITEMS
         ).map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           const Icon = item.icon;

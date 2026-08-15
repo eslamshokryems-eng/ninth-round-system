@@ -4,28 +4,13 @@ import { useState, type FormEvent } from "react";
 import type { StaffCandidate, UserRoleName } from "@9thround/identity";
 import { Role, USER_ROLES } from "@9thround/identity";
 import { useAuthStore } from "../features/auth/store";
-import { getSupabaseClient } from "../lib/composition-root";
 import { translateErrorCode } from "../lib/translate-error";
+import { authorizedFetch, type ApiErrorBody } from "../lib/authorized-fetch";
 import { Card } from "./ui/card";
 import { TextField } from "./ui/text-field";
 import { SelectField } from "./ui/select-field";
 import { Button } from "./ui/button";
 import { StaffPicker } from "./staff-picker";
-
-interface ApiErrorBody {
-  error?: { code: string; message: string };
-}
-
-async function authorizedFetch(path: string, body: unknown): Promise<Response | null> {
-  const { data: sessionData } = await getSupabaseClient().auth.getSession();
-  const accessToken = sessionData.session?.access_token;
-  if (!accessToken) return null;
-  return fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify(body),
-  });
-}
 
 /**
  * "Add Employee" (docs/phase-1/16-employee-login.md) — two steps, both

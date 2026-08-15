@@ -92,5 +92,18 @@ export async function POST(request: Request) {
     return errorResponse("ACCOUNT_CREATE_FAILED", updateError.message, 500);
   }
 
+  // The profiles UPDATE above ran on the service-role client (no
+  // auth.uid()), so the automatic audit trigger stayed silent — see
+  // log_profile_change()'s comment (20260815000002_permissions_and_staff_status.sql).
+  // This is the explicit "Create User" entry, correctly attributed to the
+  // acting admin verified above.
+  await adminClient.rpc("log_audit_event_as", {
+    p_actor_id: verified.callerId,
+    p_action: "create_user",
+    p_entity_type: "staff",
+    p_entity_id: created.user.id,
+    p_new_value: { full_name: fullName, role, branch_id: branchId, employee_code: employeeCode },
+  });
+
   return Response.json({ profileId: created.user.id, employeeCode });
 }

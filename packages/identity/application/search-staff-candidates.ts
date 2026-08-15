@@ -12,6 +12,7 @@ export interface StaffCandidate {
   fullName: string | null;
   role: UserRoleName;
   branchId: string | null;
+  isActive: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ export class SearchStaffCandidatesUseCase
         fullName: profile.fullName,
         role: profile.role.name,
         branchId: profile.branchId,
+        isActive: profile.isActive,
       })),
     );
   }

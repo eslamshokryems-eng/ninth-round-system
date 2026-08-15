@@ -42,6 +42,17 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   INVALID_LEAVE_RANGE: "End date must be on or after the start date.",
   INVALID_LEAVE_DECISION: 'Decision must be "approved" or "rejected".',
   INVALID_SALARY_AMOUNT: "Salary cannot be negative.",
+  CANNOT_DISABLE_SELF: "You cannot deactivate your own account.",
+  SET_ACTIVE_STATUS_FAILED: "Could not update this account's status. Please try again.",
+  AUDIT_LOG_LIST_FAILED: "Could not load the audit log. Please try again.",
+  AUDIT_LOG_FETCH_FAILED: "Could not load that log entry. Please try again.",
+  PERMISSION_CATALOG_FETCH_FAILED: "Could not load the permission list. Please try again.",
+  ROLE_PERMISSIONS_FETCH_FAILED: "Could not load role permissions. Please try again.",
+  USER_OVERRIDES_FETCH_FAILED: "Could not load account permission overrides. Please try again.",
+  SET_ROLE_PERMISSION_FAILED: "Could not update that permission. Please try again.",
+  SET_USER_OVERRIDE_FAILED: "Could not update that account's permission. Please try again.",
+  CLEAR_USER_OVERRIDE_FAILED: "Could not clear that override. Please try again.",
+  HAS_PERMISSION_CHECK_FAILED: "Could not check permissions. Please try again.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";

@@ -2,6 +2,7 @@ import { createSupabaseClient, type TypedSupabaseClient } from "@9thround/supaba
 import { createIdentityModule } from "@9thround/identity";
 import { createReceptionModule } from "@9thround/reception";
 import { createHrModule } from "@9thround/hr";
+import { createAuditModule } from "@9thround/audit";
 import { env } from "./env";
 
 let client: TypedSupabaseClient | null = null;
@@ -62,4 +63,11 @@ let hrModule: ReturnType<typeof createHrModule> | null = null;
 export function getHrModule(): ReturnType<typeof createHrModule> {
   hrModule ??= createHrModule(getSupabaseClient());
   return hrModule;
+}
+
+let auditModule: ReturnType<typeof createAuditModule> | null = null;
+
+export function getAuditModule(): ReturnType<typeof createAuditModule> {
+  auditModule ??= createAuditModule(getSupabaseClient());
+  return auditModule;
 }

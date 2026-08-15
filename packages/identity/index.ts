@@ -9,9 +9,17 @@ import { SearchStaffCandidatesUseCase } from "./application/search-staff-candida
 import { ListStaffPresenceUseCase } from "./application/list-staff-presence";
 import { RecordHeartbeatUseCase } from "./application/record-heartbeat";
 import { ResolveEmployeeCodeUseCase } from "./application/resolve-employee-code";
+import { ListPermissionCatalogUseCase } from "./application/list-permission-catalog";
+import { ListRolePermissionsUseCase } from "./application/list-role-permissions";
+import { ListUserPermissionOverridesUseCase } from "./application/list-user-permission-overrides";
+import { SetRolePermissionUseCase } from "./application/set-role-permission";
+import { SetUserPermissionOverrideUseCase } from "./application/set-user-permission-override";
+import { ClearUserPermissionOverrideUseCase } from "./application/clear-user-permission-override";
+import { CheckPermissionUseCase } from "./application/check-permission";
 import { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
 import { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 import { SupabaseStaffPresenceRepository } from "./infrastructure/supabase-staff-presence-repository";
+import { SupabasePermissionRepository } from "./infrastructure/supabase-permission-repository";
 
 export { Profile, type ProfileProps, type FitnessGoal, type ExperienceLevel } from "./domain/profile";
 export { Role, USER_ROLES, type UserRoleName } from "./domain/role";
@@ -51,9 +59,28 @@ export { RecordHeartbeatUseCase, type RecordHeartbeatInput } from "./application
 export { ResolveEmployeeCodeUseCase } from "./application/resolve-employee-code";
 export type { StaffPresence } from "./domain/staff-presence";
 export type { StaffPresenceRepository } from "./domain/staff-presence-repository";
+export type { Permission, RolePermission, UserPermissionOverride } from "./domain/permission";
+export type { PermissionRepository } from "./domain/permission-repository";
+export { ListPermissionCatalogUseCase } from "./application/list-permission-catalog";
+export { ListRolePermissionsUseCase } from "./application/list-role-permissions";
+export {
+  ListUserPermissionOverridesUseCase,
+  type ListUserPermissionOverridesInput,
+} from "./application/list-user-permission-overrides";
+export { SetRolePermissionUseCase, type SetRolePermissionInput } from "./application/set-role-permission";
+export {
+  SetUserPermissionOverrideUseCase,
+  type SetUserPermissionOverrideInput,
+} from "./application/set-user-permission-override";
+export {
+  ClearUserPermissionOverrideUseCase,
+  type ClearUserPermissionOverrideInput,
+} from "./application/clear-user-permission-override";
+export { CheckPermissionUseCase } from "./application/check-permission";
 export { SupabaseProfileRepository } from "./infrastructure/supabase-profile-repository";
 export { SupabaseAuthPort } from "./infrastructure/supabase-auth-port";
 export { SupabaseStaffPresenceRepository } from "./infrastructure/supabase-staff-presence-repository";
+export { SupabasePermissionRepository } from "./infrastructure/supabase-permission-repository";
 
 /**
  * The Identity context's composition root: wires the Supabase-backed
@@ -69,6 +96,7 @@ export function createIdentityModule(client: TypedSupabaseClient) {
   const profileRepository = new SupabaseProfileRepository(client);
   const authPort = new SupabaseAuthPort(client);
   const staffPresenceRepository = new SupabaseStaffPresenceRepository(client);
+  const permissionRepository = new SupabasePermissionRepository(client);
   return {
     completeOnboarding: new CompleteOnboardingUseCase(profileRepository),
     assignStaffRole: new AssignStaffRoleUseCase(profileRepository),
@@ -81,5 +109,12 @@ export function createIdentityModule(client: TypedSupabaseClient) {
     signIn: new SignInUseCase(authPort),
     requestPasswordReset: new RequestPasswordResetUseCase(authPort),
     signOut: () => authPort.signOut(),
+    listPermissionCatalog: new ListPermissionCatalogUseCase(permissionRepository),
+    listRolePermissions: new ListRolePermissionsUseCase(permissionRepository),
+    listUserPermissionOverrides: new ListUserPermissionOverridesUseCase(permissionRepository),
+    setRolePermission: new SetRolePermissionUseCase(permissionRepository),
+    setUserPermissionOverride: new SetUserPermissionOverrideUseCase(permissionRepository),
+    clearUserPermissionOverride: new ClearUserPermissionOverrideUseCase(permissionRepository),
+    checkPermission: new CheckPermissionUseCase(permissionRepository),
   };
 }

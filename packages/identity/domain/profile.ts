@@ -22,6 +22,8 @@ export interface ProfileProps {
   referralCode: string;
   /** A staff member's home location — see docs/phase-1/14-reception-membership.md §14.1. null for a `member`. */
   branchId: string | null;
+  /** Staff activate/deactivate (docs/phase-1/17-audit-log-and-permissions.md) — a disabled account keeps its full history but loses RLS-gated access. Not settable from here; changed only via the dedicated Route Handler that also bans the account at the Auth layer. */
+  isActive: boolean;
 }
 
 /**
@@ -85,6 +87,10 @@ export class Profile extends AggregateRoot<string> {
 
   get branchId(): string | null {
     return this.props.branchId;
+  }
+
+  get isActive(): boolean {
+    return this.props.isActive;
   }
 
   /** Snapshot for persistence mapping — infrastructure only, never UI. */

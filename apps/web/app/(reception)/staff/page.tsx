@@ -11,6 +11,7 @@ import { SelectField } from "../../../src/components/ui/select-field";
 import { Button } from "../../../src/components/ui/button";
 import { CreateStaffAccountForm } from "../../../src/components/create-staff-account-form";
 import { translateErrorCode } from "../../../src/lib/translate-error";
+import { authorizedFetch, type ApiErrorBody } from "../../../src/lib/authorized-fetch";
 
 // A little over 2x the 45s heartbeat interval (use-heartbeat.ts) — allows
 // for one missed beat (a slow network tick) without flipping to offline.
@@ -41,6 +42,7 @@ function timeAgo(date: Date): string {
 export default function StaffPage() {
   const actingRole = useAuthStore((state) => state.role);
   const actingProfileId = useAuthStore((state) => state.profileId);
+  const [pendingActiveToggleId, setPendingActiveToggleId] = useState<string | null>(null);
 
   const [roster, setRoster] = useState<StaffPresence[]>([]);
   const [isLoadingRoster, setIsLoadingRoster] = useState(true);
@@ -102,6 +104,34 @@ export default function StaffPage() {
       );
     } else {
       setError(translateErrorCode(result.error.code));
+    }
+  }
+
+  async function handleToggleActive(target: StaffCandidate) {
+    setError(null);
+    setSuccessMessage(null);
+    setPendingActiveToggleId(target.profileId);
+
+    const nextIsActive = !target.isActive;
+    const response = await authorizedFetch("/api/staff/set-active-status", {
+      profileId: target.profileId,
+      isActive: nextIsActive,
+    });
+
+    setPendingActiveToggleId(null);
+
+    if (!response) {
+      setError(translateErrorCode("UNAUTHORIZED"));
+      return;
+    }
+    const responseBody = (await response.json()) as { ok?: boolean } & ApiErrorBody;
+    if (response.ok && responseBody.ok) {
+      setSuccessMessage(`${target.fullName ?? "Account"} is now ${nextIsActive ? "active" : "deactivated"}.`);
+      setResults((prev) =>
+        prev.map((c) => (c.profileId === target.profileId ? { ...c, isActive: nextIsActive } : c)),
+      );
+    } else {
+      setError(responseBody.error ? translateErrorCode(responseBody.error.code) : translateErrorCode("SET_ACTIVE_STATUS_FAILED"));
     }
   }
 
@@ -208,8 +238,20 @@ export default function StaffPage() {
                     <p className="text-xs capitalize text-muted">
                       Current role: {candidate.role.replace("_", " ")}
                     </p>
+                    <p className={`text-xs ${candidate.isActive ? "text-emerald-400" : "text-red-400"}`}>
+                      {candidate.isActive ? "Active" : "Deactivated"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <Button
+                      variant={candidate.isActive ? "danger" : "secondary"}
+                      isLoading={pendingActiveToggleId === candidate.profileId}
+                      disabled={candidate.profileId === actingProfileId}
+                      onClick={() => void handleToggleActive(candidate)}
+                      className="px-3 py-1.5 text-xs"
+                    >
+                      {candidate.isActive ? "Deactivate" : "Activate"}
+                    </Button>
                     <SelectField
                       label="New role"
                       className="w-48"

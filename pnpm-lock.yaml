@@ -180,6 +180,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@9thround/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
       '@9thround/billing':
         specifier: workspace:*
         version: link:../../packages/billing
@@ -287,6 +290,28 @@ importers:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
+
+  packages/audit:
+    dependencies:
+      '@9thround/database-types':
+        specifier: workspace:*
+        version: link:../database-types
+      '@9thround/shared-kernel':
+        specifier: workspace:*
+        version: link:../shared-kernel
+      '@9thround/supabase-client':
+        specifier: workspace:*
+        version: link:../supabase-client
+    devDependencies:
+      '@9thround/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/billing:
     dependencies:

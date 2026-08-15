@@ -22,6 +22,7 @@ const row: ProfileRow = {
   phone: null,
   address: null,
   employee_code: null,
+  is_active: true,
   created_at: "2026-07-01T00:00:00.000Z",
   updated_at: "2026-07-28T10:00:00.000Z",
 };

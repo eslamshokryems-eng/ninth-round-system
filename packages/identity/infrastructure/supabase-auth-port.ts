@@ -37,13 +37,25 @@ export class SupabaseAuthPort implements AuthPort {
       password: input.password,
     });
 
-    if (error) return err(domainError("SIGN_IN_FAILED", error.message));
+    if (error) {
+      // Fire-and-forget: logging a failed login must never itself block or
+      // fail the caller's own error handling. Runs as `anon` (no session
+      // exists yet) via log_auth_event()'s narrow, action-allowlisted RPC —
+      // same trust posture as resolve_login_email().
+      void this.client.rpc("log_auth_event", { p_action: "failed_login", p_identifier: input.email });
+      return err(domainError("SIGN_IN_FAILED", error.message));
+    }
     if (!data.user) return err(domainError("SIGN_IN_FAILED", "No user returned from sign-in."));
 
+    void this.client.rpc("log_auth_event", { p_action: "login" });
     return ok({ profileId: data.user.id, emailVerified: data.user.email_confirmed_at != null });
   }
 
   async signOut(): Promise<Result<void>> {
+    // Logged BEFORE signOut() clears the session — auth.uid() needs the
+    // still-active session to attribute the event to the right account.
+    await this.client.rpc("log_auth_event", { p_action: "logout" });
+
     const { error } = await this.client.auth.signOut();
     if (error) return err(domainError("SIGN_OUT_FAILED", error.message));
     return ok(undefined);

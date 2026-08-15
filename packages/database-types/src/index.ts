@@ -46,8 +46,44 @@ export interface ProfileRow {
   phone: string | null;
   address: string | null;
   employee_code: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// --- Audit Log & Advanced Permissions (docs/phase-1/17-audit-log-and-permissions.md) ---
+
+export interface AdminAuditLogRow {
+  id: string;
+  admin_id: string | null;
+  actor_role: string | null;
+  actor_full_name: string | null;
+  action: string;
+  target_table: string;
+  target_id: string | null;
+  before: unknown;
+  after: unknown;
+  metadata: unknown;
+  created_at: string;
+}
+
+export interface PermissionRow {
+  key: string;
+  category: string;
+  description: string;
+}
+
+export interface RolePermissionRow {
+  role: UserRole;
+  permission_key: string;
+}
+
+export interface UserPermissionOverrideRow {
+  profile_id: string;
+  permission_key: string;
+  granted: boolean;
+  granted_by: string | null;
+  created_at: string;
 }
 
 export interface StaffProfileRow {
@@ -308,6 +344,37 @@ export interface Database {
         Update: Partial<OtherSaleRow>;
         Relationships: [];
       };
+      // Insert/Update are typed but unused in practice: every write to
+      // these three tables goes through a SECURITY DEFINER function
+      // (log_audit_event(), set_role_permission(), etc. — see
+      // 20260815000001_audit_log.sql / 20260815000002_permissions_and_
+      // staff_status.sql), never a direct `.insert()`/`.update()` call —
+      // there is no RLS policy that would let one succeed anyway.
+      admin_audit_log: {
+        Row: AdminAuditLogRow;
+        Insert: Partial<AdminAuditLogRow> & Pick<AdminAuditLogRow, "action" | "target_table">;
+        Update: Partial<AdminAuditLogRow>;
+        Relationships: [];
+      };
+      permissions: {
+        Row: PermissionRow;
+        Insert: PermissionRow;
+        Update: Partial<PermissionRow>;
+        Relationships: [];
+      };
+      role_permissions: {
+        Row: RolePermissionRow;
+        Insert: RolePermissionRow;
+        Update: Partial<RolePermissionRow>;
+        Relationships: [];
+      };
+      user_permission_overrides: {
+        Row: UserPermissionOverrideRow;
+        Insert: Partial<UserPermissionOverrideRow> &
+          Pick<UserPermissionOverrideRow, "profile_id" | "permission_key" | "granted">;
+        Update: Partial<UserPermissionOverrideRow>;
+        Relationships: [];
+      };
     };
     Views: {
       reception_dashboard_stats: {
@@ -374,6 +441,38 @@ export interface Database {
       resolve_login_email: {
         Args: { p_employee_code: string };
         Returns: string | null;
+      };
+      has_permission: {
+        Args: { p_permission_key: string };
+        Returns: boolean;
+      };
+      log_auth_event: {
+        Args: { p_action: string; p_identifier?: string | null };
+        Returns: undefined;
+      };
+      log_audit_event_as: {
+        Args: {
+          p_actor_id: string;
+          p_action: string;
+          p_entity_type: string;
+          p_entity_id: string | null;
+          p_previous_value?: unknown;
+          p_new_value?: unknown;
+          p_metadata?: unknown;
+        };
+        Returns: string;
+      };
+      set_role_permission: {
+        Args: { p_role: UserRole; p_permission_key: string; p_granted: boolean };
+        Returns: undefined;
+      };
+      set_user_permission_override: {
+        Args: { p_profile_id: string; p_permission_key: string; p_granted: boolean };
+        Returns: undefined;
+      };
+      clear_user_permission_override: {
+        Args: { p_profile_id: string; p_permission_key: string };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;
