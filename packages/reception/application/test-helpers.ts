@@ -13,7 +13,7 @@ import type { MemberDetail } from "../domain/member-detail";
 import type { UpdateMemberRepository } from "../domain/update-member-repository";
 import type { UpdateMemberInput } from "../domain/update-member";
 import type { CheckInRepository } from "../domain/check-in-repository";
-import type { CheckInMemberOutput } from "../domain/check-in";
+import type { CheckInHistoryEntry, CheckInMemberOutput } from "../domain/check-in";
 import type { MemberPhotoRepository } from "../domain/member-photo-repository";
 import type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "../domain/member-photo";
 import type { ExpenseRepository } from "../domain/expense-repository";
@@ -214,11 +214,17 @@ export class FakeUpdateMemberRepository implements UpdateMemberRepository {
 
 export class FakeCheckInRepository implements CheckInRepository {
   public lastMemberId: string | null = null;
+  public history: CheckInHistoryEntry[] = [];
   constructor(private result: Result<CheckInMemberOutput>) {}
 
   async checkIn(memberId: string): Promise<Result<CheckInMemberOutput>> {
     this.lastMemberId = memberId;
     return this.result;
+  }
+
+  async listByMember(memberId: string): Promise<Result<CheckInHistoryEntry[]>> {
+    this.lastMemberId = memberId;
+    return ok(this.history);
   }
 }
 

@@ -8,6 +8,7 @@ import { RenewMembershipUseCase } from "./application/renew-membership";
 import { GetMemberDetailUseCase } from "./application/get-member-detail";
 import { UpdateMemberUseCase } from "./application/update-member";
 import { CheckInMemberUseCase } from "./application/check-in-member";
+import { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
 import { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 import { RecordExpenseUseCase } from "./application/record-expense";
 import { ListExpensesUseCase } from "./application/list-expenses";
@@ -45,7 +46,7 @@ export type {
 export type { RenewMembershipInput, RenewMembershipOutput } from "./domain/renewal";
 export type { MemberDetail, MembershipHistoryEntry } from "./domain/member-detail";
 export type { UpdateMemberInput } from "./domain/update-member";
-export type { CheckInMemberOutput } from "./domain/check-in";
+export type { CheckInHistoryEntry, CheckInMemberOutput } from "./domain/check-in";
 export type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "./domain/member-photo";
 export type { Expense, ExpenseCategory, RecordExpenseInput } from "./domain/expense";
 export type { EquipmentSale, RecordEquipmentSaleInput } from "./domain/equipment-sale";
@@ -63,6 +64,7 @@ export { RenewMembershipUseCase } from "./application/renew-membership";
 export { GetMemberDetailUseCase } from "./application/get-member-detail";
 export { UpdateMemberUseCase } from "./application/update-member";
 export { CheckInMemberUseCase } from "./application/check-in-member";
+export { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
 export { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 export { RecordExpenseUseCase } from "./application/record-expense";
 export { ListExpensesUseCase } from "./application/list-expenses";
@@ -122,6 +124,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     getMemberDetail: new GetMemberDetailUseCase(memberDetailRepository),
     updateMember: new UpdateMemberUseCase(updateMemberRepository),
     checkInMember: new CheckInMemberUseCase(checkInRepository),
+    listCheckInsForMember: new ListCheckInsForMemberUseCase(checkInRepository),
     uploadMemberPhoto: new UploadMemberPhotoUseCase(memberPhotoRepository),
     recordExpense: new RecordExpenseUseCase(expenseRepository),
     listExpenses: new ListExpensesUseCase(expenseRepository),

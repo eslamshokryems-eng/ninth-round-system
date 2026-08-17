@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import type { Gender, MemberDetail, MembershipType, PaymentMethod } from "@9thround/reception";
+import type { CheckInHistoryEntry, Gender, MemberDetail, MembershipType, PaymentMethod } from "@9thround/reception";
 import type { StaffCandidate } from "@9thround/identity";
 import { getReceptionModule } from "../../../../src/lib/composition-root";
 import { translateErrorCode } from "../../../../src/lib/translate-error";
@@ -55,6 +55,9 @@ export default function MemberDetailPage() {
   const [checkInFeedback, setCheckInFeedback] = useState<{ text: string; isError: boolean } | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
 
+  const [checkInHistory, setCheckInHistory] = useState<CheckInHistoryEntry[]>([]);
+  const [isLoadingCheckInHistory, setIsLoadingCheckInHistory] = useState(true);
+
   const [isRenewOpen, setIsRenewOpen] = useState(searchParams.get("action") === "renew");
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [renewTypeId, setRenewTypeId] = useState<string | null>(null);
@@ -96,6 +99,17 @@ export default function MemberDetailPage() {
   useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
+
+  const loadCheckInHistory = useCallback(async () => {
+    setIsLoadingCheckInHistory(true);
+    const result = await getReceptionModule().listCheckInsForMember.execute(memberId);
+    setIsLoadingCheckInHistory(false);
+    if (result.isOk) setCheckInHistory(result.value);
+  }, [memberId]);
+
+  useEffect(() => {
+    void loadCheckInHistory();
+  }, [loadCheckInHistory]);
 
   useEffect(() => {
     void (async () => {
@@ -142,6 +156,7 @@ export default function MemberDetailPage() {
       return;
     }
     setCheckInFeedback({ text: "Checked in.", isError: false });
+    void loadCheckInHistory();
   }
 
   async function handleRenew() {
@@ -366,6 +381,41 @@ export default function MemberDetailPage() {
                     >
                       {entry.status}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold text-ink">Attendance</h2>
+          <p className="text-sm text-muted">
+            Total visits: <span className="font-semibold text-gold">{checkInHistory.length}</span>
+          </p>
+        </div>
+        {isLoadingCheckInHistory ? (
+          <p className="text-sm text-muted">Loading…</p>
+        ) : checkInHistory.length === 0 ? (
+          <p className="text-sm text-muted">No check-ins yet.</p>
+        ) : (
+          <div className="max-h-80 overflow-y-auto overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-surface text-xs uppercase text-muted">
+                <tr>
+                  <th className="py-2 pr-4">Date</th>
+                  <th className="py-2 pr-4">Time</th>
+                  <th className="py-2 pr-4">Checked In By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {checkInHistory.map((entry) => (
+                  <tr key={entry.checkInId} className="border-t border-white/5">
+                    <td className="py-2 pr-4 text-ink">{entry.checkedInAt.toLocaleDateString()}</td>
+                    <td className="py-2 pr-4 text-muted">{entry.checkedInAt.toLocaleTimeString()}</td>
+                    <td className="py-2 pr-4 text-muted">{entry.checkedInByName ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
