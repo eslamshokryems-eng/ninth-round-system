@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { DashboardStats } from "@9thround/reception";
+import Link from "next/link";
+import type { DashboardStats, RecentCheckInEntry } from "@9thround/reception";
 import { useAuthStore } from "../../../src/features/auth/store";
 import { getReceptionModule } from "../../../src/lib/composition-root";
 import { StatCard } from "../../../src/components/ui/stat-card";
 import { Button } from "../../../src/components/ui/button";
+import { Card } from "../../../src/components/ui/card";
 
 const canSeeRevenue = (role: string | null) => role === "branch_manager" || role === "super_admin";
 
@@ -22,6 +24,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [recentCheckIns, setRecentCheckIns] = useState<RecentCheckInEntry[]>([]);
+  const [isLoadingCheckIns, setIsLoadingCheckIns] = useState(true);
 
   const loadStats = useCallback(async () => {
     setIsLoading(true);
@@ -35,9 +39,17 @@ export default function DashboardPage() {
     setIsLoading(false);
   }, []);
 
+  const loadRecentCheckIns = useCallback(async () => {
+    setIsLoadingCheckIns(true);
+    const result = await getReceptionModule().listRecentCheckIns.execute();
+    if (result.isOk) setRecentCheckIns(result.value);
+    setIsLoadingCheckIns(false);
+  }, []);
+
   useEffect(() => {
     void loadStats();
-  }, [loadStats]);
+    void loadRecentCheckIns();
+  }, [loadStats, loadRecentCheckIns]);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -67,6 +79,31 @@ export default function DashboardPage() {
           ) : null}
         </div>
       ) : null}
+
+      <Card className="mt-6">
+        <h2 className="mb-4 text-sm font-semibold text-ink">Recent Check-Ins</h2>
+        {isLoadingCheckIns ? (
+          <p className="text-sm text-muted">Loading…</p>
+        ) : recentCheckIns.length === 0 ? (
+          <p className="text-sm text-muted">No check-ins yet today.</p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {recentCheckIns.map((entry) => (
+              <li key={entry.checkInId} className="flex items-center justify-between gap-3 py-2.5">
+                <Link
+                  href={`/members/${entry.memberId}`}
+                  className="truncate text-sm font-medium text-ink hover:text-gold"
+                >
+                  {entry.memberName}
+                </Link>
+                <span className="flex-shrink-0 text-xs text-muted">
+                  {entry.checkedInAt.toLocaleDateString()} {entry.checkedInAt.toLocaleTimeString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }

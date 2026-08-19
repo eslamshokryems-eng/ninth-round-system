@@ -9,6 +9,7 @@ import { GetMemberDetailUseCase } from "./application/get-member-detail";
 import { UpdateMemberUseCase } from "./application/update-member";
 import { CheckInMemberUseCase } from "./application/check-in-member";
 import { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
+import { ListRecentCheckInsUseCase } from "./application/list-recent-check-ins";
 import { CheckInByQrCodeUseCase } from "./application/check-in-by-qr-code";
 import { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 import { RecordExpenseUseCase } from "./application/record-expense";
@@ -47,7 +48,7 @@ export type {
 export type { RenewMembershipInput, RenewMembershipOutput } from "./domain/renewal";
 export type { MemberDetail, MembershipHistoryEntry } from "./domain/member-detail";
 export type { UpdateMemberInput } from "./domain/update-member";
-export type { CheckInHistoryEntry, CheckInMemberOutput } from "./domain/check-in";
+export type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry } from "./domain/check-in";
 export type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "./domain/member-photo";
 export type { Expense, ExpenseCategory, RecordExpenseInput } from "./domain/expense";
 export type { EquipmentSale, RecordEquipmentSaleInput } from "./domain/equipment-sale";
@@ -66,6 +67,7 @@ export { GetMemberDetailUseCase } from "./application/get-member-detail";
 export { UpdateMemberUseCase } from "./application/update-member";
 export { CheckInMemberUseCase } from "./application/check-in-member";
 export { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
+export { ListRecentCheckInsUseCase } from "./application/list-recent-check-ins";
 export { CheckInByQrCodeUseCase, type CheckInByQrCodeOutput } from "./application/check-in-by-qr-code";
 export { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 export { RecordExpenseUseCase } from "./application/record-expense";
@@ -127,6 +129,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     updateMember: new UpdateMemberUseCase(updateMemberRepository),
     checkInMember: new CheckInMemberUseCase(checkInRepository),
     listCheckInsForMember: new ListCheckInsForMemberUseCase(checkInRepository),
+    listRecentCheckIns: new ListRecentCheckInsUseCase(checkInRepository),
     checkInByQrCode: new CheckInByQrCodeUseCase(memberSearchRepository, checkInRepository),
     uploadMemberPhoto: new UploadMemberPhotoUseCase(memberPhotoRepository),
     recordExpense: new RecordExpenseUseCase(expenseRepository),

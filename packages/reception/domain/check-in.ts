@@ -9,3 +9,11 @@ export interface CheckInHistoryEntry {
   checkedInAt: Date;
   checkedInByName: string | null;
 }
+
+/** One row of the Dashboard's "Recent Check-Ins" list — across all members, not one. */
+export interface RecentCheckInEntry {
+  checkInId: string;
+  memberId: string;
+  memberName: string;
+  checkedInAt: Date;
+}

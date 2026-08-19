@@ -2,7 +2,7 @@ import { domainError, err, ok } from "@9thround/shared-kernel";
 import type { Result } from "@9thround/shared-kernel";
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import type { CheckInRepository } from "../domain/check-in-repository";
-import type { CheckInHistoryEntry, CheckInMemberOutput } from "../domain/check-in";
+import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry } from "../domain/check-in";
 
 // Most recent 500 visits — a cap, not a "last 500 only" product decision;
 // matches this app's other list caps (e.g. members.list(), 200 rows).
@@ -20,6 +20,15 @@ interface CheckInHistoryRow {
   // explanation of why this is cast rather than trusted from supabase-js's
   // own (unreliable, `Relationships`-metadata-less) inferred type.
   profiles: { full_name: string | null } | null;
+}
+
+interface RecentCheckInRow {
+  id: string;
+  member_id: string;
+  checked_in_at: string;
+  // `members` is a to-one embed (the FK is on check_ins, pointing at
+  // members) — same reasoning as `profiles` above.
+  members: { full_name: string } | null;
 }
 
 export class SupabaseCheckInRepository implements CheckInRepository {
@@ -55,6 +64,25 @@ export class SupabaseCheckInRepository implements CheckInRepository {
         checkInId: row.id,
         checkedInAt: new Date(row.checked_in_at),
         checkedInByName: row.profiles?.full_name ?? null,
+      })),
+    );
+  }
+
+  async listRecent(limit: number): Promise<Result<RecentCheckInEntry[]>> {
+    const { data, error } = await this.client
+      .from("check_ins")
+      .select("id, member_id, checked_in_at, members:member_id (full_name)")
+      .order("checked_in_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return err(domainError("LIST_CHECK_INS_FAILED", error.message));
+
+    return ok(
+      (data as unknown as RecentCheckInRow[]).map((row) => ({
+        checkInId: row.id,
+        memberId: row.member_id,
+        memberName: row.members?.full_name ?? "—",
+        checkedInAt: new Date(row.checked_in_at),
       })),
     );
   }
