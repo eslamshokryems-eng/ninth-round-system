@@ -53,6 +53,8 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   SET_USER_OVERRIDE_FAILED: "Could not update that account's permission. Please try again.",
   CLEAR_USER_OVERRIDE_FAILED: "Could not clear that override. Please try again.",
   HAS_PERMISSION_CHECK_FAILED: "Could not check permissions. Please try again.",
+  INVALID_QR_CODE: "No QR code was read. Try again or enter the code manually.",
+  MEMBER_LOOKUP_FAILED: "Could not look up that member. Please try again.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";

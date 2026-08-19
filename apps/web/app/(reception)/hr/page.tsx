@@ -35,13 +35,13 @@ export default function HrPage() {
     <div className="mx-auto max-w-4xl">
       <h1 className="mb-6 text-2xl font-semibold text-ink">HR</h1>
 
-      <div className="mb-6 flex gap-1 border-b border-white/5">
+      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-white/5">
         {visibleTabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === t.id ? "border-b-2 border-gold text-gold" : "text-muted hover:text-ink"
             }`}
           >

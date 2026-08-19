@@ -98,6 +98,8 @@ export function fakeRegistrationRepository(
 }
 
 export class FakeMemberSearchRepository implements MemberSearchRepository {
+  public byQrCode = new Map<string, MemberSearchResult>();
+
   constructor(private result: Result<MemberSearchResult[]>) {}
 
   async search(): Promise<Result<MemberSearchResult[]>> {
@@ -106,6 +108,10 @@ export class FakeMemberSearchRepository implements MemberSearchRepository {
 
   async list(): Promise<Result<MemberSearchResult[]>> {
     return this.result;
+  }
+
+  async findByQrCode(qrCode: string): Promise<Result<MemberSearchResult | null>> {
+    return ok(this.byQrCode.get(qrCode) ?? null);
   }
 }
 

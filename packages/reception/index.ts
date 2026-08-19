@@ -9,6 +9,7 @@ import { GetMemberDetailUseCase } from "./application/get-member-detail";
 import { UpdateMemberUseCase } from "./application/update-member";
 import { CheckInMemberUseCase } from "./application/check-in-member";
 import { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
+import { CheckInByQrCodeUseCase } from "./application/check-in-by-qr-code";
 import { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 import { RecordExpenseUseCase } from "./application/record-expense";
 import { ListExpensesUseCase } from "./application/list-expenses";
@@ -65,6 +66,7 @@ export { GetMemberDetailUseCase } from "./application/get-member-detail";
 export { UpdateMemberUseCase } from "./application/update-member";
 export { CheckInMemberUseCase } from "./application/check-in-member";
 export { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
+export { CheckInByQrCodeUseCase, type CheckInByQrCodeOutput } from "./application/check-in-by-qr-code";
 export { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 export { RecordExpenseUseCase } from "./application/record-expense";
 export { ListExpensesUseCase } from "./application/list-expenses";
@@ -125,6 +127,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     updateMember: new UpdateMemberUseCase(updateMemberRepository),
     checkInMember: new CheckInMemberUseCase(checkInRepository),
     listCheckInsForMember: new ListCheckInsForMemberUseCase(checkInRepository),
+    checkInByQrCode: new CheckInByQrCodeUseCase(memberSearchRepository, checkInRepository),
     uploadMemberPhoto: new UploadMemberPhotoUseCase(memberPhotoRepository),
     recordExpense: new RecordExpenseUseCase(expenseRepository),
     listExpenses: new ListExpensesUseCase(expenseRepository),

@@ -60,4 +60,17 @@ export class SupabaseMemberSearchRepository implements MemberSearchRepository {
     }
     return ok(data.map(toSearchResult));
   }
+
+  async findByQrCode(qrCode: string): Promise<Result<MemberSearchResult | null>> {
+    const { data, error } = await this.client
+      .from("members")
+      .select("id, member_code, full_name, phone, memberships(status, end_date)")
+      .eq("qr_code", qrCode)
+      .maybeSingle();
+
+    if (error) {
+      return err(domainError("MEMBER_LOOKUP_FAILED", error.message));
+    }
+    return ok(data ? toSearchResult(data) : null);
+  }
 }

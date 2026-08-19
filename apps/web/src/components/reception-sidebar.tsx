@@ -51,6 +51,20 @@ function PermissionsIcon() {
   );
 }
 
+function ScanIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <path
+        d="M3 6.5V4.5a1.5 1.5 0 0 1 1.5-1.5h2M17 6.5V4.5A1.5 1.5 0 0 0 15.5 3h-2M3 13.5v2A1.5 1.5 0 0 0 4.5 17h2M17 13.5v2a1.5 1.5 0 0 1-1.5 1.5h-2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <rect x="7.5" y="7.5" width="5" height="5" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 interface NavItem {
   href: string;
   label: string;
@@ -67,6 +81,16 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/reports", label: "Reports" },
   { href: "/profile", label: "Profile" },
 ];
+
+/**
+ * Check-in-capable roles only — matches check_in_member()'s own RLS
+ * exactly (20260806000006_check_ins.sql: reception/branch_manager/
+ * super_admin; sales_employee is deliberately excluded from check-in).
+ * Kept out of the base nav for the same reason OWNER_NAV_ITEMS is: a
+ * sales_employee account should never see a link they'd be turned away
+ * from.
+ */
+const CHECK_IN_NAV_ITEMS: NavItem[] = [{ href: "/scan", label: "Scan Check-In", icon: ScanIcon }];
 
 /**
  * Money-visibility items — only Branch Manager/Super Admin, same split as
@@ -92,8 +116,30 @@ const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { href: "/permissions", label: "Permissions", icon: PermissionsIcon },
 ];
 
-/** The Reception web app's permanent desktop sidebar — see Phase 5 of the reception-web brief. */
-export function ReceptionSidebar() {
+/**
+ * Composes the nav for a role by additive tiers rather than a chain of
+ * ternaries — each tier's membership matches a real RLS-enforced
+ * capability boundary (check-in, money-visibility, super-admin-only), so
+ * a new tier is one `if`, not a rewrite of nested branches.
+ */
+function navItemsForRole(role: string | null): NavItem[] {
+  const items = [...NAV_ITEMS];
+  // Inserted right after Dashboard — a fast-path daily action, not buried below Reports/Profile.
+  if (role && role !== "sales_employee") items.splice(1, 0, ...CHECK_IN_NAV_ITEMS);
+  if (role === "branch_manager" || role === "super_admin") items.push(...OWNER_NAV_ITEMS);
+  if (role === "super_admin") items.push(...SUPER_ADMIN_NAV_ITEMS);
+  return items;
+}
+
+export interface ReceptionSidebarProps {
+  /** "desktop" renders as the permanent `lg:`-and-up sidebar; "drawer" renders full-bleed for the mobile slide-out panel. Same nav/role logic either way — one component, no duplicated authorization list. */
+  variant?: "desktop" | "drawer";
+  /** Drawer only: closes the drawer after a nav link is tapped, so picking a page doesn't leave the panel open behind it. */
+  onNavigate?: () => void;
+}
+
+/** The Reception web app's sidebar — permanent on desktop (`variant="desktop"`), or the panel content for the mobile drawer (`variant="drawer"`). See Phase 5 of the reception-web brief. */
+export function ReceptionSidebar({ variant = "desktop", onNavigate }: ReceptionSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const fullName = useAuthStore((state) => state.fullName);
@@ -110,7 +156,13 @@ export function ReceptionSidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-shrink-0 flex-col border-r border-white/5 bg-surface">
+    <aside
+      className={
+        variant === "desktop"
+          ? "hidden h-screen w-64 flex-shrink-0 flex-col border-r border-white/5 bg-surface lg:flex"
+          : "flex h-full w-full flex-col bg-surface"
+      }
+    >
       <div className="flex items-center gap-3 px-6 py-6">
         <Image src="/emblem-red.png" alt="9th Round" width={32} height={32} />
         <div>
@@ -119,19 +171,15 @@ export function ReceptionSidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3">
-        {(role === "super_admin"
-          ? [...NAV_ITEMS, ...OWNER_NAV_ITEMS, ...SUPER_ADMIN_NAV_ITEMS]
-          : role === "branch_manager"
-            ? [...NAV_ITEMS, ...OWNER_NAV_ITEMS]
-            : NAV_ITEMS
-        ).map((item) => {
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+        {navItemsForRole(role).map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => onNavigate?.()}
               className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive ? "bg-gold/10 text-gold" : "text-muted hover:bg-white/[0.06] hover:text-ink"
               }`}
