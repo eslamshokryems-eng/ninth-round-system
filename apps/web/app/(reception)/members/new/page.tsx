@@ -74,6 +74,7 @@ export default function AddMemberPage() {
   const [sessionCountText, setSessionCountText] = useState("");
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState<SuccessState | null>(null);
 
@@ -132,6 +133,7 @@ export default function AddMemberPage() {
     if (!branchId || !membershipTypeId || !paymentMethod) return;
 
     setErrorMessage(null);
+    setErrorDetail(null);
     setIsSaving(true);
 
     let photoUrl: string | null = null;
@@ -151,6 +153,7 @@ export default function AddMemberPage() {
         // line is the only place the real cause of a failed save is visible.
         console.error("[Add Member] photo upload failed:", uploadResult.error.code, uploadResult.error.message);
         setErrorMessage(translateErrorCode(uploadResult.error.code));
+        setErrorDetail(`${uploadResult.error.code}: ${uploadResult.error.message}`);
         return;
       }
       photoUrl = uploadResult.value.signedUrl;
@@ -184,6 +187,7 @@ export default function AddMemberPage() {
       // Diagnostic only — never shown in the UI, see the note above.
       console.error("[Add Member] register_membership failed:", result.error.code, result.error.message);
       setErrorMessage(translateErrorCode(result.error.code));
+      setErrorDetail(`${result.error.code}: ${result.error.message}`);
       return;
     }
 
@@ -333,6 +337,14 @@ export default function AddMemberPage() {
       </Card>
 
       {errorMessage ? <p className="text-sm text-red-400">{errorMessage}</p> : null}
+      {/*
+        Temporary diagnostic aid: shows the real backend error code/message
+        so a screenshot of this page alone is enough to debug a failed save
+        (no DevTools needed). Small and clearly separate from the message
+        above so it doesn't read as a second user-facing error. Remove once
+        the current production Add Member issue is confirmed resolved.
+      */}
+      {errorDetail ? <p className="font-mono text-xs text-muted">{errorDetail}</p> : null}
 
       <div className="flex gap-3">
         <Button onClick={() => void handleSave()} isLoading={isSaving} disabled={!isFormComplete}>
