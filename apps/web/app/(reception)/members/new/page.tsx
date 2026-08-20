@@ -146,6 +146,10 @@ export default function AddMemberPage() {
       });
       if (uploadResult.isErr) {
         setIsSaving(false);
+        // Diagnostic only — never shown in the UI. translateErrorCode()
+        // intentionally hides raw error text from end users; this console
+        // line is the only place the real cause of a failed save is visible.
+        console.error("[Add Member] photo upload failed:", uploadResult.error.code, uploadResult.error.message);
         setErrorMessage(translateErrorCode(uploadResult.error.code));
         return;
       }
@@ -177,6 +181,8 @@ export default function AddMemberPage() {
     setIsSaving(false);
 
     if (result.isErr) {
+      // Diagnostic only — never shown in the UI, see the note above.
+      console.error("[Add Member] register_membership failed:", result.error.code, result.error.message);
       setErrorMessage(translateErrorCode(result.error.code));
       return;
     }
