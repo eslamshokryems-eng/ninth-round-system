@@ -6,6 +6,16 @@ import type { RegisterMembershipInput, RegisterMembershipOutput } from "../domai
 
 /** Postgres unique_violation — see supabase/migrations/20260806000003 for which columns this can mean. */
 const UNIQUE_VIOLATION = "23505";
+/**
+ * Postgres insufficient_privilege — raised when a row-level-security
+ * policy's WITH CHECK rejects the insert. For register_membership() this
+ * means the calling account failed is_branch_staff()/auth_role() (e.g. the
+ * account was deactivated via Manage Staff, or its branch doesn't match).
+ * Previously fell through to the generic REGISTRATION_FAILED message with
+ * no way for Reception to know why — this gives them an actionable next
+ * step instead of a dead end.
+ */
+const INSUFFICIENT_PRIVILEGE = "42501";
 
 export class SupabaseRegistrationRepository implements RegistrationRepository {
   constructor(private readonly client: TypedSupabaseClient) {}
@@ -41,6 +51,14 @@ export class SupabaseRegistrationRepository implements RegistrationRepository {
       }
       if (error.code === UNIQUE_VIOLATION && error.message.includes("uq_memberships_receipt_number")) {
         return err(domainError("RECEIPT_NUMBER_TAKEN", "This receipt number has already been used."));
+      }
+      if (error.code === INSUFFICIENT_PRIVILEGE) {
+        return err(
+          domainError(
+            "NOT_AUTHORIZED_FOR_BRANCH",
+            "Your account is not authorized to register members for this branch right now.",
+          ),
+        );
       }
       return err(domainError("REGISTRATION_FAILED", error.message));
     }

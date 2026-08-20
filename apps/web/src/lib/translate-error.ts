@@ -18,6 +18,8 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   INVALID_DISCOUNT: "Discount must be between 0 and the price.",
   PHONE_ALREADY_REGISTERED: "This phone number is already registered to another member.",
   RECEIPT_NUMBER_TAKEN: "This receipt number has already been used.",
+  NOT_AUTHORIZED_FOR_BRANCH:
+    "Your account cannot register members right now — it may be inactive, or assigned to a different branch. Check Manage Staff, or contact your Branch Manager or Super Admin.",
   MEMBER_NOT_FOUND: "Member not found.",
   NO_ACTIVE_MEMBERSHIP: "This member has no active membership.",
   EMPTY_PHOTO: "The selected photo could not be read. Please try again.",
