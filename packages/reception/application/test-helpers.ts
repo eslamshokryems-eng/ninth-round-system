@@ -12,6 +12,7 @@ import type { MemberDetailRepository } from "../domain/member-detail-repository"
 import type { MemberDetail } from "../domain/member-detail";
 import type { UpdateMemberRepository } from "../domain/update-member-repository";
 import type { UpdateMemberInput } from "../domain/update-member";
+import type { DeleteMemberRepository } from "../domain/delete-member-repository";
 import type { CheckInRepository } from "../domain/check-in-repository";
 import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry } from "../domain/check-in";
 import type { MemberPhotoRepository } from "../domain/member-photo-repository";
@@ -216,6 +217,20 @@ export class FakeUpdateMemberRepository implements UpdateMemberRepository {
     this.lastInput = input;
     return this.result;
   }
+}
+
+export class FakeDeleteMemberRepository implements DeleteMemberRepository {
+  public lastMemberId: string | null = null;
+  constructor(private result: Result<void> = ok(undefined)) {}
+
+  async delete(memberId: string): Promise<Result<void>> {
+    this.lastMemberId = memberId;
+    return this.result;
+  }
+}
+
+export function fakeDeleteMemberRepository(result: Result<void> = ok(undefined)): FakeDeleteMemberRepository {
+  return new FakeDeleteMemberRepository(result);
 }
 
 export class FakeCheckInRepository implements CheckInRepository {

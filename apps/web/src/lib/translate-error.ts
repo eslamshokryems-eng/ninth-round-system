@@ -20,6 +20,7 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   RECEIPT_NUMBER_TAKEN: "This receipt number has already been used.",
   NOT_AUTHORIZED_FOR_BRANCH:
     "Your account cannot register members right now — it may be inactive, or assigned to a different branch. Check Manage Staff, or contact your Branch Manager or Super Admin.",
+  DELETE_MEMBER_FAILED: "Could not delete this member. Only Branch Manager and Super Admin accounts can delete members.",
   MEMBER_NOT_FOUND: "Member not found.",
   NO_ACTIVE_MEMBERSHIP: "This member has no active membership.",
   EMPTY_PHOTO: "The selected photo could not be read. Please try again.",

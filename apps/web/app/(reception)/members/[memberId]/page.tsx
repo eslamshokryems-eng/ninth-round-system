@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { CheckInHistoryEntry, Gender, MemberDetail, MembershipType, PaymentMethod } from "@9thround/reception";
 import type { StaffCandidate } from "@9thround/identity";
+import { useAuthStore } from "../../../../src/features/auth/store";
 import { getReceptionModule } from "../../../../src/lib/composition-root";
 import { translateErrorCode } from "../../../../src/lib/translate-error";
 import { Button } from "../../../../src/components/ui/button";
@@ -13,6 +14,8 @@ import { SelectField } from "../../../../src/components/ui/select-field";
 import { OptionCard } from "../../../../src/components/ui/option-card";
 import { QrCodeImage } from "../../../../src/components/ui/qr-code";
 import { StaffPicker } from "../../../../src/components/staff-picker";
+
+const CAN_DELETE_MEMBER = new Set(["branch_manager", "super_admin"]);
 
 const GENDERS: { value: Gender; label: string }[] = [
   { value: "female", label: "Female" },
@@ -30,11 +33,17 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 export default function MemberDetailPage() {
   const params = useParams<{ memberId: string }>();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const memberId = params.memberId;
+  const role = useAuthStore((state) => state.role);
 
   const [detail, setDetail] = useState<MemberDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -191,6 +200,22 @@ export default function MemberDetailPage() {
     void loadDetail();
   }
 
+  async function handleDelete() {
+    setDeleteError(null);
+    setIsDeleting(true);
+
+    const result = await getReceptionModule().deleteMember.execute(memberId);
+
+    setIsDeleting(false);
+
+    if (result.isErr) {
+      setDeleteError(translateErrorCode(result.error.code));
+      return;
+    }
+
+    router.replace("/members");
+  }
+
   if (isLoading) {
     return <p className="text-muted">Loading…</p>;
   }
@@ -226,12 +251,38 @@ export default function MemberDetailPage() {
         <Button variant="secondary" onClick={() => setIsRenewOpen((open) => !open)}>
           {isRenewOpen ? "Cancel Renewal" : "Renew Membership"}
         </Button>
+        {role && CAN_DELETE_MEMBER.has(role) ? (
+          <Button variant="danger" onClick={() => setIsDeleteConfirmOpen((open) => !open)}>
+            Delete Member
+          </Button>
+        ) : null}
         {checkInFeedback ? (
           <span className={checkInFeedback.isError ? "text-sm text-red-400" : "text-sm text-gold"}>
             {checkInFeedback.text}
           </span>
         ) : null}
       </div>
+
+      {isDeleteConfirmOpen ? (
+        <Card className="space-y-3 border-red-500/40">
+          <p className="text-sm font-semibold text-red-400">
+            Permanently delete {detail.fullName} ({detail.memberCode})?
+          </p>
+          <p className="text-sm text-muted">
+            This erases the member, all their memberships, payment records, and check-in history. This cannot be
+            undone.
+          </p>
+          {deleteError ? <p className="text-sm text-red-400">{deleteError}</p> : null}
+          <div className="flex gap-3">
+            <Button variant="danger" onClick={() => void handleDelete()} isLoading={isDeleting}>
+              Yes, Delete Permanently
+            </Button>
+            <Button variant="secondary" type="button" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      ) : null}
 
       {isQrVisible ? (
         <Card className="flex flex-col items-center gap-2">
