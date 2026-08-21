@@ -18,6 +18,8 @@ function deriveStatus(status: MemberSearchResult["activeMembershipStatus"], endD
   return { text: "Active", className: "text-gold" };
 }
 
+const PAGE_SIZE = 15;
+
 /** Members (Phase 5) — the full member list by default, live search by name/phone/member ID once you type; real data only. */
 export default function MembersPage() {
   const [allMembers, setAllMembers] = useState<MemberSearchResult[]>([]);
@@ -30,6 +32,7 @@ export default function MembersPage() {
   const [checkInFeedback, setCheckInFeedback] = useState<{ memberId: string; text: string; isError: boolean } | null>(
     null,
   );
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     void (async () => {
@@ -41,6 +44,7 @@ export default function MembersPage() {
 
   const runSearch = useCallback(async (value: string) => {
     setQuery(value);
+    setPage(1);
     if (value.trim().length < 2) {
       setResults([]);
       setHasSearched(false);
@@ -55,6 +59,9 @@ export default function MembersPage() {
 
   const isFiltering = query.trim().length >= 2;
   const rows = isFiltering ? results : allMembers;
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   async function handleCheckIn(memberId: string) {
     setCheckInFeedback(null);
@@ -88,6 +95,7 @@ export default function MembersPage() {
       ) : !isFiltering && isLoadingAll ? (
         <p className="text-muted">Loading…</p>
       ) : rows.length > 0 ? (
+        <>
         <div className="overflow-x-auto rounded-card border border-white/5">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface text-xs uppercase text-muted">
@@ -100,7 +108,7 @@ export default function MembersPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((member) => {
+              {pagedRows.map((member) => {
                 const status = deriveStatus(member.activeMembershipStatus, member.activeMembershipEndDate);
                 const feedback = checkInFeedback?.memberId === member.memberId ? checkInFeedback : null;
                 return (
@@ -141,6 +149,32 @@ export default function MembersPage() {
             </tbody>
           </table>
         </div>
+        {pageCount > 1 ? (
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-sm text-muted">
+              Page {currentPage} of {pageCount} — {rows.length} member{rows.length === 1 ? "" : "s"}
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                disabled={currentPage >= pageCount}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        </>
       ) : isFiltering && hasSearched ? (
         <p className="text-muted">No members found.</p>
       ) : (
