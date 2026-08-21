@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useAuthStore } from "../../../src/features/auth/store";
-import { CreateStaffAccountForm } from "../../../src/components/create-staff-account-form";
 import { AttendanceTab } from "./attendance-tab";
 import { ScheduleTab } from "./schedule-tab";
 import { LeaveTab } from "./leave-tab";
 import { PayrollTab } from "./payroll-tab";
+import { EmployeesTab } from "./employees-tab";
 
 type Tab = "attendance" | "schedule" | "leave" | "payroll" | "employees";
 
@@ -54,7 +54,7 @@ export default function HrPage() {
       {tab === "schedule" ? <ScheduleTab /> : null}
       {tab === "leave" ? <LeaveTab /> : null}
       {tab === "payroll" && role === "super_admin" ? <PayrollTab /> : null}
-      {tab === "employees" && isAdmin(role) ? <CreateStaffAccountForm /> : null}
+      {tab === "employees" && isAdmin(role) ? <EmployeesTab /> : null}
     </div>
   );
 }

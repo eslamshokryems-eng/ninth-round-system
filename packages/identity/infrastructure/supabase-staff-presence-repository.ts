@@ -10,7 +10,7 @@ export class SupabaseStaffPresenceRepository implements StaffPresenceRepository 
   async listStaff(): Promise<Result<StaffPresence[]>> {
     const { data, error } = await this.client
       .from("profiles")
-      .select("id, full_name, role, branch_id, last_seen_at")
+      .select("id, full_name, role, branch_id, last_seen_at, employee_code, phone, is_active")
       .neq("role", "member")
       .order("full_name", { ascending: true });
 
@@ -25,6 +25,9 @@ export class SupabaseStaffPresenceRepository implements StaffPresenceRepository 
         role: row.role,
         branchId: row.branch_id,
         lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at) : null,
+        employeeCode: row.employee_code,
+        phone: row.phone,
+        isActive: row.is_active,
       })),
     );
   }

@@ -6,4 +6,7 @@ export interface StaffPresence {
   role: UserRoleName;
   branchId: string | null;
   lastSeenAt: Date | null;
+  employeeCode: string | null;
+  phone: string | null;
+  isActive: boolean;
 }

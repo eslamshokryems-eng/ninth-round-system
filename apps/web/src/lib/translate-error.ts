@@ -78,6 +78,9 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   FOLLOWUP_RESCHEDULE_FAILED: "Could not reschedule the follow-up. Please try again.",
   FOLLOWUP_CANCEL_FAILED: "Could not cancel the follow-up. Please try again.",
   DUE_AT_REQUIRED: "Choose a follow-up date and time.",
+  CANNOT_DELETE_SELF: "You cannot delete your own account.",
+  DELETE_EMPLOYEE_FAILED: "Could not delete this employee. Only Super Admin accounts can delete employees.",
+  STAFF_PRESENCE_LIST_FAILED: "Could not load the employee list. Please try again.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";
