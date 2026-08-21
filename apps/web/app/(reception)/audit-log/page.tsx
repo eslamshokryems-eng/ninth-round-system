@@ -29,9 +29,25 @@ const ACTIONS = [
   "change_role",
   "update_staff",
   "change_permissions",
+  "create_lead",
+  "update_lead",
+  "convert_lead",
+  "create_lead_followup",
+  "update_lead_followup",
 ];
 
-const ENTITY_TYPES = ["auth", "member", "membership", "payment", "check_in", "staff", "role_permissions", "user_permission_overrides"];
+const ENTITY_TYPES = [
+  "auth",
+  "member",
+  "membership",
+  "payment",
+  "check_in",
+  "staff",
+  "role_permissions",
+  "user_permission_overrides",
+  "lead",
+  "lead_followup",
+];
 
 const ROLES = ["member", "coach", "reception", "sales_employee", "branch_manager", "super_admin"];
 

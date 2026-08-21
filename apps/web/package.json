@@ -17,6 +17,7 @@
     "@9thround/i18n": "workspace:*",
     "@9thround/identity": "workspace:*",
     "@9thround/reception": "workspace:*",
+    "@9thround/sales": "workspace:*",
     "@9thround/hr": "workspace:*",
     "@9thround/audit": "workspace:*",
     "@9thround/training": "workspace:*",

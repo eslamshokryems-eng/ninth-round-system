@@ -37,6 +37,16 @@ function AuditLogIcon() {
   );
 }
 
+/** Sales/Leads — a distinct pipeline glyph, so it's never confused with the Members list icon. */
+function SalesIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <path d="M3 15.5l4-5 3 3 6-7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 5.5h4v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function PermissionsIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
@@ -93,6 +103,13 @@ const NAV_ITEMS: NavItem[] = [
 const CHECK_IN_NAV_ITEMS: NavItem[] = [{ href: "/scan", label: "Scan Check-In", icon: ScanIcon }];
 
 /**
+ * Sales/Leads CRM — sales_employee/branch_manager/super_admin only, matching
+ * can_manage_leads() (supabase/migrations/20260821000001_sales_leads_crm.sql)
+ * exactly. Plain reception/coach accounts never see this link.
+ */
+const SALES_NAV_ITEMS: NavItem[] = [{ href: "/sales", label: "Sales", icon: SalesIcon }];
+
+/**
  * Money-visibility items — only Branch Manager/Super Admin, same split as
  * the Dashboard's revenue cards and Payroll (docs/phase-1/15-reception-web-app.md
  * §15.9). Kept out of the base nav so Reception/Sales Employee accounts
@@ -126,6 +143,9 @@ function navItemsForRole(role: string | null): NavItem[] {
   const items = [...NAV_ITEMS];
   // Inserted right after Dashboard — a fast-path daily action, not buried below Reports/Profile.
   if (role && role !== "sales_employee") items.splice(1, 0, ...CHECK_IN_NAV_ITEMS);
+  if (role === "sales_employee" || role === "branch_manager" || role === "super_admin") {
+    items.splice(1, 0, ...SALES_NAV_ITEMS);
+  }
   if (role === "branch_manager" || role === "super_admin") items.push(...OWNER_NAV_ITEMS);
   if (role === "super_admin") items.push(...SUPER_ADMIN_NAV_ITEMS);
   return items;
