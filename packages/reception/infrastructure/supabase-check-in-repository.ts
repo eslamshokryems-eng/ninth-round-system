@@ -2,7 +2,7 @@ import { domainError, err, ok } from "@9thround/shared-kernel";
 import type { Result } from "@9thround/shared-kernel";
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import type { CheckInRepository } from "../domain/check-in-repository";
-import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry } from "../domain/check-in";
+import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry, TodayCheckInEntry } from "../domain/check-in";
 
 // Most recent 500 visits — a cap, not a "last 500 only" product decision;
 // matches this app's other list caps (e.g. members.list(), 200 rows).
@@ -85,5 +85,20 @@ export class SupabaseCheckInRepository implements CheckInRepository {
         checkedInAt: new Date(row.checked_in_at),
       })),
     );
+  }
+
+  async listToday(): Promise<Result<TodayCheckInEntry[]>> {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const { data, error } = await this.client
+      .from("check_ins")
+      .select("checked_in_at")
+      .gte("checked_in_at", startOfDay.toISOString())
+      .order("checked_in_at", { ascending: true });
+
+    if (error) return err(domainError("LIST_CHECK_INS_FAILED", error.message));
+
+    return ok((data ?? []).map((row) => ({ checkedInAt: new Date(row.checked_in_at) })));
   }
 }

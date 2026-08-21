@@ -14,7 +14,7 @@ import type { UpdateMemberRepository } from "../domain/update-member-repository"
 import type { UpdateMemberInput } from "../domain/update-member";
 import type { DeleteMemberRepository } from "../domain/delete-member-repository";
 import type { CheckInRepository } from "../domain/check-in-repository";
-import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry } from "../domain/check-in";
+import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry, TodayCheckInEntry } from "../domain/check-in";
 import type { MemberPhotoRepository } from "../domain/member-photo-repository";
 import type { UploadMemberPhotoInput, UploadMemberPhotoOutput } from "../domain/member-photo";
 import type { ExpenseRepository } from "../domain/expense-repository";
@@ -237,6 +237,7 @@ export class FakeCheckInRepository implements CheckInRepository {
   public lastMemberId: string | null = null;
   public history: CheckInHistoryEntry[] = [];
   public recent: RecentCheckInEntry[] = [];
+  public today: TodayCheckInEntry[] = [];
   constructor(private result: Result<CheckInMemberOutput>) {}
 
   async checkIn(memberId: string): Promise<Result<CheckInMemberOutput>> {
@@ -251,6 +252,10 @@ export class FakeCheckInRepository implements CheckInRepository {
 
   async listRecent(): Promise<Result<RecentCheckInEntry[]>> {
     return ok(this.recent);
+  }
+
+  async listToday(): Promise<Result<TodayCheckInEntry[]>> {
+    return ok(this.today);
   }
 }
 

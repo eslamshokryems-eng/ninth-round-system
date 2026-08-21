@@ -17,3 +17,8 @@ export interface RecentCheckInEntry {
   memberName: string;
   checkedInAt: Date;
 }
+
+/** Backs the Dashboard's check-in trend chart — every check-in from today (branch-scoped by RLS), for bucketing by hour. */
+export interface TodayCheckInEntry {
+  checkedInAt: Date;
+}

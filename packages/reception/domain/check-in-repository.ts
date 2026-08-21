@@ -1,5 +1,5 @@
 import type { Result } from "@9thround/shared-kernel";
-import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry } from "./check-in";
+import type { CheckInHistoryEntry, CheckInMemberOutput, RecentCheckInEntry, TodayCheckInEntry } from "./check-in";
 
 export interface CheckInRepository {
   checkIn(memberId: string): Promise<Result<CheckInMemberOutput>>;
@@ -7,4 +7,6 @@ export interface CheckInRepository {
   listByMember(memberId: string): Promise<Result<CheckInHistoryEntry[]>>;
   /** Most-recent-first, across all members at the caller's branch(es) — backs the Dashboard's "Recent Check-Ins" list. */
   listRecent(limit: number): Promise<Result<RecentCheckInEntry[]>>;
+  /** Every check-in from today (branch-scoped by RLS) — backs the Dashboard's check-in trend chart. */
+  listToday(): Promise<Result<TodayCheckInEntry[]>>;
 }
