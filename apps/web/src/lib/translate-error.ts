@@ -81,6 +81,9 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   CANNOT_DELETE_SELF: "You cannot delete your own account.",
   DELETE_EMPLOYEE_FAILED: "Could not delete this employee. Only Super Admin accounts can delete employees.",
   STAFF_PRESENCE_LIST_FAILED: "Could not load the employee list. Please try again.",
+  REVENUE_REPORT_FAILED: "Could not load the revenue report. Please try again.",
+  MEMBERSHIPS_REPORT_FAILED: "Could not load the memberships report. Please try again.",
+  SALES_REPORT_FAILED: "Could not load the sales report. Please try again.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";

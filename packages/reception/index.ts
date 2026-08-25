@@ -22,6 +22,8 @@ import { ListReceiptsUseCase } from "./application/list-receipts";
 import { ListReceiptsByDateRangeUseCase } from "./application/list-receipts-by-date-range";
 import { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
 import { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
+import { GetRevenueReportUseCase } from "./application/get-revenue-report";
+import { GetMembershipsReportUseCase } from "./application/get-memberships-report";
 import { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 import { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 import { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -37,6 +39,8 @@ import { SupabaseEquipmentSaleRepository } from "./infrastructure/supabase-equip
 import { SupabaseReceiptRepository } from "./infrastructure/supabase-receipt-repository";
 import { SupabaseMembershipNumberRepository } from "./infrastructure/supabase-membership-number-repository";
 import { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-expiring-membership-repository";
+import { SupabaseRevenueReportRepository } from "./infrastructure/supabase-revenue-report-repository";
+import { SupabaseMembershipsReportRepository } from "./infrastructure/supabase-memberships-report-repository";
 
 export type { DashboardStats } from "./domain/dashboard-stats";
 export type { DashboardRepository } from "./domain/dashboard-repository";
@@ -57,6 +61,8 @@ export type { Expense, ExpenseCategory, RecordExpenseInput } from "./domain/expe
 export type { EquipmentSale, RecordEquipmentSaleInput } from "./domain/equipment-sale";
 export type { Receipt } from "./domain/receipt";
 export type { ExpiringMembership } from "./domain/expiring-membership";
+export type { RevenueReport, RevenueReportInput, RevenueReportRow, RevenueBreakdownEntry, RevenueTrendPoint } from "./domain/revenue-report";
+export type { MembershipsReport, MembershipsReportInput, MembershipsReportRow, MembershipsBreakdownEntry } from "./domain/memberships-report";
 export {
   GetDashboardStatsUseCase,
   type GetDashboardStatsOutput,
@@ -86,6 +92,8 @@ export {
 } from "./application/list-receipts-by-date-range";
 export { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
 export { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
+export { GetRevenueReportUseCase } from "./application/get-revenue-report";
+export { GetMembershipsReportUseCase } from "./application/get-memberships-report";
 export { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 export { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 export { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -101,6 +109,8 @@ export { SupabaseEquipmentSaleRepository } from "./infrastructure/supabase-equip
 export { SupabaseReceiptRepository } from "./infrastructure/supabase-receipt-repository";
 export { SupabaseMembershipNumberRepository } from "./infrastructure/supabase-membership-number-repository";
 export { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-expiring-membership-repository";
+export { SupabaseRevenueReportRepository } from "./infrastructure/supabase-revenue-report-repository";
+export { SupabaseMembershipsReportRepository } from "./infrastructure/supabase-memberships-report-repository";
 
 /**
  * The Reception context's composition root — mirrors
@@ -125,6 +135,8 @@ export function createReceptionModule(client: TypedSupabaseClient) {
   const receiptRepository = new SupabaseReceiptRepository(client);
   const membershipNumberRepository = new SupabaseMembershipNumberRepository(client);
   const expiringMembershipRepository = new SupabaseExpiringMembershipRepository(client);
+  const revenueReportRepository = new SupabaseRevenueReportRepository(client);
+  const membershipsReportRepository = new SupabaseMembershipsReportRepository(client);
   return {
     getDashboardStats: new GetDashboardStatsUseCase(dashboardRepository),
     registerMembership: new RegisterMembershipUseCase(registrationRepository),
@@ -149,5 +161,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listReceiptsByDateRange: new ListReceiptsByDateRangeUseCase(receiptRepository),
     getNextMembershipNumber: new GetNextMembershipNumberUseCase(membershipNumberRepository),
     listExpiringMemberships: new ListExpiringMembershipsUseCase(expiringMembershipRepository),
+    getRevenueReport: new GetRevenueReportUseCase(revenueReportRepository),
+    getMembershipsReport: new GetMembershipsReportUseCase(membershipsReportRepository),
   };
 }

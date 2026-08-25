@@ -11,6 +11,7 @@ import { ConvertLeadUseCase } from "./application/convert-lead";
 import { CheckDuplicateLeadsUseCase } from "./application/check-duplicate-leads";
 import { GetLeadTimelineUseCase } from "./application/get-lead-timeline";
 import { GetSalesDashboardStatsUseCase } from "./application/get-sales-dashboard-stats";
+import { GetSalesReportUseCase } from "./application/get-sales-report";
 import { CreateFollowupUseCase } from "./application/create-followup";
 import { CompleteFollowupUseCase } from "./application/complete-followup";
 import { RescheduleFollowupUseCase } from "./application/reschedule-followup";
@@ -21,6 +22,7 @@ import { SupabaseLeadRepository } from "./infrastructure/supabase-lead-repositor
 import { SupabaseLeadFollowupRepository } from "./infrastructure/supabase-lead-followup-repository";
 import { SupabaseLeadTimelineRepository } from "./infrastructure/supabase-lead-timeline-repository";
 import { SupabaseSalesDashboardRepository } from "./infrastructure/supabase-sales-dashboard-repository";
+import { SupabaseSalesReportRepository } from "./infrastructure/supabase-sales-report-repository";
 
 export type {
   LeadStatus,
@@ -37,6 +39,7 @@ export type {
 export type { FollowupStatus, LeadFollowup, CreateFollowupInput } from "./domain/lead-followup";
 export type { LeadTimelineEntry } from "./domain/lead-timeline-entry";
 export type { SalesDashboardStats } from "./domain/sales-dashboard-stats";
+export type { SalesReport, SalesReportInput, SalesReportRow, SalesBreakdownEntry, SalespersonPerformance } from "./domain/sales-report";
 export type { LeadRepository } from "./domain/lead-repository";
 export type { LeadFollowupRepository } from "./domain/lead-followup-repository";
 
@@ -52,6 +55,7 @@ export { ConvertLeadUseCase } from "./application/convert-lead";
 export { CheckDuplicateLeadsUseCase, type CheckDuplicateLeadsInput } from "./application/check-duplicate-leads";
 export { GetLeadTimelineUseCase } from "./application/get-lead-timeline";
 export { GetSalesDashboardStatsUseCase } from "./application/get-sales-dashboard-stats";
+export { GetSalesReportUseCase } from "./application/get-sales-report";
 export { CreateFollowupUseCase } from "./application/create-followup";
 export { CompleteFollowupUseCase, type CompleteFollowupInput } from "./application/complete-followup";
 export { RescheduleFollowupUseCase, type RescheduleFollowupInput } from "./application/reschedule-followup";
@@ -62,6 +66,7 @@ export { SupabaseLeadRepository } from "./infrastructure/supabase-lead-repositor
 export { SupabaseLeadFollowupRepository } from "./infrastructure/supabase-lead-followup-repository";
 export { SupabaseLeadTimelineRepository } from "./infrastructure/supabase-lead-timeline-repository";
 export { SupabaseSalesDashboardRepository } from "./infrastructure/supabase-sales-dashboard-repository";
+export { SupabaseSalesReportRepository } from "./infrastructure/supabase-sales-report-repository";
 
 /**
  * The Sales/Leads context's composition root — same one-entry-point shape
@@ -77,6 +82,7 @@ export function createSalesModule(client: TypedSupabaseClient) {
   const followupRepository = new SupabaseLeadFollowupRepository(client);
   const timelineRepository = new SupabaseLeadTimelineRepository(client);
   const dashboardRepository = new SupabaseSalesDashboardRepository(client);
+  const salesReportRepository = new SupabaseSalesReportRepository(client);
 
   return {
     listLeads: new ListLeadsUseCase(leadRepository),
@@ -91,6 +97,7 @@ export function createSalesModule(client: TypedSupabaseClient) {
     checkDuplicateLeads: new CheckDuplicateLeadsUseCase(leadRepository),
     getLeadTimeline: new GetLeadTimelineUseCase(timelineRepository),
     getSalesDashboardStats: new GetSalesDashboardStatsUseCase(dashboardRepository),
+    getSalesReport: new GetSalesReportUseCase(salesReportRepository),
     createFollowup: new CreateFollowupUseCase(followupRepository),
     completeFollowup: new CompleteFollowupUseCase(followupRepository),
     rescheduleFollowup: new RescheduleFollowupUseCase(followupRepository),
