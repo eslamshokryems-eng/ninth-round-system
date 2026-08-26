@@ -5,4 +5,6 @@ export interface AttendanceRecord {
   branchId: string;
   clockIn: Date;
   clockOut: Date | null;
+  clockInLatitude: number | null;
+  clockInLongitude: number | null;
 }

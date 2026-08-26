@@ -41,7 +41,7 @@ export class InMemoryAttendanceRepository implements AttendanceRepository {
     return ok(this.records.find((r) => r.profileId === profileId && r.clockOut === null) ?? null);
   }
 
-  async clockIn(profileId: string, branchId: string): Promise<Result<AttendanceRecord>> {
+  async clockIn(profileId: string, branchId: string, latitude: number, longitude: number): Promise<Result<AttendanceRecord>> {
     const record: AttendanceRecord = {
       id: nextId("attendance"),
       profileId,
@@ -49,6 +49,8 @@ export class InMemoryAttendanceRepository implements AttendanceRepository {
       branchId,
       clockIn: new Date(),
       clockOut: null,
+      clockInLatitude: latitude,
+      clockInLongitude: longitude,
     };
     this.records.push(record);
     return ok(record);

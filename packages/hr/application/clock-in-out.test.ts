@@ -6,7 +6,7 @@ import { InMemoryAttendanceRepository } from "./test-helpers";
 describe("ClockInUseCase / ClockOutUseCase", () => {
   it("clocks in successfully when not already clocked in", async () => {
     const useCase = new ClockInUseCase(new InMemoryAttendanceRepository());
-    const result = await useCase.execute({ profileId: "profile-1", branchId: "branch-1" });
+    const result = await useCase.execute({ profileId: "profile-1", branchId: "branch-1", latitude: 30.0444, longitude: 31.2357 });
     expect(result.isOk).toBe(true);
     if (result.isOk) expect(result.value.clockOut).toBeNull();
   });
@@ -14,15 +14,15 @@ describe("ClockInUseCase / ClockOutUseCase", () => {
   it("rejects a second clock-in while already clocked in", async () => {
     const repo = new InMemoryAttendanceRepository();
     const useCase = new ClockInUseCase(repo);
-    await useCase.execute({ profileId: "profile-1", branchId: "branch-1" });
-    const second = await useCase.execute({ profileId: "profile-1", branchId: "branch-1" });
+    await useCase.execute({ profileId: "profile-1", branchId: "branch-1", latitude: 30.0444, longitude: 31.2357 });
+    const second = await useCase.execute({ profileId: "profile-1", branchId: "branch-1", latitude: 30.0444, longitude: 31.2357 });
     expect(second.isErr).toBe(true);
     if (second.isErr) expect(second.error.code).toBe("ALREADY_CLOCKED_IN");
   });
 
   it("clocks out an open record", async () => {
     const repo = new InMemoryAttendanceRepository();
-    await new ClockInUseCase(repo).execute({ profileId: "profile-1", branchId: "branch-1" });
+    await new ClockInUseCase(repo).execute({ profileId: "profile-1", branchId: "branch-1", latitude: 30.0444, longitude: 31.2357 });
     const result = await new ClockOutUseCase(repo).execute("profile-1");
     expect(result.isOk).toBe(true);
     if (result.isOk) expect(result.value.clockOut).not.toBeNull();

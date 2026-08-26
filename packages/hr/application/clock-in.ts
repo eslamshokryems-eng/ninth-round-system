@@ -6,6 +6,8 @@ import type { AttendanceRepository } from "../domain/attendance-repository";
 export interface ClockInInput {
   profileId: string;
   branchId: string;
+  latitude: number;
+  longitude: number;
 }
 
 export class ClockInUseCase implements UseCase<ClockInInput, AttendanceRecord> {
@@ -17,6 +19,6 @@ export class ClockInUseCase implements UseCase<ClockInInput, AttendanceRecord> {
     if (open.value) {
       return err(domainError("ALREADY_CLOCKED_IN", "Already clocked in — clock out first."));
     }
-    return this.attendance.clockIn(input.profileId, input.branchId);
+    return this.attendance.clockIn(input.profileId, input.branchId, input.latitude, input.longitude);
   }
 }

@@ -84,6 +84,16 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   REVENUE_REPORT_FAILED: "Could not load the revenue report. Please try again.",
   MEMBERSHIPS_REPORT_FAILED: "Could not load the memberships report. Please try again.",
   SALES_REPORT_FAILED: "Could not load the sales report. Please try again.",
+  GEOLOCATION_PERMISSION_DENIED: "Location access is off. Enable it for this site in your browser/phone settings, then try again.",
+  GEOLOCATION_UNAVAILABLE: "Could not get your location. Check your device's location/GPS is on and try again.",
+  // TOO_FAR_FROM_BRANCH's real message (built server-side, includes the
+  // exact distance) is shown directly rather than through this generic
+  // map — see attendance-tab.tsx. This entry is only the fallback if that
+  // message is ever missing.
+  TOO_FAR_FROM_BRANCH: "You're too far from the branch to clock in.",
+  INVALID_RADIUS: "Check-in radius must be between 10 and 2000 meters.",
+  BRANCH_LOCATION_FETCH_FAILED: "Could not load the branch location. Please try again.",
+  SET_BRANCH_LOCATION_FAILED: "Could not save the branch location. Please try again.",
 };
 
 const GENERIC_MESSAGE = "Something went wrong. Please try again.";

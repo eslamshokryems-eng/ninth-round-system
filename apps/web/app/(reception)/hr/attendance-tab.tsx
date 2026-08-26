@@ -5,8 +5,10 @@ import type { AttendanceRecord } from "@9thround/hr";
 import { useAuthStore } from "../../../src/features/auth/store";
 import { getHrModule } from "../../../src/lib/composition-root";
 import { translateErrorCode } from "../../../src/lib/translate-error";
+import { getCurrentPosition } from "../../../src/lib/geolocation";
 import { Card } from "../../../src/components/ui/card";
 import { Button } from "../../../src/components/ui/button";
+import { BranchLocationCard } from "./branch-location-card";
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -29,6 +31,7 @@ export function AttendanceTab() {
   const [openRecord, setOpenRecord] = useState<AttendanceRecord | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [branchRecords, setBranchRecords] = useState<AttendanceRecord[]>([]);
@@ -60,16 +63,44 @@ export function AttendanceTab() {
   async function handleToggle() {
     if (!profileId || !branchId) return;
     setError(null);
+
+    if (openRecord) {
+      setIsToggling(true);
+      const result = await getHrModule().clockOut.execute(profileId);
+      setIsToggling(false);
+      if (result.isOk) {
+        setOpenRecord(null);
+        void loadBranchAttendance();
+      } else {
+        setError(translateErrorCode(result.error.code));
+      }
+      return;
+    }
+
+    // Clock In requires the device's current GPS position — real,
+    // server-side enforcement happens in clock_in_at_location() (the
+    // branch's radius, not anything this client claims).
+    setIsLocating(true);
+    let coords: { latitude: number; longitude: number };
+    try {
+      coords = await getCurrentPosition();
+    } catch (err) {
+      setIsLocating(false);
+      setError(translateErrorCode(err instanceof Error ? err.message : "GEOLOCATION_UNAVAILABLE"));
+      return;
+    }
+    setIsLocating(false);
+
     setIsToggling(true);
-    const result = openRecord
-      ? await getHrModule().clockOut.execute(profileId)
-      : await getHrModule().clockIn.execute({ profileId, branchId });
+    const result = await getHrModule().clockIn.execute({ profileId, branchId, ...coords });
     setIsToggling(false);
     if (result.isOk) {
-      setOpenRecord(openRecord ? null : result.value);
+      setOpenRecord(result.value);
       void loadBranchAttendance();
     } else {
-      setError(translateErrorCode(result.error.code));
+      // TOO_FAR_FROM_BRANCH's message is built server-side with the exact
+      // distance — shown verbatim rather than through the generic map.
+      setError(result.error.code === "TOO_FAR_FROM_BRANCH" ? result.error.message : translateErrorCode(result.error.code));
     }
   }
 
@@ -89,13 +120,15 @@ export function AttendanceTab() {
                 <p className="text-sm text-muted">{formatDuration(openRecord.clockIn, null)} so far</p>
               ) : null}
             </div>
-            <Button onClick={() => void handleToggle()} isLoading={isToggling} variant={openRecord ? "danger" : "primary"}>
-              {openRecord ? "Clock Out" : "Clock In"}
+            <Button onClick={() => void handleToggle()} isLoading={isToggling || isLocating} variant={openRecord ? "danger" : "primary"}>
+              {isLocating ? "Getting your location…" : openRecord ? "Clock Out" : "Clock In"}
             </Button>
           </div>
         )}
         {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
       </Card>
+
+      {isAdmin(role) && branchId ? <BranchLocationCard branchId={branchId} /> : null}
 
       {isAdmin(role) ? (
         <div className="space-y-3">
