@@ -52,7 +52,10 @@ Prepared ahead of the first submission, not discovered during it:
 
 ## 8.4 Web Deployment (Admin + Trainer Portal)
 
-- Hosted on **Vercel**: automatic preview deployment per PR (reviewers see a live URL before merge), production deploy on merge to `main`.
+- Hosted on **Vercel**: automatic preview deployment per PR (reviewers see a live URL before merge), production deploy on merge to `main`. Vercel project **Root Directory** is set to `apps/web` (monorepo).
+- Production domain: **`9throundegypt.com`** (registered via GoDaddy), added as a custom domain on the Vercel project alongside its default `*.vercel.app` URL. DNS is managed at GoDaddy, pointing at Vercel per the records Vercel's Domains settings page generates for the domain (an `A` record for the apex plus a `CNAME` for `www`, or delegated nameservers — whichever Vercel currently recommends for the account).
+- `NEXT_PUBLIC_SITE_URL=https://9throundegypt.com` set in Vercel's production environment variables, used for `metadataBase` and any absolute links (see `apps/web/app/layout.tsx`).
+- Supabase Auth **Site URL** and **Redirect URLs** (Supabase Dashboard → Authentication → URL Configuration, not `supabase/config.toml` which only governs local dev) updated to `https://9throundegypt.com` once the domain is live, so password-reset and OAuth redirects land on production instead of `localhost`.
 - Environment variables (Supabase URL/anon key, Stripe publishable key, etc.) configured per-environment in Vercel project settings, never in the repo.
 - Role-gated routing (`(admin)` vs `(trainer)` route groups) enforced both in Next.js middleware (fast reject) and re-validated server-side per request (defense in depth, matching the RLS philosophy used elsewhere).
 
