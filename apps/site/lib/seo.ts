@@ -18,7 +18,10 @@ export function pageMetadata({ title, description, path, noindex }: PageSeo): Me
   const fullTitle = path === "/" ? `${site.name} — ${site.tagline}` : `${title} — ${site.name}`;
 
   return {
-    title: fullTitle,
+    // `absolute` bypasses the root layout's `title.template` — without it the
+    // site name is appended twice ("Programs — 9th Round — 9th Round"),
+    // because `fullTitle` already carries it.
+    title: { absolute: fullTitle },
     description,
     alternates: { canonical: url },
     robots: noindex
