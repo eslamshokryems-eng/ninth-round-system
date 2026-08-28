@@ -178,6 +178,49 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
+  apps/site:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: 2.45.4
+        version: 2.45.4
+      next:
+        specifier: ^14.2.0
+        version: 14.2.35(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      react:
+        specifier: 18.2.0
+        version: 18.2.0
+      react-dom:
+        specifier: 18.2.0
+        version: 18.2.0(react@18.2.0)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
+    devDependencies:
+      '@9thround/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.19.43
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.2.0
+        version: 18.3.7(@types/react@18.3.31)
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.4(postcss@8.5.25)
+      postcss:
+        specifier: ^8.4.47
+        version: 8.5.25
+      tailwindcss:
+        specifier: ^3.4.0
+        version: 3.4.19(yaml@2.9.0)
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
   apps/web:
     dependencies:
       '@9thround/audit':

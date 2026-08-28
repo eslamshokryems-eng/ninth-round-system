@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * PUBLIC SITE global stylesheet. Scoped to @9thround/site only — the
+ * internal Web App has its own app/globals.css and never imports this one.
+ * The site commits to a single dark combat-sports visual world, so there
+ * is no light theme; every colour is painted explicitly so the page holds
+ * on any host background.
+ */
+
+@layer base {
+  :root {
+    --font-display: "Oswald", "Arial Narrow", sans-serif;
+    --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: #0b0b0c;
+    color: #f4f3f1;
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: #e4141b;
+    color: #fff;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid #ff2e2e;
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer components {
+  .u-wrap {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: clamp(1.125rem, 5vw, 2.5rem);
+  }
+
+  /* Uppercase mono eyebrow used across sections. */
+  .u-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #e4141b;
+  }
+
+  .u-prose p {
+    max-width: 68ch;
+  }
+}
