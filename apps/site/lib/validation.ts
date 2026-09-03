@@ -1,7 +1,13 @@
 /**
  * Server-side validation for the public trial form. Deliberately dependency
  * free. Shared shape between the client form and the API route.
+ *
+ * Error messages come back in the visitor's language: the form renders
+ * whatever the server returns, so an Arabic page must not surface an
+ * English validation error.
  */
+
+export type FormLang = "ar" | "en";
 
 export interface TrialFormInput {
   fullName: string;
@@ -13,6 +19,10 @@ export interface TrialFormInput {
   notes?: string;
   gender?: string;
   consent: boolean;
+  /** Which language the visitor filled the form in. */
+  lang?: string;
+  /** Ad-campaign tag, when the lead came from a /go/* landing page. */
+  campaign?: string;
   /** Honeypot - must be empty. Real users never see this field. */
   company?: string;
   /** Cloudflare Turnstile token, when the widget is enabled. */
@@ -32,7 +42,40 @@ export interface ValidationResult {
   };
 }
 
-const MAX = { name: 120, phone: 32, email: 160, free: 600 } as const;
+const MAX = { name: 120, phone: 32, email: 160, free: 600, campaign: 60 } as const;
+
+const MESSAGES = {
+  en: {
+    name: "Please enter your full name.",
+    nameLong: "That name is too long.",
+    phone: "Please enter a valid phone number.",
+    phoneLong: "That phone number is too long.",
+    email: "That email doesn't look right.",
+    consent: "Please accept the privacy note to continue.",
+    generic: "Could not submit. Please try again.",
+    rateLimit: "Too many requests. Please wait a moment and try again.",
+    unverified: "Could not verify the request. Please reload and try again.",
+    invalid: "Invalid request.",
+  },
+  ar: {
+    name: "اكتب اسمك بالكامل من فضلك.",
+    nameLong: "الاسم ده طويل أوي.",
+    phone: "اكتب رقم تليفون صحيح من فضلك.",
+    phoneLong: "الرقم ده طويل أوي.",
+    email: "الإيميل ده شكله مش مظبوط.",
+    consent: "وافق على إشعار الخصوصية عشان تكمّل.",
+    generic: "مانفعش نبعت الطلب. جرب تاني من فضلك.",
+    rateLimit: "طلبات كتير أوي. استنى شوية وجرب تاني.",
+    unverified: "مانفعش نتأكد من الطلب. اعمل ريفريش وجرب تاني.",
+    invalid: "طلب غير صالح.",
+  },
+};
+
+export type Messages = { [K in keyof typeof MESSAGES.en]: string };
+
+export function messages(lang: string | undefined): Messages {
+  return lang === "ar" ? MESSAGES.ar : MESSAGES.en;
+}
 
 // Strip ASCII control bytes (hex-escaped so the source has no literal
 // control characters), then collapse ordinary whitespace.
@@ -58,33 +101,34 @@ export function normalisePhone(raw: string): string {
 }
 
 export function validateTrialForm(input: Partial<TrialFormInput>): ValidationResult {
+  const m = messages(input.lang);
   const errors: Record<string, string> = {};
 
   // Honeypot: if filled, treat as spam but don't reveal why.
   if (typeof input.company === "string" && input.company.trim() !== "") {
-    return { ok: false, errors: { form: "Could not submit. Please try again." } };
+    return { ok: false, errors: { form: m.generic } };
   }
 
   const fullName = clean(input.fullName);
-  if (fullName.length < 2) errors.fullName = "Please enter your full name.";
-  else if (fullName.length > MAX.name) errors.fullName = "That name is too long.";
+  if (fullName.length < 2) errors.fullName = m.name;
+  else if (fullName.length > MAX.name) errors.fullName = m.nameLong;
 
   const phoneRaw = clean(input.phone);
-  if (phoneRaw.replace(/\D/g, "").length < 8) errors.phone = "Please enter a valid phone number.";
-  else if (phoneRaw.length > MAX.phone) errors.phone = "That phone number is too long.";
+  if (phoneRaw.replace(/\D/g, "").length < 8) errors.phone = m.phone;
+  else if (phoneRaw.length > MAX.phone) errors.phone = m.phoneLong;
   const phone = normalisePhone(phoneRaw);
 
   let email: string | null = null;
   const emailRaw = clean(input.email);
   if (emailRaw) {
     if (emailRaw.length > MAX.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
-      errors.email = "That email doesn't look right.";
+      errors.email = m.email;
     } else {
       email = emailRaw.toLowerCase();
     }
   }
 
-  if (input.consent !== true) errors.consent = "Please accept the privacy note to continue.";
+  if (input.consent !== true) errors.consent = m.consent;
 
   const genderIn = clean(input.gender).toLowerCase();
   const gender =
@@ -98,16 +142,24 @@ export function validateTrialForm(input: Partial<TrialFormInput>): ValidationRes
   const preferredDate = clean(input.preferredDate).slice(0, 40);
   const preferredTime = clean(input.preferredTime).slice(0, 40);
   const notes = clean(input.notes).slice(0, MAX.free);
+  const campaign = clean(input.campaign).slice(0, MAX.campaign);
+  const lang = input.lang === "ar" ? "ar" : "en";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   // Compose the human-readable interest note. This is the ONLY place the
   // trial preferences land - no schema change to the `leads` table (see
   // the Safety Audit, decision D6 option A).
-  const parts: string[] = ["Website trial request."];
+  //
+  // The note is always English so the Sales app reads one format, but it
+  // records which language the visitor used — that tells the team which
+  // language to call back in, which is the difference between a warm
+  // follow-up and a confusing one.
+  const parts: string[] = [campaign ? `Website trial request [${campaign}].` : "Website trial request."];
   if (program) parts.push(`Program: ${program}.`);
   if (preferredDate) parts.push(`Preferred date: ${preferredDate}.`);
   if (preferredTime) parts.push(`Preferred time: ${preferredTime}.`);
+  parts.push(`Language: ${lang}.`);
   if (notes) parts.push(`Notes: ${notes}`);
   const interestNotes = parts.join(" ").slice(0, 1000);
 

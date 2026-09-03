@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { track, events } from "@/lib/analytics";
+import type { Lang } from "@/content/i18n/config";
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://eu.posthog.com";
@@ -13,13 +14,13 @@ const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://eu.posthog.com";
  * interactive. Sends a `page_view` on every route change. No PII.
  * With no key set, this renders nothing and the site is analytics-free.
  */
-export function Analytics() {
+export function Analytics({ lang }: { lang: Lang }) {
   const pathname = usePathname();
 
   useEffect(() => {
     if (!KEY) return;
-    track(events.pageView, { path: pathname });
-  }, [pathname]);
+    track(events.pageView, { path: pathname, lang });
+  }, [pathname, lang]);
 
   if (!KEY) return null;
 

@@ -1,12 +1,16 @@
 import { Container } from "@/components/primitives";
 import { ButtonLink } from "@/components/button";
+import { dict } from "@/content/i18n";
+import { href, type Lang } from "@/content/i18n/config";
 
 /**
  * Homepage hero. The background is a placeholder gradient + grain until a
  * real 9th Round facility photo/loop is supplied (see README). No stock
  * imagery is used in its place.
  */
-export function Hero() {
+export function Hero({ lang }: { lang: Lang }) {
+  const t = dict(lang);
+
   return (
     <section className="relative overflow-hidden border-b border-white/10 bg-ink-950">
       {/* Placeholder atmosphere — replaced by real facility media. */}
@@ -27,22 +31,19 @@ export function Hero() {
         }}
       />
       <Container className="relative py-24 sm:py-32 lg:py-40">
-        <p className="u-eyebrow">9th Round · Egypt</p>
+        <p className="u-eyebrow">{t.hero.eyebrow}</p>
         <h1 className="mt-4 max-w-4xl text-[clamp(2.75rem,9vw,5.5rem)] uppercase leading-[0.95] tracking-tight">
-          Your first round
+          {t.hero.titleTop}
           <br />
-          starts here
+          {t.hero.titleBottom}
         </h1>
-        <p className="mt-6 max-w-xl text-lg text-ash sm:text-xl">
-          Boxing, kickboxing and combat-fitness conditioning — nine rounds, about thirty minutes, a coach on the floor
-          every round. No class times. Come as you are.
-        </p>
+        <p className="mt-6 max-w-xl text-lg text-ash sm:text-xl">{t.hero.body}</p>
         <div className="mt-9 flex flex-wrap gap-3">
-          <ButtonLink href="/trial" size="lg">
-            Book a trial
+          <ButtonLink href={href(lang, "/trial")} size="lg">
+            {t.cta.trial}
           </ButtonLink>
-          <ButtonLink href="/programs" size="lg" variant="outline">
-            Explore programs
+          <ButtonLink href={href(lang, "/programs")} size="lg" variant="outline">
+            {t.cta.programs}
           </ButtonLink>
         </div>
       </Container>

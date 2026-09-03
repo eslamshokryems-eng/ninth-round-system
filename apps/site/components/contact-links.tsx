@@ -2,7 +2,10 @@
 
 import type { ReactNode } from "react";
 import { track, events } from "@/lib/analytics";
-import { site } from "@/content/site.config";
+import { whatsappMessages } from "@/content/site.config";
+import type { Lang } from "@/content/i18n/config";
+
+export type MsgKey = "trial" | "memberships" | "kids" | "events" | "general";
 
 function waHref(message: string): string | null {
   const num = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
@@ -15,31 +18,27 @@ function telHref(): string | null {
   return num ? `tel:+${num}` : null;
 }
 
-export const WHATSAPP_MESSAGES = {
-  trial: `Hi ${site.name} — I'd like to book a free trial session.`,
-  memberships: `Hi ${site.name} — I'd like to know the membership options.`,
-  kids: `Hi ${site.name} — I'm asking about the kids / junior program.`,
-  general: `Hi ${site.name} — I have a question.`,
-} as const;
-
-type MsgKey = keyof typeof WHATSAPP_MESSAGES;
-
 /**
  * Renders a WhatsApp link, or nothing if no number is configured yet.
  * Never fakes a number.
+ *
+ * The opening message is written in the visitor's language, so a lead who
+ * clicked from the Arabic site lands in the club's inbox speaking Arabic.
  */
 export function WhatsAppLink({
+  lang,
   message = "general",
   children,
   className = "",
   context = "unknown",
 }: {
+  lang: Lang;
   message?: MsgKey;
   children: ReactNode;
   className?: string;
   context?: string;
 }) {
-  const href = waHref(WHATSAPP_MESSAGES[message]);
+  const href = waHref(whatsappMessages(lang)[message]);
   if (!href) return null;
   return (
     <a
@@ -47,7 +46,7 @@ export function WhatsAppLink({
       target="_blank"
       rel="noopener noreferrer"
       className={className}
-      onClick={() => track(events.clickWhatsapp, { context, topic: message })}
+      onClick={() => track(events.clickWhatsapp, { context, topic: message, lang })}
     >
       {children}
     </a>
@@ -56,10 +55,12 @@ export function WhatsAppLink({
 
 /** Renders a click-to-call link, or nothing if no number is configured. */
 export function CallLink({
+  lang,
   children,
   className = "",
   context = "unknown",
 }: {
+  lang: Lang;
   children: ReactNode;
   className?: string;
   context?: string;
@@ -67,7 +68,7 @@ export function CallLink({
   const href = telHref();
   if (!href) return null;
   return (
-    <a href={href} className={className} onClick={() => track(events.clickCall, { context })}>
+    <a href={href} className={className} onClick={() => track(events.clickCall, { context, lang })}>
       {children}
     </a>
   );

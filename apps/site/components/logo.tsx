@@ -1,13 +1,21 @@
 import Link from "next/link";
+import { href, type Lang } from "@/content/i18n/config";
 
 /**
  * Wordmark lockup. The emblem SVG is a clean placeholder built from the
  * 9th Round mark's idea (a bold "9" + "TH"); it is REPLACED by the real
  * vector logo once 9th Round supplies it (see README, "Content required").
+ *
+ * The wordmark stays Latin in both locales — "9th Round" is the brand
+ * name, not a phrase to translate.
  */
-export function Logo({ className = "" }: { className?: string }) {
+export function Logo({ lang, className = "" }: { lang: Lang; className?: string }) {
   return (
-    <Link href="/" className={`group inline-flex items-center gap-2.5 ${className}`} aria-label="9th Round — home">
+    <Link
+      href={href(lang, "/")}
+      className={`group inline-flex items-center gap-2.5 ${className}`}
+      aria-label={lang === "ar" ? "9th Round — الرئيسية" : "9th Round — home"}
+    >
       <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true" className="shrink-0">
         <rect width="34" height="34" rx="7" fill="#E4141B" />
         <path
@@ -18,7 +26,13 @@ export function Logo({ className = "" }: { className?: string }) {
           TH
         </text>
       </svg>
-      <span className="font-display text-lg font-bold uppercase tracking-wide text-bone">9th Round</span>
+      <span
+        dir="ltr"
+        className="font-display text-lg font-bold uppercase tracking-wide text-bone"
+        style={{ fontFamily: "var(--font-display-latin), Oswald, sans-serif" }}
+      >
+        9th Round
+      </span>
     </Link>
   );
 }

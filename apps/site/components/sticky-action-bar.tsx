@@ -3,15 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { track, events } from "@/lib/analytics";
+import { href, stripLang, type Lang } from "@/content/i18n/config";
 
 /**
  * Mobile-only sticky bar: Book a Trial always shows; WhatsApp / Call only
  * appear when a real number is configured. Hidden on the trial page itself
- * (the form is already the focus there).
+ * and on ad landing pages, where a form is already the focus.
+ *
+ * Labels arrive as props from the server layout so no dictionary reaches
+ * the client bundle.
  */
-export function StickyActionBar() {
-  const pathname = usePathname();
-  if (pathname === "/trial" || pathname === "/thank-you") return null;
+export function StickyActionBar({
+  lang,
+  labels,
+}: {
+  lang: Lang;
+  labels: { trial: string; whatsapp: string; call: string };
+}) {
+  const pathname = usePathname() || "/";
+  const bare = stripLang(pathname);
+  if (bare === "/trial" || bare === "/thank-you" || bare.startsWith("/go/")) return null;
 
   const wa = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
   const tel = process.env.NEXT_PUBLIC_PHONE_NUMBER;
@@ -20,18 +31,18 @@ export function StickyActionBar() {
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink-950/95 backdrop-blur lg:hidden">
       <div className="mx-auto flex max-w-lg items-stretch gap-2 p-2.5">
         <Link
-          href="/trial"
-          className="flex flex-1 items-center justify-center rounded-pill bg-blood px-4 py-3 text-sm font-display font-semibold uppercase tracking-wide text-white"
+          href={href(lang, "/trial")}
+          className="flex flex-1 items-center justify-center rounded-pill bg-blood px-4 py-3 font-display text-sm font-semibold uppercase tracking-wide text-white"
         >
-          Book a trial
+          {labels.trial}
         </Link>
         {wa ? (
           <a
             href={`https://wa.me/${wa}`}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Chat on WhatsApp"
-            onClick={() => track(events.clickWhatsapp, { context: "sticky_bar" })}
+            aria-label={labels.whatsapp}
+            onClick={() => track(events.clickWhatsapp, { context: "sticky_bar", lang })}
             className="flex h-12 w-12 items-center justify-center rounded-pill border border-white/20 text-bone"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -42,8 +53,8 @@ export function StickyActionBar() {
         {tel ? (
           <a
             href={`tel:+${tel}`}
-            aria-label="Call"
-            onClick={() => track(events.clickCall, { context: "sticky_bar" })}
+            aria-label={labels.call}
+            onClick={() => track(events.clickCall, { context: "sticky_bar", lang })}
             className="flex h-12 w-12 items-center justify-center rounded-pill border border-white/20 text-bone"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { validateTrialForm } from "@/lib/validation";
+import { validateTrialForm, messages } from "@/lib/validation";
 import type { TrialFormInput } from "@/lib/validation";
 import { rateLimit, sweep } from "@/lib/rate-limit";
 import { createWebsiteLead } from "@/lib/leads";
@@ -42,10 +42,12 @@ export async function POST(req: Request) {
   sweep();
   const ip = clientIp(req);
 
+  // The visitor's language is not known until the body is parsed, so the
+  // pre-parse messages fall back to the site default (Arabic).
   const limited = rateLimit(`trial:${ip}`);
   if (!limited.ok) {
     return NextResponse.json(
-      { ok: false, errors: { form: "Too many requests. Please wait a moment and try again." } },
+      { ok: false, errors: { form: messages("ar").rateLimit } },
       { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
     );
   }
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
   try {
     raw = (await req.json()) as Partial<TrialFormInput>;
   } catch {
-    return NextResponse.json({ ok: false, errors: { form: "Invalid request." } }, { status: 400 });
+    return NextResponse.json({ ok: false, errors: { form: messages("ar").invalid } }, { status: 400 });
   }
 
   const result = validateTrialForm(raw);
@@ -64,10 +66,7 @@ export async function POST(req: Request) {
 
   const humanVerified = await verifyTurnstile(raw.turnstileToken, ip);
   if (!humanVerified) {
-    return NextResponse.json(
-      { ok: false, errors: { form: "Could not verify the request. Please reload and try again." } },
-      { status: 422 },
-    );
+    return NextResponse.json({ ok: false, errors: { form: messages(raw.lang).unverified } }, { status: 422 });
   }
 
   const insert = await createWebsiteLead(result.clean);

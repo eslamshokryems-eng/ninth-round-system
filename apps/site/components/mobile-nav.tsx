@@ -4,9 +4,26 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ButtonLink } from "@/components/button";
-import { PRIMARY_NAV, PROGRAM_LINKS } from "@/components/nav-items";
+import type { NavLink } from "@/components/nav-items";
+import { href, type Lang } from "@/content/i18n/config";
 
-export function MobileNav() {
+/**
+ * Mobile menu. Every string arrives as a prop from the server header, so
+ * neither dictionary is pulled into the client bundle.
+ */
+export function MobileNav({
+  lang,
+  nav,
+  programs,
+  programsHref,
+  labels,
+}: {
+  lang: Lang;
+  nav: NavLink[];
+  programs: NavLink[];
+  programsHref: string;
+  labels: { menu: string; open: string; close: string; mobile: string; programs: string; trial: string };
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -31,7 +48,7 @@ export function MobileNav() {
     <div className="lg:hidden">
       <button
         type="button"
-        aria-label="Open menu"
+        aria-label={labels.open}
         aria-expanded={open}
         onClick={() => setOpen(true)}
         className="flex h-10 w-10 items-center justify-center rounded-lg text-bone hover:bg-white/5"
@@ -42,12 +59,17 @@ export function MobileNav() {
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-ink-950" role="dialog" aria-modal="true" aria-label="Menu">
+        <div
+          className="fixed inset-0 z-[60] flex flex-col bg-ink-950"
+          role="dialog"
+          aria-modal="true"
+          aria-label={labels.menu}
+        >
           <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
-            <span className="font-display text-lg font-bold uppercase tracking-wide">Menu</span>
+            <span className="font-display text-lg font-bold uppercase tracking-wide">{labels.menu}</span>
             <button
               type="button"
-              aria-label="Close menu"
+              aria-label={labels.close}
               onClick={() => setOpen(false)}
               className="flex h-10 w-10 items-center justify-center rounded-lg text-bone hover:bg-white/5"
             >
@@ -57,12 +79,12 @@ export function MobileNav() {
             </button>
           </div>
 
-          <nav aria-label="Mobile" className="flex-1 overflow-y-auto px-5 py-6">
-            <Link href="/programs" className="block py-3 text-2xl font-display font-semibold uppercase">
-              Programs
+          <nav aria-label={labels.mobile} className="flex-1 overflow-y-auto px-5 py-6">
+            <Link href={programsHref} className="block py-3 font-display text-2xl font-semibold uppercase">
+              {labels.programs}
             </Link>
-            <ul className="mb-4 space-y-1 border-l border-white/10 pl-4">
-              {PROGRAM_LINKS.map((p) => (
+            <ul className="mb-4 space-y-1 border-white/10 ps-4 border-s">
+              {programs.map((p) => (
                 <li key={p.href}>
                   <Link href={p.href} className="block py-2 text-base text-ash hover:text-bone">
                     {p.label}
@@ -70,20 +92,22 @@ export function MobileNav() {
                 </li>
               ))}
             </ul>
-            {PRIMARY_NAV.filter((i) => i.href !== "/programs").map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block py-3 text-2xl font-display font-semibold uppercase text-bone"
-              >
-                {item.label}
-              </Link>
-            ))}
+            {nav
+              .filter((i) => i.href !== programsHref)
+              .map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="block py-3 font-display text-2xl font-semibold uppercase text-bone"
+                >
+                  {item.label}
+                </Link>
+              ))}
           </nav>
 
           <div className="border-t border-white/10 p-5">
-            <ButtonLink href="/trial" size="lg" className="w-full">
-              Book a trial
+            <ButtonLink href={href(lang, "/trial")} size="lg" className="w-full">
+              {labels.trial}
             </ButtonLink>
           </div>
         </div>

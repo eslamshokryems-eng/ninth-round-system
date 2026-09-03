@@ -12,10 +12,25 @@
 
 @layer base {
   :root {
-    --font-display: "Oswald", "Arial Narrow", sans-serif;
-    --font-sans: "IBM Plex Sans", system-ui, sans-serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    /* Latin is the default script. `html[dir="rtl"]` swaps all three below. */
+    --font-display: var(--font-display-latin), "Oswald", "Arial Narrow", sans-serif;
+    --font-sans: var(--font-sans-latin), "IBM Plex Sans", system-ui, sans-serif;
+    --font-mono: var(--font-mono-latin), "IBM Plex Mono", ui-monospace, monospace;
     color-scheme: dark;
+  }
+
+  /*
+   * Arabic typography. Oswald and IBM Plex have no Arabic glyphs, so the
+   * whole stack is swapped rather than relying on per-glyph fallback,
+   * which would mix two unrelated typefaces inside one headline.
+   * There is no Arabic monospace in the set — the mono role (eyebrows,
+   * small caps labels) falls back to the Arabic text face, which is the
+   * correct call: a "typewriter" Arabic reads as a novelty, not a label.
+   */
+  html[dir="rtl"] {
+    --font-display: var(--font-display-arabic), "Cairo", "Segoe UI", sans-serif;
+    --font-sans: var(--font-sans-arabic), "IBM Plex Sans Arabic", "Segoe UI", sans-serif;
+    --font-mono: var(--font-sans-arabic), "IBM Plex Sans Arabic", "Segoe UI", sans-serif;
   }
 
   html {
@@ -42,6 +57,29 @@
     font-weight: 600;
     line-height: 1.05;
     text-wrap: balance;
+  }
+
+  /*
+   * Arabic is a connected script: letter-spacing pulls the joins apart and
+   * turns a headline into disconnected letters. Every `tracking-*` utility
+   * is therefore neutralised in RTL — this is a correctness fix, not a
+   * style preference. Arabic also needs more leading than a condensed
+   * Latin display face, so headline line-height is relaxed.
+   */
+  html[dir="rtl"] [class*="tracking-"] {
+    letter-spacing: normal;
+  }
+
+  html[dir="rtl"] h1,
+  html[dir="rtl"] h2,
+  html[dir="rtl"] h3 {
+    line-height: 1.25;
+  }
+
+  /* `text-transform: uppercase` is meaningless in Arabic and only risks
+     odd rendering on transliterated Latin fragments inside Arabic text. */
+  html[dir="rtl"] .uppercase {
+    text-transform: none;
   }
 
   :focus-visible {
@@ -81,7 +119,24 @@
     color: #e4141b;
   }
 
+  html[dir="rtl"] .u-eyebrow {
+    letter-spacing: normal;
+    text-transform: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
   .u-prose p {
     max-width: 68ch;
+  }
+
+  /* Arabic runs wider per character than Latin at the same measure. */
+  html[dir="rtl"] .u-prose p {
+    max-width: 62ch;
+  }
+
+  /* Arrow glyphs inside links point the way the text reads. */
+  html[dir="rtl"] .u-flip {
+    transform: scaleX(-1);
   }
 }

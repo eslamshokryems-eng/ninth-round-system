@@ -1,12 +1,17 @@
 import { Section, SectionHead } from "@/components/primitives";
-import { FAQS } from "@/content/faqs";
+import { faqs } from "@/content/faqs";
+import { dict } from "@/content/i18n";
+import type { Lang } from "@/content/i18n/config";
 
-export function Faq() {
+export function Faq({ lang, title, eyebrow }: { lang: Lang; title?: string; eyebrow?: string }) {
+  const t = dict(lang).faq;
+  const items = faqs(lang);
+
   return (
     <Section>
-      <SectionHead eyebrow="Questions" title="Before your first session" />
+      <SectionHead eyebrow={eyebrow ?? t.eyebrow} title={title ?? t.title} />
       <div className="mx-auto mt-10 max-w-3xl divide-y divide-white/10 border-y border-white/10">
-        {FAQS.map((f) => (
+        {items.map((f) => (
           <details key={f.q} className="group py-4">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display text-base uppercase tracking-wide text-bone">
               {f.q}

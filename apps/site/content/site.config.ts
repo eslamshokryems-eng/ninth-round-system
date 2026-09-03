@@ -11,19 +11,36 @@
  *
  * Verified values are drawn from 9th Round's own project documents
  * (operational guide, investor deck) and the internal system's data.
+ *
+ * BILINGUAL: any value a visitor reads is a `Localized` pair
+ * (`{ en, ar }`). Anything that is not language-dependent — a phone
+ * number, a price string, an image path, a URL — stays a plain value.
  */
+
+import type { Lang, Localized } from "./i18n/config";
 
 export type ConfirmedString = string | null;
 
 export const site = {
   name: "9th Round",
-  legalName: "9th Round Egypt",
-  domain: "https://9throundegypt.com",
-  locale: "en",
+  legalName: { en: "9th Round Egypt", ar: "9th Round إيجيبت" } as Localized,
+  /**
+   * Canonical origin, WITH `www`. The apex (`9throundegypt.com`) 308s to
+   * the `www` host on Vercel, so canonical/hreflang/sitemap URLs must name
+   * `www` directly — pointing them at a redirecting host is a self-inflicted
+   * SEO defect. If the apex is ever made primary in Vercel instead, change
+   * this and `NEXT_PUBLIC_SITE_URL` together.
+   */
+  domain: "https://www.9throundegypt.com",
   /** Positioning line — from the 9th Round brand system. */
-  tagline: "No classes. No waiting. Just action.",
-  shortDescription:
-    "A structured combat-fitness experience in Egypt — boxing, kickboxing and conditioning across 9 rounds in 30 minutes, with a coach on the floor every round.",
+  tagline: {
+    en: "No classes. No waiting. Just action.",
+    ar: "لا كلاسات. لا انتظار. أكشن بس.",
+  } as Localized,
+  shortDescription: {
+    en: "A structured combat-fitness experience in Egypt — boxing, kickboxing and conditioning across 9 rounds in 30 minutes, with a coach on the floor every round.",
+    ar: "تجربة لياقة قتالية منظّمة في مصر — بوكس وكيك بوكسينج ولياقة في تسع راوندات خلال تلاتين دقيقة، وكابتن معاك على الأرض كل راوند.",
+  } as Localized,
 
   /**
    * CONTACT — every field here must be confirmed by 9th Round before launch.
@@ -35,18 +52,18 @@ export const site = {
     /** e.g. "20xxxxxxxxxx". Also set NEXT_PUBLIC_WHATSAPP_NUMBER. */
     whatsapp: null as ConfirmedString,
     email: null as ConfirmedString,
-    /** Full street address, one line. */
-    addressLine: null as ConfirmedString,
-    city: null as ConfirmedString,
+    /** Full street address, one line, in both languages. */
+    addressLine: null as Localized | null,
+    city: null as Localized | null,
     /** Google Maps place URL (share link). */
     mapsUrl: null as ConfirmedString,
     /** For LocalBusiness structured data — only emitted when BOTH are set. */
     geo: { lat: null as number | null, lng: null as number | null },
     /**
-     * Opening hours. Each entry: [day, "HH:MM-HH:MM" | "closed"].
-     * Empty array => the hours block is hidden.
+     * Opening hours. `day` is localized; `hours` is a clock range
+     * ("10:00-22:00") or the string "closed". Empty array => hidden.
      */
-    openingHours: [] as Array<{ day: string; hours: string }>,
+    openingHours: [] as Array<{ day: Localized; hours: string }>,
   },
 
   /**
@@ -69,14 +86,37 @@ export const site = {
    */
   memberships: {
     showPrices: false,
-    contactCta: "Contact us for current membership options",
-    /** Plan NAMES are from the internal system's membership_types table. */
+    contactCta: {
+      en: "Contact us for current membership options",
+      ar: "كلمنا تعرف خيارات الاشتراك الحالية",
+    } as Localized,
+    /** Plan NAMES mirror the internal system's membership_types table. */
     plans: [
-      { name: "One Month", note: "Full access to the 9-round circuit", price: null as ConfirmedString },
-      { name: "Three Months", note: "Best for building a real training habit", price: null as ConfirmedString },
-      { name: "Six Months", note: "Commit to a full training phase", price: null as ConfirmedString },
-      { name: "Annual", note: "The full year-long progression", price: null as ConfirmedString },
-      { name: "Personal Training", note: "1-to-1 coaching, goal-based programming", price: null as ConfirmedString },
+      {
+        name: { en: "One Month", ar: "شهر" } as Localized,
+        note: { en: "Full access to the 9-round circuit", ar: "دخول كامل لدايرة التسع راوندات" } as Localized,
+        price: null as ConfirmedString,
+      },
+      {
+        name: { en: "Three Months", ar: "تلات شهور" } as Localized,
+        note: { en: "Best for building a real training habit", ar: "الأنسب عشان تبني عادة تمرين حقيقية" } as Localized,
+        price: null as ConfirmedString,
+      },
+      {
+        name: { en: "Six Months", ar: "ست شهور" } as Localized,
+        note: { en: "Commit to a full training phase", ar: "التزام بمرحلة تدريب كاملة" } as Localized,
+        price: null as ConfirmedString,
+      },
+      {
+        name: { en: "Annual", ar: "سنة" } as Localized,
+        note: { en: "The full year-long progression", ar: "التدرّج الكامل على مدار سنة" } as Localized,
+        price: null as ConfirmedString,
+      },
+      {
+        name: { en: "Personal Training", ar: "تدريب شخصي" } as Localized,
+        note: { en: "1-to-1 coaching, goal-based programming", ar: "تدريب واحد لواحد ببرنامج على هدفك" } as Localized,
+        price: null as ConfirmedString,
+      },
     ],
   },
 
@@ -89,29 +129,34 @@ export const site = {
    */
   coaches: [
     {
-      name: "Captain Eslam Shokry",
-      role: "Founder & Head Coach",
+      name: { en: "Captain Eslam Shokry", ar: "كابتن إسلام شكري" } as Localized,
+      role: { en: "Founder & Head Coach", ar: "المؤسس والمدرب الرئيسي" } as Localized,
       // Verified: investor deck / operational guide.
-      credentials: ["Master's in Physical Education", "ISSA Certified Trainer"],
-      specialties: ["Combat conditioning", "Boxing", "Programming"],
+      credentials: [
+        { en: "Master's in Physical Education", ar: "ماجستير تربية رياضية" } as Localized,
+        { en: "ISSA Certified Trainer", ar: "مدرب معتمد ISSA" } as Localized,
+      ],
       photo: null as ConfirmedString, // TODO: professional photo
-      bio:
-        "Founder of 9th Round and the coach behind its 9-round system. Builds training that stays serious for experienced athletes while keeping the door open for complete beginners.",
+      bio: {
+        en: "Founder of 9th Round and the coach behind its 9-round system. Builds training that stays serious for experienced athletes while keeping the door open for complete beginners.",
+        ar: "مؤسس 9th Round والكابتن اللي وراء نظام التسع راوندات. بيبني تدريب يفضل جدّي للاعبين المحترفين وفي نفس الوقت الباب مفتوح للمبتدئين تماماً.",
+      } as Localized,
     },
   ],
 
   /**
    * TESTIMONIALS — never fabricated. Empty => the section is not rendered.
    * Add { quote, name } only with the member's real words and consent.
+   * `quote` is stored in the language the member actually said it in.
    */
-  testimonials: [] as Array<{ quote: string; name: string; context?: string }>,
+  testimonials: [] as Array<{ quote: Localized; name: string; context?: Localized }>,
 
   /**
    * GALLERY — real 9th Round facility media only. Each item points at a
    * file in /public/gallery. Empty => the gallery shows a labelled
    * "photography coming soon" placeholder, never stock imagery.
    */
-  gallery: [] as Array<{ src: string; alt: string }>,
+  gallery: [] as Array<{ src: string; alt: Localized }>,
 
   /** Analytics event names — keep in sync with lib/analytics.ts. */
   analyticsEvents: {
@@ -122,12 +167,12 @@ export const site = {
     leadCreated: "lead_created",
     membershipInquiry: "membership_inquiry",
   },
-} as const;
+};
 
 /** True when we have enough to render the LocalBusiness schema honestly. */
 export function hasLocalBusinessData(): boolean {
   const c = site.contact;
-  return Boolean(c.addressLine && c.city && c.phone);
+  return Boolean(c.addressLine && c.city && (c.phone || process.env.NEXT_PUBLIC_PHONE_NUMBER));
 }
 
 export function whatsappHref(message: string): string | null {
@@ -140,4 +185,28 @@ export function phoneHref(): string | null {
   const num = process.env.NEXT_PUBLIC_PHONE_NUMBER || site.contact.phone;
   if (!num) return null;
   return `tel:+${num}`;
+}
+
+/**
+ * WhatsApp opening lines, in the visitor's language. A lead who clicks
+ * from the Arabic site should arrive in the club's inbox writing Arabic —
+ * that alone tells the sales team which language to answer in.
+ */
+export function whatsappMessages(lang: Lang): Record<"trial" | "memberships" | "kids" | "events" | "general", string> {
+  if (lang === "ar") {
+    return {
+      trial: "السلام عليكم 9th Round — حابب أحجز سيشن تجربة.",
+      memberships: "السلام عليكم 9th Round — حابب أعرف خيارات الاشتراك.",
+      kids: "السلام عليكم 9th Round — بسأل عن برنامج الأطفال والناشئين.",
+      events: "السلام عليكم 9th Round — حابب أعرف تفاصيل الفعالية الجاية.",
+      general: "السلام عليكم 9th Round — عندي سؤال.",
+    };
+  }
+  return {
+    trial: `Hi ${site.name} — I'd like to book a free trial session.`,
+    memberships: `Hi ${site.name} — I'd like to know the membership options.`,
+    kids: `Hi ${site.name} — I'm asking about the kids / junior program.`,
+    events: `Hi ${site.name} — I'd like details about the next event.`,
+    general: `Hi ${site.name} — I have a question.`,
+  };
 }
