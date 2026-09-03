@@ -12,9 +12,29 @@
  * and reintroduces multi-instance chunks instead of fixing them — the
  * localized-copy approach alone is both necessary and sufficient.
  */
+const CANONICAL_HOST = "9throundegypt.com";
+// Vercel's own default production alias for this project, following the
+// same <project-name>.vercel.app pattern already confirmed for the
+// sibling ninth-round-system-web project. Scoped to this exact host only
+// — never a *.vercel.app wildcard, which would also catch per-branch
+// preview URLs and defeat the point of previewing a PR before it's live.
+// If this string is ever wrong (e.g. the project gets renamed), the rule
+// just never matches — safe failure, not a broken build.
+const VERCEL_PRODUCTION_HOST = "ninth-round-system-web-site.vercel.app";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: VERCEL_PRODUCTION_HOST }],
+        destination: `https://${CANONICAL_HOST}/:path*`,
+        permanent: true,
+      },
+    ];
+  },
   typescript: {
     // `next build`'s own internal typecheck walks up from wherever the
     // `next` package itself physically resolves (under this workspace's
