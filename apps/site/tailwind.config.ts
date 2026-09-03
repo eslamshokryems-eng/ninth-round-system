@@ -1,25 +1,30 @@
 import type { Config } from "tailwindcss";
 
-// Values copied from packages/ui/tokens/index.ts (the black/white/gold
-// system — same convention apps/web/tailwind.config.ts already follows,
-// since Tailwind config must be static/requireable, not a TS import).
-// This is a read of shared values only, at author time — apps/site has
-// no runtime dependency on packages/ui or apps/web.
+// 9th Round — Kenpo & Fitness brand system. Exact values from the brand
+// brief: red/black/bone/grey, not the earlier gold placeholder palette
+// (that was draft-only, replaced now that real brand guidelines exist).
+// Font families are loaded via next/font/google in app/layout.tsx and
+// exposed as CSS variables there — referenced here by variable name, not
+// re-declared, so there is exactly one place each font is configured.
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        bg: "#0B0B0C",
-        surface: "#161616",
-        ink: "#FFFFFF",
-        muted: "#9A9A9A",
-        gold: "#C9A227",
-        "gold-soft": "#F4D976",
+        red: "#C1121F",
+        black: "#0F0F0F",
+        bone: "#F5F3EF",
+        grey: "#8A8A8A",
+      },
+      fontFamily: {
+        display: ["var(--font-display)", "sans-serif"], // Anton — headlines, CAPS
+        condensed: ["var(--font-condensed)", "sans-serif"], // Barlow Condensed — numbers, subheadings
+        body: ["var(--font-body)", "sans-serif"], // Inter — English body text
+        arabic: ["var(--font-arabic)", "sans-serif"], // Cairo — Arabic text
       },
       borderRadius: {
-        card: "20px",
+        card: "12px",
         pill: "999px",
       },
     },

@@ -1,14 +1,12 @@
-/**
- * Single source of truth for contact/CTA targets. Every value below is a
- * placeholder — no real WhatsApp number, phone number, address, or social
- * handle has been supplied yet. Update here once, everywhere on the site
- * picks it up.
- */
+/** Real contact details for 9th Round — Kenpo & Fitness. */
 export const CONTACT = {
-  whatsappHref: "#", // TODO: replace with https://wa.me/20XXXXXXXXXX
-  callHref: "#", // TODO: replace with tel:+20XXXXXXXXXX
-  addressLine: null as string | null, // TODO: full branch address
-  mapHref: null as string | null, // TODO: Google Maps link
-  instagramHandle: null as string | null,
-  facebookHandle: null as string | null,
+  whatsappHref: "https://wa.me/message/6KQ7SGUW6UIMP1",
+  whatsappDisplay: "0122 999 2919",
+  callHref: "tel:+201222266465",
+  phoneDisplay: "01222266465",
+  addressLine: "Inside Nordic Club, Highland Park, Fifth Settlement, New Cairo",
+  mapHref: "https://maps.app.goo.gl/pJMLb8wjUrUga1KU9?g_st=ic",
+  instagramHandle: "@9th.round",
+  instagramHref: "https://instagram.com/9th.round",
+  facebookHref: "https://www.facebook.com/share/1dqUBYg4FQ/?mibextid=wwXIfr",
 } as const;

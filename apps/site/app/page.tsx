@@ -1,138 +1,144 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
 import { Container } from "../src/components/container";
 import { PrimaryCta, SecondaryCta } from "../src/components/cta-buttons";
-import { PlaceholderTag } from "../src/components/placeholder-tag";
+import { PackagesTable } from "../src/components/packages-table";
 import { CONTACT } from "../src/data/contact";
 import { PROGRAMS } from "../src/data/programs";
 import { COACHES } from "../src/data/coaches";
+import { useLanguage } from "../src/i18n/language-provider";
 
 export default function HomePage() {
+  const { dict, locale } = useLanguage();
+
   return (
     <>
       {/* 1. Hero */}
-      <section className="relative overflow-hidden border-b border-white/5 py-16 text-center sm:py-24">
-        <Container>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-red-500">
-            Combat-Fitness &middot; 9-Station Circuit
-          </p>
-          <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-black uppercase leading-tight tracking-tight sm:text-6xl">
-            Where Legends Are Made
+      <section className="relative overflow-hidden border-b border-bone/10">
+        <div className="absolute inset-0">
+          <Image
+            src="/gym/gym-floor-wide.jpg"
+            alt={dict.hero.imageAlt}
+            fill
+            priority
+            className="object-cover opacity-40"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/40" />
+        </div>
+        <Container className="relative py-24 text-center sm:py-32">
+          <p className="font-condensed text-sm font-bold uppercase tracking-[0.3em] text-red">{dict.hero.kicker}</p>
+          <h1 className="mx-auto mt-4 max-w-3xl font-display text-5xl uppercase leading-none tracking-tight text-bone sm:text-7xl">
+            {dict.hero.headline}
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-base text-muted sm:text-lg">
-            9th Round Egypt — no classes, no waiting, just action. Boxing, kickboxing,
-            and functional fitness in one structured, high-energy round.
-          </p>
+          <p className="mx-auto mt-5 max-w-xl font-condensed text-lg text-bone/90 sm:text-xl">{dict.hero.sub}</p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <PrimaryCta href="/trial">Book a Free Trial</PrimaryCta>
-            <SecondaryCta href="/programs">View Programs</SecondaryCta>
-          </div>
-
-          <div className="mt-8 flex items-center justify-center">
-            <div className="flex aspect-video w-full max-w-2xl items-center justify-center rounded-card border border-white/10 bg-surface">
-              <PlaceholderTag label="hero photo/video of the real facility needed" />
-            </div>
+            <PrimaryCta href="/trial">{dict.hero.ctaPrimary}</PrimaryCta>
+            <SecondaryCta href="/programs">{dict.hero.ctaSecondary}</SecondaryCta>
           </div>
         </Container>
       </section>
 
-      {/* 2. Why 9th Round */}
-      <section className="border-b border-white/5 py-16">
-        <Container>
-          <h2 className="text-center text-2xl font-bold sm:text-3xl">Not Another Gym</h2>
-          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            <WhyCard title="Methodology" body="A structured 9-station circuit — every round has a purpose, nothing wasted." />
-            <WhyCard title="Coaching" body="Real coaching, real technique — beginners welcome, no boxing experience required." />
-            <WhyCard title="Community" body="Train alongside people who show up — energy that pushes you further." />
-            <WhyCard title="Results" body="Strength, conditioning, and skill, built one round at a time." />
-          </div>
+      {/* 2. Why */}
+      <section className="border-b border-bone/10 bg-bone py-16 text-black">
+        <Container className="text-center">
+          <h2 className="font-display text-3xl uppercase text-black sm:text-4xl">{dict.why.heading}</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-black/70">{dict.why.body}</p>
         </Container>
       </section>
 
-      {/* 3. Programs */}
-      <section className="border-b border-white/5 py-16">
+      {/* 3. How It Works — 9 stations */}
+      <section className="border-b border-bone/10 py-16">
         <Container>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <h2 className="text-2xl font-bold sm:text-3xl">Programs</h2>
-            <SecondaryCta href="/programs">See all programs</SecondaryCta>
+          <div className="text-center">
+            <h2 className="font-display text-3xl uppercase text-bone sm:text-4xl">{dict.howItWorks.heading}</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-grey">{dict.howItWorks.body}</p>
           </div>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {PROGRAMS.slice(0, 4).map((program) => (
-              <div key={program.slug} className="rounded-card border border-white/10 bg-surface p-5">
-                <h3 className="text-base font-semibold text-ink">{program.name}</h3>
-                <p className="mt-1 text-xs font-medium uppercase tracking-wide text-red-500">{program.tagline}</p>
-                <p className="mt-2 text-sm text-muted">{program.description}</p>
+
+          <div className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-3 sm:grid-cols-9">
+            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => (
+              <div
+                key={n}
+                className="flex aspect-square items-center justify-center rounded-card border border-bone/15 bg-black"
+              >
+                <span className="font-display text-2xl text-red sm:text-3xl">{n}</span>
               </div>
             ))}
           </div>
-        </Container>
-      </section>
-
-      {/* 4. Training Experience */}
-      <section className="border-b border-white/5 bg-surface py-16">
-        <Container>
-          <div className="grid items-center gap-8 sm:grid-cols-2">
-            <div>
-              <h2 className="text-2xl font-bold sm:text-3xl">The 9th Round Experience</h2>
-              <p className="mt-4 text-muted">
-                9 stations, roughly three minutes each — warm-up, strength, boxing, kickboxing,
-                functional movement, core, and conditioning, all in one complete session. Come
-                as you are. Learn. Train. Improve.
-              </p>
-            </div>
-            <div className="flex aspect-video items-center justify-center rounded-card border border-white/10 bg-bg">
-              <PlaceholderTag label="training-experience photo/video needed" />
-            </div>
-          </div>
-        </Container>
-      </section>
-
-      {/* 5. Coaches */}
-      <section className="border-b border-white/5 py-16">
-        <Container>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <h2 className="text-2xl font-bold sm:text-3xl">Coaches</h2>
-            <SecondaryCta href="/coaches">Meet the team</SecondaryCta>
-          </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {COACHES.map((coach) => (
-              <div key={coach.id} className="flex items-center gap-4 rounded-card border border-white/10 bg-surface p-5">
-                <div className="h-16 w-16 flex-shrink-0 rounded-full border border-white/10 bg-bg" />
-                <div>
-                  <p className="font-semibold text-ink">{coach.name}</p>
-                  <p className="text-sm text-muted">{coach.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3">
-            <PlaceholderTag label="real coach names, roles, and photos needed" />
-          </div>
-        </Container>
-      </section>
-
-      {/* 6. Classes / Schedule (preview) */}
-      <section className="border-b border-white/5 bg-surface py-16">
-        <Container>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <h2 className="text-2xl font-bold sm:text-3xl">Classes</h2>
-            <SecondaryCta href="/classes">View schedule</SecondaryCta>
-          </div>
-          <p className="mt-4 max-w-xl text-muted">
-            A public schedule is coming soon. This preview does not reflect real class times yet.
+          <p className="mt-4 text-center font-condensed text-xs uppercase tracking-[0.2em] text-grey">
+            {dict.howItWorks.stations}
           </p>
+        </Container>
+      </section>
+
+      {/* 4. Programs preview */}
+      <section className="border-b border-bone/10 bg-bone py-16 text-black">
+        <Container>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 className="font-display text-3xl uppercase text-black sm:text-4xl">{dict.programs.heading}</h2>
+            <Link
+              href="/programs"
+              className="inline-flex items-center justify-center rounded-pill border border-black/30 px-6 py-3 text-sm font-bold uppercase tracking-wide text-black transition-colors hover:border-black"
+            >
+              {dict.programs.seeAll}
+            </Link>
+          </div>
+          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {PROGRAMS.map((program) => (
+              <div key={program.slug} className="rounded-card border border-black/10 bg-black/5 p-4">
+                <h3 className="font-condensed text-base font-bold uppercase text-black">{program.name[locale]}</h3>
+                <p className="mt-1 text-xs text-black/60">{program.tagline[locale]}</p>
+              </div>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      {/* 5. Packages */}
+      <section className="border-b border-bone/10 py-16">
+        <Container>
+          <div className="text-center">
+            <h2 className="font-display text-3xl uppercase text-bone sm:text-4xl">{dict.packages.heading}</h2>
+            <p className="mx-auto mt-3 max-w-xl text-grey">{dict.packages.sub}</p>
+          </div>
+          <div className="mt-10">
+            <PackagesTable />
+          </div>
+        </Container>
+      </section>
+
+      {/* 6. Coaches preview */}
+      <section className="border-b border-bone/10 py-16">
+        <Container>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 className="font-display text-3xl uppercase text-bone sm:text-4xl">{dict.coaches.heading}</h2>
+            <SecondaryCta href="/coaches">{dict.coaches.seeAll}</SecondaryCta>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {COACHES.map((coach) => (
+              <div key={coach.id} className="rounded-card border border-bone/15 p-5 text-center">
+                <div className="mx-auto h-20 w-20 rounded-full border border-bone/20 bg-bone/5" />
+                <p className="mt-4 font-condensed text-base font-bold uppercase text-bone">{coach.name[locale]}</p>
+                <p className="text-sm text-grey">{coach.role[locale]}</p>
+              </div>
+            ))}
+          </div>
         </Container>
       </section>
 
       {/* 7. Trial CTA */}
-      <section className="border-b border-white/5 py-16 text-center">
-        <Container>
-          <h2 className="text-2xl font-bold sm:text-3xl">Try Your First Session Free</h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted">
-            Come as you are. Learn the fundamentals, feel the energy, and see what a real
-            round feels like — no commitment required.
-          </p>
+      <section className="relative overflow-hidden border-b border-bone/10 py-20 text-center">
+        <div className="absolute inset-0">
+          <Image src="/gym/gym-ring.jpg" alt="" fill className="object-cover opacity-30" />
+          <div className="absolute inset-0 bg-black/70" />
+        </div>
+        <Container className="relative">
+          <h2 className="font-display text-3xl uppercase text-bone sm:text-4xl">{dict.trialCta.heading}</h2>
+          <p className="mx-auto mt-3 max-w-xl text-bone/80">{dict.trialCta.body}</p>
           <div className="mt-6 flex justify-center">
-            <PrimaryCta href="/trial">Book a Free Trial</PrimaryCta>
+            <PrimaryCta href="/trial">{dict.trialCta.cta}</PrimaryCta>
           </div>
         </Container>
       </section>
@@ -142,31 +148,29 @@ export default function HomePage() {
         <Container>
           <div className="grid gap-8 sm:grid-cols-2">
             <div>
-              <h2 className="text-lg font-bold">Location</h2>
-              <p className="mt-2 text-muted">{CONTACT.addressLine ?? "Full address not yet supplied."}</p>
-              <div className="mt-2">
-                <PlaceholderTag label="branch address + map link needed" />
-              </div>
+              <h2 className="font-display text-lg uppercase text-bone">{dict.location.heading}</h2>
+              <p className="mt-2 text-grey">{CONTACT.addressLine}</p>
+              <a
+                href={CONTACT.mapHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block text-sm font-bold text-red hover:text-red/80"
+              >
+                {dict.location.getDirections} →
+              </a>
             </div>
             <div>
-              <h2 className="text-lg font-bold">Contact</h2>
-              <p className="mt-2 text-muted">WhatsApp and phone details not yet supplied.</p>
-              <div className="mt-2">
-                <PlaceholderTag label="WhatsApp + phone number needed" />
-              </div>
+              <h2 className="font-display text-lg uppercase text-bone">{dict.location.contactHeading}</h2>
+              <p className="mt-2 text-grey">
+                {dict.location.whatsapp} — {CONTACT.whatsappDisplay}
+              </p>
+              <p className="text-grey">
+                {dict.location.phone} — {CONTACT.phoneDisplay}
+              </p>
             </div>
           </div>
         </Container>
       </section>
     </>
-  );
-}
-
-function WhyCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div>
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gold">{title}</h3>
-      <p className="mt-2 text-sm text-muted">{body}</p>
-    </div>
   );
 }
