@@ -11,6 +11,7 @@
 - `public/gym/gym-ring.jpg` — used as the "Your First Session Is Free" trial-CTA background.
 - `public/gym/gym-ring-corner.jpg` — available, not yet placed on a page.
 - `public/gym/gym-ring-detail.jpg` — available, not yet placed on a page.
+- `public/founder/islam-shokry.jpg` — founder portrait (Islam Shokry), used in the new Founder section on `/about`. Background isolated from the supplied photo and composited onto a 9th Round–branded dark background (black with a soft red glow), permission to publish confirmed by the founder himself.
 
 ## Still needed
 

@@ -75,6 +75,16 @@ export interface Dictionary {
     rights: string;
   };
   whatsappSticky: string;
+  founder: {
+    eyebrow: string;
+    headline: string;
+    name: string;
+    title: string;
+    paragraphs: string[];
+    experienceStat: string;
+    credentialsHeading: string;
+    imageAlt: string;
+  };
   pages: {
     about: { title: string; description: string };
     classes: { title: string; description: string; scheduleHeading: string; openHours: string; openHoursValue: string; classesHeading: string; classesValue: string };
@@ -158,10 +168,28 @@ export const dictionaries: Record<Locale, Dictionary> = {
       rights: "All rights reserved.",
     },
     whatsappSticky: "WhatsApp Us",
+    founder: {
+      eyebrow: "The Founder",
+      headline: "Built on Science. Driven by Performance.",
+      name: "Islam Shokry",
+      title: "Founder & Visionary — 9th Round",
+      paragraphs: [
+        "I didn't build 9th Round to be just another place to work out.",
+        "I built it around a belief that training should be more than exercise. It should be a structured experience that develops physical capability, discipline, confidence, and performance.",
+        "My journey in training began in 2007, and over the years I have combined practical coaching experience with an academic foundation in sports science.",
+        "I earned a Bachelor of Physical Education in 2008, followed by a Master of Sports Sciences in 2019, focused on physical abilities development and its impact on the skill-related and physiological variables of athletes — alongside professional certification as an ISSA Certified Fitness Trainer.",
+        "This combination of science and practical experience became the foundation of 9th Round.",
+        "The goal is simple: to create a training system and environment that challenges people, develops their physical abilities, and makes them realize that they are capable of more than they thought.",
+        "9th Round is not about simply finishing a workout. It's about becoming better prepared for the next round.",
+      ],
+      experienceStat: "19+ Years of Training Experience",
+      credentialsHeading: "Academic & Professional Credentials",
+      imageAlt: "Islam Shokry, Founder of 9th Round",
+    },
     pages: {
       about: {
         title: "About",
-        description: "About 9th Round — Kenpo & Fitness.",
+        description: "About 9th Round — Kenpo & Fitness, founded by Islam Shokry.",
       },
       classes: {
         title: "Classes",
@@ -263,10 +291,28 @@ export const dictionaries: Record<Locale, Dictionary> = {
       rights: "كل الحقوق محفوظة.",
     },
     whatsappSticky: "واتساب",
+    founder: {
+      eyebrow: "المؤسس",
+      headline: "مبني على العلم. مدفوع بالأداء.",
+      name: "إسلام شكري",
+      title: "المؤسس والرؤية وراء 9th Round",
+      paragraphs: [
+        "لم أؤسس 9th Round ليكون مجرد مكان آخر للتمرين.",
+        "أسست 9th Round انطلاقًا من إيمان بأن التدريب يجب أن يكون أكثر من مجرد ممارسة للتمارين؛ يجب أن يكون تجربة منظمة تطور القدرات البدنية، والانضباط، والثقة، والأداء.",
+        "بدأت رحلتي في مجال التدريب عام 2007، وعلى مدار السنوات جمعت بين الخبرة العملية في التدريب وبين الدراسة الأكاديمية المتخصصة في علوم الرياضة.",
+        "حصلت على بكالوريوس التربية الرياضية عام 2008، ثم ماجستير العلوم الرياضية عام 2019 في تنمية القدرات البدنية وتأثيرها على المتغيرات المهارية والفسيولوجية لدى اللاعبين، إلى جانب حصولي على شهادة Certified Fitness Trainer (CFT) من ISSA.",
+        "هذا المزيج بين العلم والخبرة العملية أصبح أحد الأسس التي بُنيت عليها فلسفة 9th Round.",
+        "الهدف بسيط: أن نصنع نظامًا وبيئة تدريبية تتحدى الإنسان، وتطور قدراته البدنية، وتجعله يكتشف أنه قادر على الوصول إلى مستوى أعلى مما كان يعتقد.",
+        "9th Round ليست مجرد حصة تنتهي. إنها استعداد للجولة القادمة.",
+      ],
+      experienceStat: "أكتر من 19 سنة خبرة في التدريب",
+      credentialsHeading: "المؤهلات العلمية والمهنية",
+      imageAlt: "إسلام شكري، مؤسس 9th Round",
+    },
     pages: {
       about: {
         title: "عن الجيم",
-        description: "عن 9th Round — Kenpo & Fitness.",
+        description: "عن 9th Round — Kenpo & Fitness، بقيادة المؤسس إسلام شكري.",
       },
       classes: {
         title: "المواعيد",
