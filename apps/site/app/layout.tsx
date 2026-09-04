@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   icons: {
-    icon: "/emblem-red.png",
+    icon: "/brand/logo-mark-red.png",
   },
 };
 

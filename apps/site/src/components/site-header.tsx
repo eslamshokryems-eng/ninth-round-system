@@ -23,11 +23,15 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-bone/10 bg-black/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
-          <Image src="/emblem-red.png" alt="9th Round" width={28} height={28} />
-          <span className="font-display text-sm uppercase tracking-wide text-bone">
-            9th Round <span className="text-grey">Kenpo &amp; Fitness</span>
-          </span>
+        <Link href="/" className="flex items-center" onClick={() => setIsMenuOpen(false)}>
+          <Image
+            src="/brand/logo-lockup-dark.png"
+            alt="9th Round — Kenpo & Fitness"
+            width={1030}
+            height={340}
+            priority
+            className="h-9 w-auto sm:h-11"
+          />
         </Link>
 
         <nav className="hidden items-center gap-6 lg:flex">

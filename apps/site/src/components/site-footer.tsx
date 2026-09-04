@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "../i18n/language-provider";
 import { CONTACT } from "../data/contact";
@@ -20,8 +21,14 @@ export function SiteFooter() {
     <footer className="border-t border-bone/10">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-3 sm:px-6 lg:px-8">
         <div>
-          <p className="font-display text-sm uppercase tracking-wide text-bone">9th Round</p>
-          <p className="mt-2 text-sm text-grey">{dict.footer.tagline}</p>
+          <Image
+            src="/brand/logo-lockup-dark.png"
+            alt="9th Round — Kenpo & Fitness"
+            width={1030}
+            height={340}
+            className="h-12 w-auto"
+          />
+          <p className="mt-3 text-sm text-grey">{dict.footer.tagline}</p>
         </div>
 
         <div>
