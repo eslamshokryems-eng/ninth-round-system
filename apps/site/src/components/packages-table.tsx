@@ -32,7 +32,7 @@ export function PackagesTable() {
       </div>
 
       <div className="mt-6 flex justify-center">
-        <ExternalCta href={CONTACT.whatsappHref}>{dict.packages.cta}</ExternalCta>
+        <ExternalCta href={CONTACT.whatsappHref} placement="section">{dict.packages.cta}</ExternalCta>
       </div>
     </div>
   );

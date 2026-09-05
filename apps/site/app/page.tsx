@@ -35,7 +35,7 @@ export default function HomePage() {
           <p className="mx-auto mt-5 max-w-xl font-condensed text-lg text-bone/90 sm:text-xl">{dict.hero.sub}</p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <PrimaryCta href="/trial">{dict.hero.ctaPrimary}</PrimaryCta>
+            <PrimaryCta href="/trial" placement="hero">{dict.hero.ctaPrimary}</PrimaryCta>
             <SecondaryCta href="/programs">{dict.hero.ctaSecondary}</SecondaryCta>
           </div>
         </Container>
@@ -138,7 +138,7 @@ export default function HomePage() {
           <h2 className="font-display text-3xl uppercase text-bone sm:text-4xl">{dict.trialCta.heading}</h2>
           <p className="mx-auto mt-3 max-w-xl text-bone/80">{dict.trialCta.body}</p>
           <div className="mt-6 flex justify-center">
-            <PrimaryCta href="/trial">{dict.trialCta.cta}</PrimaryCta>
+            <PrimaryCta href="/trial" placement="section">{dict.trialCta.cta}</PrimaryCta>
           </div>
         </Container>
       </section>

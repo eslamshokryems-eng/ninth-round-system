@@ -24,7 +24,7 @@ export function ProgramsContent() {
       </div>
 
       <div className="mt-10 flex justify-center">
-        <PrimaryCta href="/trial">{dict.trialCta.cta}</PrimaryCta>
+        <PrimaryCta href="/trial" placement="section">{dict.trialCta.cta}</PrimaryCta>
       </div>
     </Container>
   );

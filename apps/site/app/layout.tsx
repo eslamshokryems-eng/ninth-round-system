@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { Anton, Barlow_Condensed, Inter, Cairo } from "next/font/google";
 import { SiteHeader } from "../src/components/site-header";
 import { SiteFooter } from "../src/components/site-footer";
 import { WhatsAppSticky } from "../src/components/whatsapp-sticky";
+import { AnalyticsScripts, GtmNoScript } from "../src/components/analytics-scripts";
+import { AnalyticsPageViewTracker } from "../src/components/analytics-page-view-tracker";
 import { LanguageProvider } from "../src/i18n/language-provider";
 import "./globals.css";
 
@@ -49,6 +52,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${anton.variable} ${barlowCondensed.variable} ${inter.variable} ${cairo.variable}`}>
       <body className="flex min-h-screen flex-col bg-black font-body text-bone antialiased">
+        <AnalyticsScripts />
+        <GtmNoScript />
+        <Suspense fallback={null}>
+          <AnalyticsPageViewTracker />
+        </Suspense>
         <LanguageProvider>
           <SiteHeader />
           <main className="flex-1 pb-16 sm:pb-0">{children}</main>

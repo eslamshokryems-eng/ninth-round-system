@@ -1,17 +1,21 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useLanguage } from "../i18n/language-provider";
 import { CONTACT } from "../data/contact";
+import { trackWhatsAppClick } from "../lib/analytics";
 
 /** Sticky WhatsApp CTA, mobile only — the primary conversion action per brand instruction, always reachable while scrolling. */
 export function WhatsAppSticky() {
   const { dict } = useLanguage();
+  const pathname = usePathname();
 
   return (
     <a
       href={CONTACT.whatsappHref}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => trackWhatsAppClick(pathname, "sticky")}
       className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center gap-2 bg-red py-3 text-sm font-bold uppercase tracking-wide text-bone sm:hidden"
     >
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">

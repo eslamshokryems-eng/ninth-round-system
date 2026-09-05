@@ -1,14 +1,20 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { PROGRAMS } from "../data/programs";
 import { useLanguage } from "../i18n/language-provider";
+import { trackTrialFormStart, trackTrialFormSubmit } from "../lib/analytics";
+import { getStoredUtm } from "../lib/utm";
 
 /**
  * UX/structure only: this form does NOT call Supabase or any backend.
  * Submitting captures nothing beyond local component state and shows a
  * confirmation message — no lead is created, no production data is
  * touched. Wiring this to the CRM is a separate, explicitly-approved task.
+ *
+ * trial_form_start/trial_form_submit are still tracked here (page + form
+ * type + session UTM only, never the field values) — analytics attribution
+ * doesn't depend on the CRM wiring existing yet.
  */
 export function TrialForm() {
   const { dict, locale } = useLanguage();
@@ -19,10 +25,18 @@ export function TrialForm() {
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
   const [notes, setNotes] = useState("");
+  const hasStarted = useRef(false);
+
+  function handleFormStart() {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+    trackTrialFormStart("/trial");
+  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setIsSubmitted(true);
+    trackTrialFormSubmit("/trial", getStoredUtm());
   }
 
   if (isSubmitted) {
@@ -47,6 +61,7 @@ export function TrialForm() {
           type="text"
           required
           value={fullName}
+          onFocus={handleFormStart}
           onChange={(event) => setFullName(event.target.value)}
           className="w-full rounded-lg border border-bone/20 bg-black px-3 py-2 text-sm text-bone outline-none focus:border-red"
         />

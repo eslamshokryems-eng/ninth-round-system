@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "../i18n/language-provider";
 import { LanguageToggle } from "./language-toggle";
+import { trackTrialCtaClick } from "../lib/analytics";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -49,6 +50,7 @@ export function SiteHeader() {
           <LanguageToggle />
           <Link
             href="/trial"
+            onClick={() => trackTrialCtaClick(pathname, "header")}
             className="rounded-pill bg-red px-5 py-2 text-sm font-bold uppercase tracking-wide text-bone transition-colors hover:bg-red/90"
           >
             {dict.nav.bookTrial}
@@ -88,7 +90,10 @@ export function SiteHeader() {
           ))}
           <Link
             href="/trial"
-            onClick={() => setIsMenuOpen(false)}
+            onClick={() => {
+              setIsMenuOpen(false);
+              trackTrialCtaClick(pathname, "header");
+            }}
             className="mt-2 rounded-pill bg-red px-5 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-bone"
           >
             {dict.nav.bookTrial}

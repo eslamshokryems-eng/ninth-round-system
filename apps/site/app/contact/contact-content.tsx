@@ -1,25 +1,28 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Container } from "../../src/components/container";
 import { ExternalCta, PrimaryCta } from "../../src/components/cta-buttons";
 import { CONTACT } from "../../src/data/contact";
 import { useLanguage } from "../../src/i18n/language-provider";
+import { trackSocialClick } from "../../src/lib/analytics";
 
 export function ContactContent() {
   const { dict } = useLanguage();
+  const pathname = usePathname();
 
   return (
     <Container className="py-16">
       <h1 className="font-display text-4xl uppercase text-bone sm:text-5xl">{dict.pages.contact.title}</h1>
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <ExternalCta href={CONTACT.whatsappHref}>
+        <ExternalCta href={CONTACT.whatsappHref} placement="contact">
           {dict.location.whatsapp} — {CONTACT.whatsappDisplay}
         </ExternalCta>
-        <ExternalCta href={CONTACT.callHref}>
+        <ExternalCta href={CONTACT.callHref} placement="contact">
           {dict.location.phone} — {CONTACT.phoneDisplay}
         </ExternalCta>
-        <PrimaryCta href="/trial">{dict.trialCta.cta}</PrimaryCta>
+        <PrimaryCta href="/trial" placement="contact">{dict.trialCta.cta}</PrimaryCta>
       </div>
 
       <div className="mt-10 grid gap-8 sm:grid-cols-2">
@@ -38,12 +41,24 @@ export function ContactContent() {
         <div>
           <h2 className="font-display text-lg uppercase text-bone">Social</h2>
           <p className="mt-2 text-grey">
-            <a href={CONTACT.instagramHref} target="_blank" rel="noopener noreferrer" className="hover:text-bone">
+            <a
+              href={CONTACT.instagramHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackSocialClick("instagram", pathname, "contact")}
+              className="hover:text-bone"
+            >
               Instagram — {CONTACT.instagramHandle}
             </a>
           </p>
           <p className="text-grey">
-            <a href={CONTACT.facebookHref} target="_blank" rel="noopener noreferrer" className="hover:text-bone">
+            <a
+              href={CONTACT.facebookHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackSocialClick("facebook", pathname, "contact")}
+              className="hover:text-bone"
+            >
               Facebook
             </a>
           </p>
