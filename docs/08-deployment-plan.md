@@ -52,9 +52,18 @@ Prepared ahead of the first submission, not discovered during it:
 
 ## 8.4 Web Deployment (Admin + Trainer Portal)
 
-- Hosted on **Vercel**: automatic preview deployment per PR (reviewers see a live URL before merge), production deploy on merge to `main`.
+- Hosted on **Vercel** as its own project, separate from the public site (§8.4.1): automatic preview deployment per PR, production deploy on merge to its production branch. Vercel project **Root Directory** is set to `apps/web` (monorepo), project name `ninth-round-system-web`.
+- Production domain: **`app.9throundegypt.com`** — a subdomain, not the apex; the apex and `www` belong to the public site (§8.4.1). Added as a custom domain on this Vercel project alongside its default `*.vercel.app` URL. DNS is a single `CNAME` record for `app` at GoDaddy, pointing at the exact value Vercel's Domains settings page shows for this project when the subdomain is added — never assume/reuse a value from another domain or project.
+- `NEXT_PUBLIC_SITE_URL=https://app.9throundegypt.com` set in this Vercel project's production environment variables, used for `metadataBase` and any absolute links (see `apps/web/app/layout.tsx`).
+- Supabase Auth **Site URL** and **Redirect URLs** (Supabase Dashboard → Authentication → URL Configuration, not `supabase/config.toml` which only governs local dev) set to `https://app.9throundegypt.com`, since this is where the actual login/password-reset flow lives — not the apex.
 - Environment variables (Supabase URL/anon key, Stripe publishable key, etc.) configured per-environment in Vercel project settings, never in the repo.
 - Role-gated routing (`(admin)` vs `(trainer)` route groups) enforced both in Next.js middleware (fast reject) and re-validated server-side per request (defense in depth, matching the RLS philosophy used elsewhere).
+
+### 8.4.1 Public Website (apps/site)
+
+- A **fully separate Vercel project** (`ninth-round-system-web-site`), Root Directory `apps/site`, deliberately isolated from `apps/web` — different Next.js major version, own `node_modules` resolution (see `apps/site/scripts/localize-next.mjs`), zero shared runtime. See `apps/site/vercel.json` for its pinned build command.
+- Production domain: **`9throundegypt.com`** (apex) with **`www.9throundegypt.com`** redirecting to it — the apex is canonical, `www` is the redirect target's alias, not the other way around.
+- `NEXT_PUBLIC_SITE_URL=https://9throundegypt.com` set in this Vercel project's production environment variables. No Supabase variables — this app has no backend dependency.
 
 ## 8.5 Database Migrations
 
