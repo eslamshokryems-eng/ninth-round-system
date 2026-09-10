@@ -12,6 +12,7 @@ import { CheckInMemberUseCase } from "./application/check-in-member";
 import { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
 import { ListRecentCheckInsUseCase } from "./application/list-recent-check-ins";
 import { GetTodayCheckInsUseCase } from "./application/get-today-check-ins";
+import { ListCheckInsByDateRangeUseCase } from "./application/list-check-ins-by-date-range";
 import { CheckInByQrCodeUseCase } from "./application/check-in-by-qr-code";
 import { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 import { RecordExpenseUseCase } from "./application/record-expense";
@@ -80,6 +81,10 @@ export { CheckInMemberUseCase } from "./application/check-in-member";
 export { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
 export { ListRecentCheckInsUseCase } from "./application/list-recent-check-ins";
 export { GetTodayCheckInsUseCase } from "./application/get-today-check-ins";
+export {
+  ListCheckInsByDateRangeUseCase,
+  type ListCheckInsByDateRangeInput,
+} from "./application/list-check-ins-by-date-range";
 export { CheckInByQrCodeUseCase, type CheckInByQrCodeOutput } from "./application/check-in-by-qr-code";
 export { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 export { RecordExpenseUseCase } from "./application/record-expense";
@@ -153,6 +158,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listCheckInsForMember: new ListCheckInsForMemberUseCase(checkInRepository),
     listRecentCheckIns: new ListRecentCheckInsUseCase(checkInRepository),
     getTodayCheckIns: new GetTodayCheckInsUseCase(checkInRepository),
+    listCheckInsByDateRange: new ListCheckInsByDateRangeUseCase(checkInRepository),
     checkInByQrCode: new CheckInByQrCodeUseCase(memberSearchRepository, checkInRepository),
     uploadMemberPhoto: new UploadMemberPhotoUseCase(memberPhotoRepository),
     recordExpense: new RecordExpenseUseCase(expenseRepository),

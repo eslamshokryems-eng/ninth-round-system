@@ -9,4 +9,6 @@ export interface CheckInRepository {
   listRecent(limit: number): Promise<Result<RecentCheckInEntry[]>>;
   /** Every check-in from today (branch-scoped by RLS) — backs the Dashboard's check-in trend chart. */
   listToday(): Promise<Result<TodayCheckInEntry[]>>;
+  /** All check-ins within a date range (inclusive, "YYYY-MM-DD"), across all members at the caller's branch(es) — backs the Check-in History page's calendar/daily-count view. */
+  listByDateRange(startDate: string, endDate: string): Promise<Result<RecentCheckInEntry[]>>;
 }
