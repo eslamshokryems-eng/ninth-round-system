@@ -84,6 +84,22 @@ function HistoryIcon() {
   );
 }
 
+function TrainersIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <circle cx="7" cy="6.5" r="2.25" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="14" cy="7.5" r="1.75" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M2.5 16v-.5A4.5 4.5 0 0 1 7 11h.5A4.5 4.5 0 0 1 12 15.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path d="M13 11.5a3.5 3.5 0 0 1 3.5 3.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 interface NavItem {
   href: string;
   label: string;
@@ -96,6 +112,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/members/new", label: "Add Member" },
   { href: "/memberships", label: "Memberships" },
   { href: "/expiring", label: "Expiring" },
+  { href: "/trainers", label: "Trainers", icon: TrainersIcon },
   { href: "/hr", label: "HR", icon: HrIcon },
   { href: "/reports", label: "Reports" },
   { href: "/profile", label: "Profile" },
@@ -120,6 +137,7 @@ const CHECK_IN_NAV_ITEMS: NavItem[] = [
  * exactly. Plain reception/coach accounts never see this link.
  */
 const SALES_NAV_ITEMS: NavItem[] = [{ href: "/sales", label: "Sales", icon: SalesIcon }];
+
 
 /**
  * Money-visibility items — only Branch Manager/Super Admin, same split as
