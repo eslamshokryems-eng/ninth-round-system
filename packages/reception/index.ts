@@ -12,6 +12,7 @@ import { CheckInMemberUseCase } from "./application/check-in-member";
 import { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
 import { ListRecentCheckInsUseCase } from "./application/list-recent-check-ins";
 import { GetTodayCheckInsUseCase } from "./application/get-today-check-ins";
+import { ListCheckInsByDateRangeUseCase } from "./application/list-check-ins-by-date-range";
 import { CheckInByQrCodeUseCase } from "./application/check-in-by-qr-code";
 import { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 import { RecordExpenseUseCase } from "./application/record-expense";
@@ -20,6 +21,9 @@ import { RecordEquipmentSaleUseCase } from "./application/record-equipment-sale"
 import { ListEquipmentSalesUseCase } from "./application/list-equipment-sales";
 import { ListReceiptsUseCase } from "./application/list-receipts";
 import { ListReceiptsByDateRangeUseCase } from "./application/list-receipts-by-date-range";
+import { UpdateReceiptDateUseCase } from "./application/update-receipt-date";
+import { ListTrainersUseCase } from "./application/list-trainers";
+import { ListTrainerPlayersUseCase } from "./application/list-trainer-players";
 import { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
 import { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 import { GetRevenueReportUseCase } from "./application/get-revenue-report";
@@ -39,6 +43,7 @@ import { SupabaseEquipmentSaleRepository } from "./infrastructure/supabase-equip
 import { SupabaseReceiptRepository } from "./infrastructure/supabase-receipt-repository";
 import { SupabaseMembershipNumberRepository } from "./infrastructure/supabase-membership-number-repository";
 import { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-expiring-membership-repository";
+import { SupabaseTrainerRepository } from "./infrastructure/supabase-trainer-repository";
 import { SupabaseRevenueReportRepository } from "./infrastructure/supabase-revenue-report-repository";
 import { SupabaseMembershipsReportRepository } from "./infrastructure/supabase-memberships-report-repository";
 
@@ -79,6 +84,10 @@ export { CheckInMemberUseCase } from "./application/check-in-member";
 export { ListCheckInsForMemberUseCase } from "./application/list-check-ins-for-member";
 export { ListRecentCheckInsUseCase } from "./application/list-recent-check-ins";
 export { GetTodayCheckInsUseCase } from "./application/get-today-check-ins";
+export {
+  ListCheckInsByDateRangeUseCase,
+  type ListCheckInsByDateRangeInput,
+} from "./application/list-check-ins-by-date-range";
 export { CheckInByQrCodeUseCase, type CheckInByQrCodeOutput } from "./application/check-in-by-qr-code";
 export { UploadMemberPhotoUseCase } from "./application/upload-member-photo";
 export { RecordExpenseUseCase } from "./application/record-expense";
@@ -90,6 +99,10 @@ export {
   ListReceiptsByDateRangeUseCase,
   type ListReceiptsByDateRangeInput,
 } from "./application/list-receipts-by-date-range";
+export { UpdateReceiptDateUseCase, type UpdateReceiptDateInput } from "./application/update-receipt-date";
+export { ListTrainersUseCase } from "./application/list-trainers";
+export { ListTrainerPlayersUseCase, type ListTrainerPlayersInput } from "./application/list-trainer-players";
+export type { TrainerSummary, TrainerPlayer } from "./domain/trainer";
 export { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
 export { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 export { GetRevenueReportUseCase } from "./application/get-revenue-report";
@@ -109,6 +122,7 @@ export { SupabaseEquipmentSaleRepository } from "./infrastructure/supabase-equip
 export { SupabaseReceiptRepository } from "./infrastructure/supabase-receipt-repository";
 export { SupabaseMembershipNumberRepository } from "./infrastructure/supabase-membership-number-repository";
 export { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-expiring-membership-repository";
+export { SupabaseTrainerRepository } from "./infrastructure/supabase-trainer-repository";
 export { SupabaseRevenueReportRepository } from "./infrastructure/supabase-revenue-report-repository";
 export { SupabaseMembershipsReportRepository } from "./infrastructure/supabase-memberships-report-repository";
 
@@ -135,6 +149,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
   const receiptRepository = new SupabaseReceiptRepository(client);
   const membershipNumberRepository = new SupabaseMembershipNumberRepository(client);
   const expiringMembershipRepository = new SupabaseExpiringMembershipRepository(client);
+  const trainerRepository = new SupabaseTrainerRepository(client);
   const revenueReportRepository = new SupabaseRevenueReportRepository(client);
   const membershipsReportRepository = new SupabaseMembershipsReportRepository(client);
   return {
@@ -151,6 +166,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listCheckInsForMember: new ListCheckInsForMemberUseCase(checkInRepository),
     listRecentCheckIns: new ListRecentCheckInsUseCase(checkInRepository),
     getTodayCheckIns: new GetTodayCheckInsUseCase(checkInRepository),
+    listCheckInsByDateRange: new ListCheckInsByDateRangeUseCase(checkInRepository),
     checkInByQrCode: new CheckInByQrCodeUseCase(memberSearchRepository, checkInRepository),
     uploadMemberPhoto: new UploadMemberPhotoUseCase(memberPhotoRepository),
     recordExpense: new RecordExpenseUseCase(expenseRepository),
@@ -159,8 +175,11 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listEquipmentSales: new ListEquipmentSalesUseCase(equipmentSaleRepository),
     listReceipts: new ListReceiptsUseCase(receiptRepository),
     listReceiptsByDateRange: new ListReceiptsByDateRangeUseCase(receiptRepository),
+    updateReceiptDate: new UpdateReceiptDateUseCase(receiptRepository),
     getNextMembershipNumber: new GetNextMembershipNumberUseCase(membershipNumberRepository),
     listExpiringMemberships: new ListExpiringMembershipsUseCase(expiringMembershipRepository),
+    listTrainers: new ListTrainersUseCase(trainerRepository),
+    listTrainerPlayers: new ListTrainerPlayersUseCase(trainerRepository),
     getRevenueReport: new GetRevenueReportUseCase(revenueReportRepository),
     getMembershipsReport: new GetMembershipsReportUseCase(membershipsReportRepository),
   };

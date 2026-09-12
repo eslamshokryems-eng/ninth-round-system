@@ -5,18 +5,11 @@ import Link from "next/link";
 import type { MemberSearchResult } from "@9thround/reception";
 import { getReceptionModule } from "../../../src/lib/composition-root";
 import { translateErrorCode } from "../../../src/lib/translate-error";
+import { deriveMembershipStatus } from "../../../src/lib/membership-status";
 import { Button } from "../../../src/components/ui/button";
 import { TextField } from "../../../src/components/ui/text-field";
 
-function deriveStatus(status: MemberSearchResult["activeMembershipStatus"], endDate: string | null) {
-  if (status === null) return { text: "No membership", className: "text-muted" };
-  if (status === "expired" || status === "cancelled") return { text: "Expired", className: "text-red-400" };
-  if (endDate) {
-    const daysLeft = Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    if (daysLeft <= 7) return { text: "Expiring Soon", className: "text-red-400" };
-  }
-  return { text: "Active", className: "text-gold" };
-}
+const deriveStatus = deriveMembershipStatus;
 
 const PAGE_SIZE = 15;
 

@@ -7,6 +7,7 @@ import { getReceptionModule } from "../../../src/lib/composition-root";
 import { ReceiptsCalendar, monthRange, toDateKey } from "../../../src/components/receipts-calendar";
 import { Button } from "../../../src/components/ui/button";
 import { Card } from "../../../src/components/ui/card";
+import { TextField } from "../../../src/components/ui/text-field";
 
 const today = new Date();
 
@@ -21,6 +22,10 @@ export default function ReceiptsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editDateValue, setEditDateValue] = useState("");
+  const [isSavingDate, setIsSavingDate] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!branchId) return;
@@ -64,6 +69,30 @@ export default function ReceiptsPage() {
       }
       return next;
     });
+  }
+
+  function startEditDate(receipt: Receipt) {
+    setEditingPaymentId(receipt.paymentId);
+    setEditDateValue(receipt.paymentDate.slice(0, 10));
+    setEditError(null);
+  }
+
+  function cancelEditDate() {
+    setEditingPaymentId(null);
+    setEditError(null);
+  }
+
+  async function saveEditDate(paymentId: string) {
+    setIsSavingDate(true);
+    setEditError(null);
+    const result = await getReceptionModule().updateReceiptDate.execute({ paymentId, newDate: editDateValue });
+    setIsSavingDate(false);
+    if (result.isErr) {
+      setEditError(result.error.message);
+      return;
+    }
+    setEditingPaymentId(null);
+    await load();
   }
 
   function changeMonth(delta: number) {
@@ -140,7 +169,47 @@ export default function ReceiptsPage() {
             <tbody>
               {visibleReceipts.map((receipt) => (
                 <tr key={receipt.paymentId} className="border-t border-white/5">
-                  <td className="px-4 py-3 text-muted">{receipt.paymentDate}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {editingPaymentId === receipt.paymentId ? (
+                      <div className="flex items-center gap-2">
+                        <TextField
+                          label=""
+                          aria-label="Payment date"
+                          type="date"
+                          value={editDateValue}
+                          onChange={(event) => setEditDateValue(event.target.value)}
+                          className="!py-1"
+                        />
+                        <Button
+                          variant="primary"
+                          className="!px-3 !py-1 text-xs"
+                          isLoading={isSavingDate}
+                          onClick={() => void saveEditDate(receipt.paymentId)}
+                        >
+                          Save
+                        </Button>
+                        <Button variant="ghost" className="!px-3 !py-1 text-xs" onClick={cancelEditDate} disabled={isSavingDate}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{receipt.paymentDate}</span>
+                        {role === "super_admin" ? (
+                          <button
+                            type="button"
+                            onClick={() => startEditDate(receipt)}
+                            className="text-xs font-medium text-gold hover:underline"
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+                    {editingPaymentId === receipt.paymentId && editError ? (
+                      <p className="mt-1 text-xs text-red-400">{editError}</p>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3 text-ink">{receipt.memberFullName}</td>
                   <td className="px-4 py-3 text-muted">{receipt.receiptNumber}</td>
                   <td className="px-4 py-3 text-muted">{receipt.membershipNumber}</td>

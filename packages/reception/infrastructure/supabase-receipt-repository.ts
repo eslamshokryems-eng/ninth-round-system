@@ -86,4 +86,13 @@ export class SupabaseReceiptRepository implements ReceiptRepository {
     // real type guarantee.
     return ok((data as unknown as ReceiptRow[]).map(toReceipt));
   }
+
+  async updateDate(paymentId: string, newDate: string): Promise<Result<void>> {
+    const { error } = await this.client.from("membership_payments").update({ payment_date: newDate }).eq("id", paymentId);
+
+    if (error) {
+      return err(domainError("UPDATE_RECEIPT_DATE_FAILED", error.message));
+    }
+    return ok(undefined);
+  }
 }

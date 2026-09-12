@@ -257,6 +257,10 @@ export class FakeCheckInRepository implements CheckInRepository {
   async listToday(): Promise<Result<TodayCheckInEntry[]>> {
     return ok(this.today);
   }
+
+  async listByDateRange(): Promise<Result<RecentCheckInEntry[]>> {
+    return ok(this.recent);
+  }
 }
 
 export function fakeCheckInRepository(overrides: Partial<CheckInMemberOutput> = {}): FakeCheckInRepository {

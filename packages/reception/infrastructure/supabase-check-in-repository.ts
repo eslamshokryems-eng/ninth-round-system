@@ -87,6 +87,27 @@ export class SupabaseCheckInRepository implements CheckInRepository {
     );
   }
 
+  async listByDateRange(startDate: string, endDate: string): Promise<Result<RecentCheckInEntry[]>> {
+    const { data, error } = await this.client
+      .from("check_ins")
+      .select("id, member_id, checked_in_at, members:member_id (full_name)")
+      .gte("checked_in_at", startDate)
+      .lte("checked_in_at", `${endDate}T23:59:59.999`)
+      .order("checked_in_at", { ascending: true })
+      .limit(5000);
+
+    if (error) return err(domainError("LIST_CHECK_INS_FAILED", error.message));
+
+    return ok(
+      (data as unknown as RecentCheckInRow[]).map((row) => ({
+        checkInId: row.id,
+        memberId: row.member_id,
+        memberName: row.members?.full_name ?? "—",
+        checkedInAt: new Date(row.checked_in_at),
+      })),
+    );
+  }
+
   async listToday(): Promise<Result<TodayCheckInEntry[]>> {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);

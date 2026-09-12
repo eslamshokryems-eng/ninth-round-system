@@ -1,0 +1,18 @@
+{
+  "extends": "@9thround/config/tsconfig.web.json",
+  "include": ["app", "src", "next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"],
+  "compilerOptions": {
+    "allowJs": true,
+    "incremental": true,
+    // Pin type resolution to apps/site's own node_modules/@types only —
+    // this workspace hoists node_modules (see next.config.mjs's comment),
+    // so without this TypeScript can walk up and pick @types/react from a
+    // different consumer (apps/mobile is on React 19) instead of this
+    // app's own React 18 types.
+    "typeRoots": ["./node_modules/@types"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
