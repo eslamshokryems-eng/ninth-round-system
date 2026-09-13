@@ -80,3 +80,30 @@ export function trackTrialFormSubmit(page: string, utm: Record<string, string>):
 export function trackSocialClick(platform: string, page: string, placement: string): void {
   trackEvent("social_click", { platform, page, placement });
 }
+
+// Shop — anonymous commerce events only (slug/category/quantity/counts).
+// Never send customer name, phone, email, or payment details.
+
+export function trackShopView(): void {
+  trackEvent("shop_view", {});
+}
+
+export function trackProductView(slug: string, category: string): void {
+  trackEvent("product_view", { slug, category });
+}
+
+export function trackAddToCart(slug: string, category: string, quantity: number): void {
+  trackEvent("add_to_cart", { slug, category, quantity });
+}
+
+export function trackRemoveFromCart(slug: string, category: string): void {
+  trackEvent("remove_from_cart", { slug, category });
+}
+
+export function trackBeginCheckout(itemCount: number): void {
+  trackEvent("begin_checkout", { item_count: itemCount });
+}
+
+export function trackWhatsAppOrderClick(itemCount: number, source: "product" | "cart"): void {
+  trackEvent("whatsapp_order_click", { item_count: itemCount, source });
+}
