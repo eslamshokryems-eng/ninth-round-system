@@ -6,6 +6,7 @@ import { SearchMembersUseCase } from "./application/search-members";
 import { ListMembersUseCase } from "./application/list-members";
 import { RenewMembershipUseCase } from "./application/renew-membership";
 import { GetMemberDetailUseCase } from "./application/get-member-detail";
+import { AssignMembershipCoachUseCase } from "./application/assign-membership-coach";
 import { UpdateMemberUseCase } from "./application/update-member";
 import { DeleteMemberUseCase } from "./application/delete-member";
 import { CheckInMemberUseCase } from "./application/check-in-member";
@@ -34,6 +35,7 @@ import { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-mem
 import { SupabaseMemberSearchRepository } from "./infrastructure/supabase-member-search-repository";
 import { SupabaseRenewalRepository } from "./infrastructure/supabase-renewal-repository";
 import { SupabaseMemberDetailRepository } from "./infrastructure/supabase-member-detail-repository";
+import { SupabaseMembershipCoachRepository } from "./infrastructure/supabase-membership-coach-repository";
 import { SupabaseUpdateMemberRepository } from "./infrastructure/supabase-update-member-repository";
 import { SupabaseDeleteMemberRepository } from "./infrastructure/supabase-delete-member-repository";
 import { SupabaseCheckInRepository } from "./infrastructure/supabase-check-in-repository";
@@ -78,6 +80,10 @@ export { SearchMembersUseCase, type SearchMembersInput } from "./application/sea
 export { ListMembersUseCase } from "./application/list-members";
 export { RenewMembershipUseCase } from "./application/renew-membership";
 export { GetMemberDetailUseCase } from "./application/get-member-detail";
+export {
+  AssignMembershipCoachUseCase,
+  type AssignMembershipCoachInput,
+} from "./application/assign-membership-coach";
 export { UpdateMemberUseCase } from "./application/update-member";
 export { DeleteMemberUseCase } from "./application/delete-member";
 export { CheckInMemberUseCase } from "./application/check-in-member";
@@ -113,6 +119,7 @@ export { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-mem
 export { SupabaseMemberSearchRepository } from "./infrastructure/supabase-member-search-repository";
 export { SupabaseRenewalRepository } from "./infrastructure/supabase-renewal-repository";
 export { SupabaseMemberDetailRepository } from "./infrastructure/supabase-member-detail-repository";
+export { SupabaseMembershipCoachRepository } from "./infrastructure/supabase-membership-coach-repository";
 export { SupabaseUpdateMemberRepository } from "./infrastructure/supabase-update-member-repository";
 export { SupabaseDeleteMemberRepository } from "./infrastructure/supabase-delete-member-repository";
 export { SupabaseCheckInRepository } from "./infrastructure/supabase-check-in-repository";
@@ -140,6 +147,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
   const memberSearchRepository = new SupabaseMemberSearchRepository(client);
   const renewalRepository = new SupabaseRenewalRepository(client);
   const memberDetailRepository = new SupabaseMemberDetailRepository(client);
+  const membershipCoachRepository = new SupabaseMembershipCoachRepository(client);
   const updateMemberRepository = new SupabaseUpdateMemberRepository(client);
   const deleteMemberRepository = new SupabaseDeleteMemberRepository(client);
   const checkInRepository = new SupabaseCheckInRepository(client);
@@ -160,6 +168,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listMembers: new ListMembersUseCase(memberSearchRepository),
     renewMembership: new RenewMembershipUseCase(renewalRepository),
     getMemberDetail: new GetMemberDetailUseCase(memberDetailRepository),
+    assignMembershipCoach: new AssignMembershipCoachUseCase(membershipCoachRepository),
     updateMember: new UpdateMemberUseCase(updateMemberRepository),
     deleteMember: new DeleteMemberUseCase(deleteMemberRepository),
     checkInMember: new CheckInMemberUseCase(checkInRepository),

@@ -82,6 +82,12 @@ export default function MemberDetailPage() {
   const [renewCoach, setRenewCoach] = useState<StaffCandidate | null>(null);
   const [renewSessionCountText, setRenewSessionCountText] = useState("");
 
+  const [isEditingCoach, setIsEditingCoach] = useState(false);
+  const [coachPick, setCoachPick] = useState<StaffCandidate | null>(null);
+  const [coachSessionCountText, setCoachSessionCountText] = useState("");
+  const [coachError, setCoachError] = useState<string | null>(null);
+  const [isSavingCoach, setIsSavingCoach] = useState(false);
+
   const loadDetail = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -197,6 +203,41 @@ export default function MemberDetailPage() {
     setRenewWantsCoach(false);
     setRenewCoach(null);
     setRenewSessionCountText("");
+    void loadDetail();
+  }
+
+  const activeMembership = detail?.membershipHistory.find((m) => m.status === "active") ?? null;
+
+  function startEditCoach() {
+    if (!activeMembership) return;
+    setCoachPick(
+      activeMembership.coachId
+        ? { profileId: activeMembership.coachId, fullName: activeMembership.coachFullName, role: "coach", branchId: null, isActive: true }
+        : null,
+    );
+    setCoachSessionCountText(activeMembership.sessionCount ? String(activeMembership.sessionCount) : "");
+    setCoachError(null);
+    setIsEditingCoach(true);
+  }
+
+  async function handleSaveCoach() {
+    if (!activeMembership) return;
+    setCoachError(null);
+    setIsSavingCoach(true);
+
+    const result = await getReceptionModule().assignMembershipCoach.execute({
+      membershipId: activeMembership.membershipId,
+      coachId: coachPick?.profileId ?? null,
+      sessionCount: coachPick && coachSessionCountText.trim() ? Number(coachSessionCountText) : null,
+    });
+
+    setIsSavingCoach(false);
+
+    if (result.isErr) {
+      setCoachError(translateErrorCode(result.error.code));
+      return;
+    }
+    setIsEditingCoach(false);
     void loadDetail();
   }
 
@@ -391,6 +432,48 @@ export default function MemberDetailPage() {
           Save
         </Button>
       </Card>
+
+      {activeMembership ? (
+        <Card className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink">Coach</h2>
+          {isEditingCoach ? (
+            <div className="space-y-3">
+              <StaffPicker selected={coachPick} onSelect={setCoachPick} roleFilter="coach" label="Coach" />
+              {coachPick ? (
+                <TextField
+                  label="Number of Sessions"
+                  type="number"
+                  min={1}
+                  value={coachSessionCountText}
+                  onChange={(e) => setCoachSessionCountText(e.target.value)}
+                />
+              ) : null}
+              {coachError ? <p className="text-sm text-red-400">{coachError}</p> : null}
+              <div className="flex gap-3">
+                <Button onClick={() => void handleSaveCoach()} isLoading={isSavingCoach}>
+                  Save
+                </Button>
+                <Button variant="secondary" onClick={() => setIsEditingCoach(false)} disabled={isSavingCoach}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-ink">
+                {activeMembership.coachFullName
+                  ? `${activeMembership.coachFullName}${
+                      activeMembership.sessionCount ? ` (${activeMembership.sessionCount} sessions)` : ""
+                    }`
+                  : <span className="text-muted">No coach assigned to the current membership.</span>}
+              </p>
+              <Button variant="secondary" onClick={startEditCoach}>
+                {activeMembership.coachFullName ? "Change Coach" : "Assign a Coach"}
+              </Button>
+            </div>
+          )}
+        </Card>
+      ) : null}
 
       <Card>
         <h2 className="mb-4 text-sm font-semibold text-ink">Membership History</h2>
