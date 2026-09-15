@@ -1,11 +1,23 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { getReceptionModule } from "../lib/composition-root";
 import { translateErrorCode } from "../lib/translate-error";
 import { Button } from "./ui/button";
 import { TextField } from "./ui/text-field";
-import { QrScanner } from "./qr-scanner";
+
+// Code-split: the camera + jsQR decode path has no reason to be part of the
+// Dashboard's own bundle — every staff member loads this page on every
+// login, whether or not they ever click "Start Scanning" this session.
+const QrScanner = dynamic(() => import("./qr-scanner").then((mod) => mod.QrScanner), {
+  ssr: false,
+  loading: () => (
+    <div className="flex aspect-square w-full items-center justify-center rounded-card border border-white/10 bg-black">
+      <p className="text-sm text-muted">Starting camera…</p>
+    </div>
+  ),
+});
 
 interface ScanResult {
   isError: boolean;
