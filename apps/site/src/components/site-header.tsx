@@ -18,6 +18,7 @@ export function SiteHeader() {
     { href: "/programs", label: dict.nav.programs },
     { href: "/coaches", label: dict.nav.coaches },
     { href: "/classes", label: dict.nav.classes },
+    { href: "/shop", label: dict.nav.shop },
     { href: "/contact", label: dict.nav.contact },
   ];
 

@@ -82,6 +82,27 @@ export default function MemberDetailPage() {
   const [renewCoach, setRenewCoach] = useState<StaffCandidate | null>(null);
   const [renewSessionCountText, setRenewSessionCountText] = useState("");
 
+  const [isAddPackageOpen, setIsAddPackageOpen] = useState(false);
+  const [addPackageTypeId, setAddPackageTypeId] = useState<string | null>(null);
+  const [addPackageReceiptNumber, setAddPackageReceiptNumber] = useState("");
+  const [addPackagePriceText, setAddPackagePriceText] = useState("");
+  const [addPackageDiscountText, setAddPackageDiscountText] = useState("0");
+  const [addPackageStartDate, setAddPackageStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [addPackagePaymentMethod, setAddPackagePaymentMethod] = useState<PaymentMethod | null>(null);
+  const [addPackageError, setAddPackageError] = useState<string | null>(null);
+  const [isAddingPackage, setIsAddingPackage] = useState(false);
+  const [addPackageSuccess, setAddPackageSuccess] = useState<string | null>(null);
+
+  const [addPackageWantsCoach, setAddPackageWantsCoach] = useState(false);
+  const [addPackageCoach, setAddPackageCoach] = useState<StaffCandidate | null>(null);
+  const [addPackageSessionCountText, setAddPackageSessionCountText] = useState("");
+
+  const [isEditingCoach, setIsEditingCoach] = useState(false);
+  const [coachPick, setCoachPick] = useState<StaffCandidate | null>(null);
+  const [coachSessionCountText, setCoachSessionCountText] = useState("");
+  const [coachError, setCoachError] = useState<string | null>(null);
+  const [isSavingCoach, setIsSavingCoach] = useState(false);
+
   const loadDetail = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -200,6 +221,85 @@ export default function MemberDetailPage() {
     void loadDetail();
   }
 
+  /**
+   * Sells a new, concurrent membership (e.g. a Personal Training package)
+   * alongside whatever the member already has active — unlike Renew, this
+   * never touches their existing membership(s). See
+   * supabase/migrations/20260915000001.
+   */
+  async function handleAddPackage() {
+    if (!addPackageTypeId || !addPackagePaymentMethod) return;
+    setAddPackageError(null);
+    setIsAddingPackage(true);
+
+    const result = await getReceptionModule().sellAdditionalMembership.execute({
+      memberId,
+      membershipTypeId: addPackageTypeId,
+      receiptNumber: addPackageReceiptNumber.trim(),
+      price: Number(addPackagePriceText) || 0,
+      discount: Number(addPackageDiscountText) || 0,
+      startDate: addPackageStartDate,
+      paymentMethod: addPackagePaymentMethod,
+      notes: null,
+      coachId: addPackageWantsCoach ? (addPackageCoach?.profileId ?? null) : null,
+      sessionCount: addPackageWantsCoach && addPackageSessionCountText.trim() ? Number(addPackageSessionCountText) : null,
+    });
+
+    setIsAddingPackage(false);
+
+    if (result.isErr) {
+      setAddPackageError(translateErrorCode(result.error.code));
+      return;
+    }
+
+    setAddPackageSuccess(`Added — new membership ${result.value.membershipNumber}, valid until ${result.value.endDate}.`);
+    setIsAddPackageOpen(false);
+    setAddPackageTypeId(null);
+    setAddPackageReceiptNumber("");
+    setAddPackagePriceText("");
+    setAddPackageDiscountText("0");
+    setAddPackagePaymentMethod(null);
+    setAddPackageWantsCoach(false);
+    setAddPackageCoach(null);
+    setAddPackageSessionCountText("");
+    void loadDetail();
+  }
+
+  const activeMembership = detail?.membershipHistory.find((m) => m.status === "active") ?? null;
+
+  function startEditCoach() {
+    if (!activeMembership) return;
+    setCoachPick(
+      activeMembership.coachId
+        ? { profileId: activeMembership.coachId, fullName: activeMembership.coachFullName, role: "coach", branchId: null, isActive: true }
+        : null,
+    );
+    setCoachSessionCountText(activeMembership.sessionCount ? String(activeMembership.sessionCount) : "");
+    setCoachError(null);
+    setIsEditingCoach(true);
+  }
+
+  async function handleSaveCoach() {
+    if (!activeMembership) return;
+    setCoachError(null);
+    setIsSavingCoach(true);
+
+    const result = await getReceptionModule().assignMembershipCoach.execute({
+      membershipId: activeMembership.membershipId,
+      coachId: coachPick?.profileId ?? null,
+      sessionCount: coachPick && coachSessionCountText.trim() ? Number(coachSessionCountText) : null,
+    });
+
+    setIsSavingCoach(false);
+
+    if (result.isErr) {
+      setCoachError(translateErrorCode(result.error.code));
+      return;
+    }
+    setIsEditingCoach(false);
+    void loadDetail();
+  }
+
   async function handleDelete() {
     setDeleteError(null);
     setIsDeleting(true);
@@ -250,6 +350,9 @@ export default function MemberDetailPage() {
         </Button>
         <Button variant="secondary" onClick={() => setIsRenewOpen((open) => !open)}>
           {isRenewOpen ? "Cancel Renewal" : "Renew Membership"}
+        </Button>
+        <Button variant="secondary" onClick={() => setIsAddPackageOpen((open) => !open)}>
+          {isAddPackageOpen ? "Cancel" : "+ Add Package"}
         </Button>
         {role && CAN_DELETE_MEMBER.has(role) ? (
           <Button variant="danger" onClick={() => setIsDeleteConfirmOpen((open) => !open)}>
@@ -364,6 +467,100 @@ export default function MemberDetailPage() {
         </Card>
       ) : null}
 
+      {addPackageSuccess ? <p className="text-sm text-gold">{addPackageSuccess}</p> : null}
+
+      {isAddPackageOpen ? (
+        <Card className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Add Package</h2>
+            <p className="text-sm text-muted">
+              Sells a new membership (e.g. Personal Training) alongside whatever this member already has active — it
+              doesn&apos;t replace or expire their existing membership.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {membershipTypes.map((type) => (
+              <OptionCard
+                key={type.id}
+                label={type.name}
+                isSelected={addPackageTypeId === type.id}
+                onClick={() => {
+                  setAddPackageTypeId(type.id);
+                  if (!addPackagePriceText && type.price > 0) setAddPackagePriceText(String(type.price));
+                }}
+              />
+            ))}
+          </div>
+          <TextField
+            label="Receipt Number"
+            value={addPackageReceiptNumber}
+            onChange={(e) => setAddPackageReceiptNumber(e.target.value)}
+          />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <TextField label="Price" type="number" value={addPackagePriceText} onChange={(e) => setAddPackagePriceText(e.target.value)} />
+            <TextField
+              label="Discount"
+              type="number"
+              value={addPackageDiscountText}
+              onChange={(e) => setAddPackageDiscountText(e.target.value)}
+            />
+            <TextField
+              label="Start Date"
+              type="date"
+              value={addPackageStartDate}
+              onChange={(e) => setAddPackageStartDate(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            {PAYMENT_METHODS.map((option) => (
+              <OptionCard
+                key={option.value}
+                label={option.label}
+                isSelected={addPackagePaymentMethod === option.value}
+                onClick={() => setAddPackagePaymentMethod(option.value)}
+              />
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              checked={addPackageWantsCoach}
+              onChange={(e) => {
+                setAddPackageWantsCoach(e.target.checked);
+                if (!e.target.checked) {
+                  setAddPackageCoach(null);
+                  setAddPackageSessionCountText("");
+                }
+              }}
+              className="h-4 w-4 accent-gold"
+            />
+            Assign a Coach
+          </label>
+          {addPackageWantsCoach ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <StaffPicker selected={addPackageCoach} onSelect={setAddPackageCoach} roleFilter="coach" label="Coach" />
+              </div>
+              <TextField
+                label="Number of Sessions"
+                type="number"
+                min={1}
+                value={addPackageSessionCountText}
+                onChange={(e) => setAddPackageSessionCountText(e.target.value)}
+              />
+            </div>
+          ) : null}
+          {addPackageError ? <p className="text-sm text-red-400">{addPackageError}</p> : null}
+          <Button
+            onClick={() => void handleAddPackage()}
+            isLoading={isAddingPackage}
+            disabled={!addPackageTypeId || !addPackagePaymentMethod || !addPackageReceiptNumber.trim()}
+          >
+            Confirm
+          </Button>
+        </Card>
+      ) : null}
+
       <Card className="space-y-4">
         <h2 className="text-sm font-semibold text-ink">Member Details</h2>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -391,6 +588,48 @@ export default function MemberDetailPage() {
           Save
         </Button>
       </Card>
+
+      {activeMembership ? (
+        <Card className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink">Coach</h2>
+          {isEditingCoach ? (
+            <div className="space-y-3">
+              <StaffPicker selected={coachPick} onSelect={setCoachPick} roleFilter="coach" label="Coach" />
+              {coachPick ? (
+                <TextField
+                  label="Number of Sessions"
+                  type="number"
+                  min={1}
+                  value={coachSessionCountText}
+                  onChange={(e) => setCoachSessionCountText(e.target.value)}
+                />
+              ) : null}
+              {coachError ? <p className="text-sm text-red-400">{coachError}</p> : null}
+              <div className="flex gap-3">
+                <Button onClick={() => void handleSaveCoach()} isLoading={isSavingCoach}>
+                  Save
+                </Button>
+                <Button variant="secondary" onClick={() => setIsEditingCoach(false)} disabled={isSavingCoach}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-ink">
+                {activeMembership.coachFullName
+                  ? `${activeMembership.coachFullName}${
+                      activeMembership.sessionCount ? ` (${activeMembership.sessionCount} sessions)` : ""
+                    }`
+                  : <span className="text-muted">No coach assigned to the current membership.</span>}
+              </p>
+              <Button variant="secondary" onClick={startEditCoach}>
+                {activeMembership.coachFullName ? "Change Coach" : "Assign a Coach"}
+              </Button>
+            </div>
+          )}
+        </Card>
+      ) : null}
 
       <Card>
         <h2 className="mb-4 text-sm font-semibold text-ink">Membership History</h2>

@@ -17,6 +17,7 @@ interface MembershipHistoryRow {
   payment_method: PaymentMethod;
   status: MembershipStatus;
   session_count: number | null;
+  coach_id: string | null;
   // Both to-one embeds (the FK is on `memberships`, pointing at
   // membership_types/profiles) — see the comment at the call site for why
   // this is cast rather than trusted from supabase-js's own inference.
@@ -35,7 +36,7 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
          emergency_contact_name, emergency_contact_phone, address, notes,
          memberships (
            id, membership_number, start_date, end_date, price, discount, final_price,
-           payment_method, status, session_count, membership_types (name), coach:profiles!memberships_coach_id_fkey (full_name)
+           payment_method, status, session_count, coach_id, membership_types (name), coach:profiles!memberships_coach_id_fkey (full_name)
          )`,
       )
       .eq("id", memberId)
@@ -85,6 +86,7 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
         finalPrice: m.final_price,
         paymentMethod: m.payment_method,
         status: m.status,
+        coachId: m.coach_id,
         coachFullName: m.coach?.full_name ?? null,
         sessionCount: m.session_count,
       })),

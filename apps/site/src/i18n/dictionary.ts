@@ -8,6 +8,7 @@ export interface Dictionary {
     coaches: string;
     classes: string;
     contact: string;
+    shop: string;
     bookTrial: string;
     staffLogin: string;
   };
@@ -91,6 +92,63 @@ export interface Dictionary {
     contact: { title: string; description: string };
     trial: { title: string; description: string; formName: string; formPhone: string; formProgram: string; formDate: string; formTime: string; formNotes: string; formSubmit: string };
   };
+  shop: {
+    pageTitle: string;
+    pageDescription: string;
+    hero: { kicker: string; headline: string; sub: string };
+    sampleNotice: string;
+    categoriesHeading: string;
+    featuredHeading: string;
+    newArrivalsHeading: string;
+    merchHeading: string;
+    allCategories: string;
+    categories: { boxing: string; apparel: string; accessories: string; trainingGear: string; merch: string };
+    categoryComingSoon: string;
+    badge: { new: string; bestSeller: string; limited: string };
+    priceComingSoon: string;
+    available: string;
+    unavailable: string;
+    viewProduct: string;
+    backToShop: string;
+    imageComingSoon: string;
+    product: {
+      category: string;
+      description: string;
+      size: string;
+      color: string;
+      quantity: string;
+      availability: string;
+      addToCart: string;
+      addedToCart: string;
+      whatsappOrder: string;
+    };
+    cart: {
+      heading: string;
+      subtotal: string;
+      total: string;
+      items: string;
+      clear: string;
+      remove: string;
+      empty: string;
+      continueShopping: string;
+      checkoutWhatsapp: string;
+      priceUnknownNotice: string;
+    };
+    empty: {
+      noProducts: string;
+      productUnavailable: string;
+      emptyCart: string;
+      failedLoading: string;
+    };
+    whatsappMessage: {
+      title: string;
+      product: string;
+      variant: string;
+      quantity: string;
+      total: string;
+      confirmLine: string;
+    };
+  };
 }
 
 export const dictionaries: Record<Locale, Dictionary> = {
@@ -101,6 +159,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       coaches: "Coaches",
       classes: "Classes",
       contact: "Contact",
+      shop: "Shop",
       bookTrial: "Book a Free Trial",
       staffLogin: "Staff Login",
     },
@@ -216,6 +275,73 @@ export const dictionaries: Record<Locale, Dictionary> = {
         formSubmit: "Request My Free Trial",
       },
     },
+    shop: {
+      pageTitle: "Shop",
+      pageDescription: "9th Round Shop — boxing equipment, training gear, and 9th Round branded apparel and merchandise.",
+      hero: {
+        kicker: "9TH ROUND SHOP",
+        headline: "Train Like You Mean It.",
+        sub: "Gear built for training, performance, and the 9th Round lifestyle.",
+      },
+      sampleNotice: "Sample catalog — this is a preview of the shop experience. Real products are coming soon.",
+      categoriesHeading: "Categories",
+      featuredHeading: "Featured",
+      newArrivalsHeading: "New Arrivals",
+      merchHeading: "9th Round Merch",
+      allCategories: "All",
+      categories: {
+        boxing: "Boxing",
+        apparel: "Apparel",
+        accessories: "Accessories",
+        trainingGear: "Training Gear",
+        merch: "9th Round Merch",
+      },
+      categoryComingSoon: "More coming soon.",
+      badge: { new: "New", bestSeller: "Best Seller", limited: "Limited" },
+      priceComingSoon: "Price coming soon",
+      available: "Available",
+      unavailable: "Currently unavailable",
+      viewProduct: "View",
+      backToShop: "Back to Shop",
+      imageComingSoon: "Product image coming soon",
+      product: {
+        category: "Category",
+        description: "Description",
+        size: "Size",
+        color: "Color",
+        quantity: "Quantity",
+        availability: "Availability",
+        addToCart: "Add to Cart",
+        addedToCart: "Added to cart",
+        whatsappOrder: "Order via WhatsApp",
+      },
+      cart: {
+        heading: "Your Cart",
+        subtotal: "Subtotal",
+        total: "Total",
+        items: "items",
+        clear: "Clear Cart",
+        remove: "Remove",
+        empty: "Your cart is empty.",
+        continueShopping: "Continue Shopping",
+        checkoutWhatsapp: "Order via WhatsApp",
+        priceUnknownNotice: "Some items are priced on confirmation — final total will be confirmed on WhatsApp.",
+      },
+      empty: {
+        noProducts: "Products coming soon.",
+        productUnavailable: "Currently unavailable.",
+        emptyCart: "Your cart is empty.",
+        failedLoading: "Something went wrong. Please try again.",
+      },
+      whatsappMessage: {
+        title: "9th Round Shop Order",
+        product: "Product:",
+        variant: "Variant:",
+        quantity: "Quantity:",
+        total: "Total:",
+        confirmLine: "Please confirm availability and delivery details.",
+      },
+    },
   },
   ar: {
     nav: {
@@ -224,6 +350,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       coaches: "المدربين",
       classes: "المواعيد",
       contact: "تواصل",
+      shop: "المتجر",
       bookTrial: "احجز حصة تجريبية",
       staffLogin: "دخول الموظفين",
     },
@@ -337,6 +464,73 @@ export const dictionaries: Record<Locale, Dictionary> = {
         formTime: "الوقت المفضل",
         formNotes: "ملاحظات (اختياري)",
         formSubmit: "اطلب حصتي المجانية",
+      },
+    },
+    shop: {
+      pageTitle: "المتجر",
+      pageDescription: "متجر 9th Round — معدات بوكس، أدوات تدريب، وملابس وميرتشاندايز 9th Round.",
+      hero: {
+        kicker: "9TH ROUND SHOP",
+        headline: "Train Like You Mean It.",
+        sub: "معدات مصممة للتدريب، الأداء، وأسلوب حياة 9th Round.",
+      },
+      sampleNotice: "كتالوج تجريبي — ده معاينة لتجربة المتجر. المنتجات الحقيقية جاية قريبًا.",
+      categoriesHeading: "الفئات",
+      featuredHeading: "مميز",
+      newArrivalsHeading: "وصل حديثًا",
+      merchHeading: "ميرتشاندايز 9th Round",
+      allCategories: "الكل",
+      categories: {
+        boxing: "بوكس",
+        apparel: "ملابس",
+        accessories: "إكسسوارات",
+        trainingGear: "معدات تدريب",
+        merch: "ميرتشاندايز 9th Round",
+      },
+      categoryComingSoon: "المزيد قريبًا.",
+      badge: { new: "جديد", bestSeller: "الأكتر مبيعًا", limited: "كمية محدودة" },
+      priceComingSoon: "السعر هيتحدد قريبًا",
+      available: "متاح",
+      unavailable: "مش متاح حاليًا",
+      viewProduct: "عرض",
+      backToShop: "رجوع للمتجر",
+      imageComingSoon: "صورة المنتج هتتضاف قريبًا",
+      product: {
+        category: "الفئة",
+        description: "الوصف",
+        size: "المقاس",
+        color: "اللون",
+        quantity: "الكمية",
+        availability: "التوافر",
+        addToCart: "أضف للسلة",
+        addedToCart: "اتضاف للسلة",
+        whatsappOrder: "اطلب عبر واتساب",
+      },
+      cart: {
+        heading: "سلتك",
+        subtotal: "الإجمالي الفرعي",
+        total: "الإجمالي",
+        items: "منتجات",
+        clear: "افرغ السلة",
+        remove: "إزالة",
+        empty: "سلتك فاضية.",
+        continueShopping: "كمل تسوق",
+        checkoutWhatsapp: "اطلب عبر واتساب",
+        priceUnknownNotice: "بعض المنتجات سعرها هيتأكد بعدين — الإجمالي النهائي هيتأكد على الواتساب.",
+      },
+      empty: {
+        noProducts: "المنتجات هتتضاف قريبًا.",
+        productUnavailable: "مش متاح حاليًا.",
+        emptyCart: "سلتك فاضية.",
+        failedLoading: "حصل خطأ. حاول تاني.",
+      },
+      whatsappMessage: {
+        title: "طلب من متجر 9th Round",
+        product: "المنتج:",
+        variant: "التفاصيل:",
+        quantity: "الكمية:",
+        total: "الإجمالي:",
+        confirmLine: "من فضلك أكد التوافر وتفاصيل التوصيل.",
       },
     },
   },

@@ -5,7 +5,6 @@ import type { RecentCheckInEntry } from "@9thround/reception";
 import { getReceptionModule } from "../../../src/lib/composition-root";
 import { ReceiptsCalendar, monthRange, toDateKey } from "../../../src/components/receipts-calendar";
 import { Button } from "../../../src/components/ui/button";
-import { Card } from "../../../src/components/ui/card";
 
 const today = new Date();
 
