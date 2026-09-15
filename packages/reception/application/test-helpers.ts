@@ -8,6 +8,8 @@ import type { MemberSearchRepository } from "../domain/member-search-repository"
 import type { MemberSearchResult } from "../domain/member-search-result";
 import type { RenewalRepository } from "../domain/renewal-repository";
 import type { RenewMembershipInput, RenewMembershipOutput } from "../domain/renewal";
+import type { AdditionalMembershipRepository } from "../domain/additional-membership-repository";
+import type { SellAdditionalMembershipInput, SellAdditionalMembershipOutput } from "../domain/additional-membership";
 import type { MemberDetailRepository } from "../domain/member-detail-repository";
 import type { MemberDetail } from "../domain/member-detail";
 import type { UpdateMemberRepository } from "../domain/update-member-repository";
@@ -152,6 +154,48 @@ export function fakeRenewalRepository(output: Partial<RenewMembershipOutput> = {
       membershipNumber: "9R-000002",
       startDate: "2026-08-06",
       endDate: "2026-09-05",
+      ...output,
+    }),
+  );
+}
+
+export function buildSellAdditionalMembershipInput(
+  overrides: Partial<SellAdditionalMembershipInput> = {},
+): SellAdditionalMembershipInput {
+  return {
+    memberId: "member-1",
+    membershipTypeId: "type-pt",
+    receiptNumber: "RCPT-0003",
+    price: 1200,
+    discount: 0,
+    startDate: "2026-09-15",
+    paymentMethod: "cash",
+    notes: null,
+    coachId: null,
+    sessionCount: null,
+    ...overrides,
+  };
+}
+
+export class FakeAdditionalMembershipRepository implements AdditionalMembershipRepository {
+  public lastInput: SellAdditionalMembershipInput | null = null;
+  constructor(private result: Result<SellAdditionalMembershipOutput>) {}
+
+  async sell(input: SellAdditionalMembershipInput): Promise<Result<SellAdditionalMembershipOutput>> {
+    this.lastInput = input;
+    return this.result;
+  }
+}
+
+export function fakeAdditionalMembershipRepository(
+  output: Partial<SellAdditionalMembershipOutput> = {},
+): FakeAdditionalMembershipRepository {
+  return new FakeAdditionalMembershipRepository(
+    ok({
+      membershipId: "membership-3",
+      membershipNumber: "9R-000003",
+      startDate: "2026-09-15",
+      endDate: "2026-10-15",
       ...output,
     }),
   );
