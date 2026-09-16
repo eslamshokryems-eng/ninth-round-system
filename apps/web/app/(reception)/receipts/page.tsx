@@ -1,15 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Receipt } from "@9thround/reception";
+import type { ProgramType, Receipt } from "@9thround/reception";
+import type { StaffCandidate } from "@9thround/identity";
 import { useAuthStore } from "../../../src/features/auth/store";
 import { getReceptionModule } from "../../../src/lib/composition-root";
 import { ReceiptsCalendar, monthRange, toDateKey } from "../../../src/components/receipts-calendar";
 import { Button } from "../../../src/components/ui/button";
 import { Card } from "../../../src/components/ui/card";
 import { TextField } from "../../../src/components/ui/text-field";
+import { OptionCard } from "../../../src/components/ui/option-card";
+import { StaffPicker } from "../../../src/components/staff-picker";
 
 const today = new Date();
+
+const PROGRAM_TYPES: { value: ProgramType; label: string }[] = [
+  { value: "ninth_round", label: "9th Round" },
+  { value: "boxing", label: "Boxing" },
+  { value: "kickboxing", label: "Kickboxing" },
+  { value: "mma", label: "MMA" },
+];
+
+function programLabel(programType: ProgramType | null): string {
+  return PROGRAM_TYPES.find((option) => option.value === programType)?.label ?? "—";
+}
 
 /** Receipts (Phase 5, "Payments / Receipts") — a calendar of daily income for the displayed month; select one or more days to total just those, and the table below follows the selection. Real data from membership_payments, no mock numbers. */
 export default function ReceiptsPage() {
@@ -27,19 +41,28 @@ export default function ReceiptsPage() {
   const [isSavingDate, setIsSavingDate] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [filterProgramType, setFilterProgramType] = useState<ProgramType | null>(null);
+  const [filterCoach, setFilterCoach] = useState<StaffCandidate | null>(null);
+
   const load = useCallback(async () => {
     if (!branchId) return;
     setIsLoading(true);
     setErrorMessage(null);
     const { startDate, endDate } = monthRange(year, month);
-    const result = await getReceptionModule().listReceiptsByDateRange.execute({ branchId, startDate, endDate });
+    const result = await getReceptionModule().listReceiptsByDateRange.execute({
+      branchId,
+      startDate,
+      endDate,
+      programType: filterProgramType,
+      coachId: filterCoach?.profileId ?? null,
+    });
     setIsLoading(false);
     if (result.isErr) {
       setErrorMessage("Could not load receipts.");
       return;
     }
     setReceipts(result.value);
-  }, [branchId, year, month]);
+  }, [branchId, year, month, filterProgramType, filterCoach]);
 
   useEffect(() => {
     void load();
@@ -147,6 +170,38 @@ export default function ReceiptsPage() {
         </div>
       </div>
 
+      <Card className="mb-6 space-y-3">
+        <p className="text-xs font-medium text-muted">Filter by Program and/or Coach — combinable, future coach-commission reporting.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted">Program</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PROGRAM_TYPES.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  label={option.label}
+                  isSelected={filterProgramType === option.value}
+                  onClick={() => setFilterProgramType((current) => (current === option.value ? null : option.value))}
+                />
+              ))}
+            </div>
+          </div>
+          <StaffPicker selected={filterCoach} onSelect={setFilterCoach} roleFilter="coach" label="Coach" />
+        </div>
+        {filterProgramType || filterCoach ? (
+          <Button
+            variant="ghost"
+            className="!px-3 !py-1 text-xs"
+            onClick={() => {
+              setFilterProgramType(null);
+              setFilterCoach(null);
+            }}
+          >
+            Clear filters
+          </Button>
+        ) : null}
+      </Card>
+
       {isLoading ? (
         <p className="text-muted">Loading…</p>
       ) : errorMessage ? (
@@ -162,6 +217,8 @@ export default function ReceiptsPage() {
                 <th className="px-4 py-3">Member</th>
                 <th className="px-4 py-3">Receipt #</th>
                 <th className="px-4 py-3">Membership #</th>
+                <th className="px-4 py-3">Program</th>
+                <th className="px-4 py-3">Coach</th>
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3 text-right">Amount</th>
               </tr>
@@ -213,6 +270,8 @@ export default function ReceiptsPage() {
                   <td className="px-4 py-3 text-ink">{receipt.memberFullName}</td>
                   <td className="px-4 py-3 text-muted">{receipt.receiptNumber}</td>
                   <td className="px-4 py-3 text-muted">{receipt.membershipNumber}</td>
+                  <td className="px-4 py-3 text-muted">{programLabel(receipt.programType)}</td>
+                  <td className="px-4 py-3 text-muted">{receipt.coachFullName ?? "—"}</td>
                   <td className="px-4 py-3 text-muted capitalize">{receipt.paymentMethod.replace("_", " ")}</td>
                   <td className="px-4 py-3 text-right font-medium text-gold">{receipt.amount.toLocaleString()} EGP</td>
                 </tr>

@@ -72,6 +72,7 @@ export function buildRegisterMembershipInput(
     photoUrl: null,
     coachId: null,
     sessionCount: null,
+    programType: null,
     ...overrides,
   };
 }
@@ -133,6 +134,7 @@ export function buildRenewMembershipInput(overrides: Partial<RenewMembershipInpu
     notes: null,
     coachId: null,
     sessionCount: null,
+    programType: null,
     ...overrides,
   };
 }
@@ -173,6 +175,7 @@ export function buildSellAdditionalMembershipInput(
     notes: null,
     coachId: null,
     sessionCount: null,
+    programType: null,
     ...overrides,
   };
 }

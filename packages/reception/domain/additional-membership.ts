@@ -1,4 +1,4 @@
-import type { PaymentMethod } from "./registration";
+import type { PaymentMethod, ProgramType } from "./registration";
 
 /**
  * Sells a new, concurrent membership to an existing member — e.g. a
@@ -19,6 +19,7 @@ export interface SellAdditionalMembershipInput {
   notes: string | null;
   coachId: string | null;
   sessionCount: number | null;
+  programType: ProgramType | null;
 }
 
 export interface SellAdditionalMembershipOutput {

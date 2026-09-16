@@ -1,4 +1,4 @@
-import type { Gender, PaymentMethod } from "./registration";
+import type { Gender, PaymentMethod, ProgramType } from "./registration";
 import type { MembershipStatus } from "./member-search-result";
 
 export interface MembershipHistoryEntry {
@@ -15,6 +15,7 @@ export interface MembershipHistoryEntry {
   coachId: string | null;
   coachFullName: string | null;
   sessionCount: number | null;
+  programType: ProgramType | null;
 }
 
 export interface MemberDetail {

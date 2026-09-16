@@ -3,7 +3,7 @@ import type { Result } from "@9thround/shared-kernel";
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import type { MemberDetailRepository } from "../domain/member-detail-repository";
 import type { MemberDetail } from "../domain/member-detail";
-import type { PaymentMethod } from "../domain/registration";
+import type { PaymentMethod, ProgramType } from "../domain/registration";
 import type { MembershipStatus } from "../domain/member-search-result";
 
 interface MembershipHistoryRow {
@@ -18,6 +18,7 @@ interface MembershipHistoryRow {
   status: MembershipStatus;
   session_count: number | null;
   coach_id: string | null;
+  program_type: ProgramType | null;
   // Both to-one embeds (the FK is on `memberships`, pointing at
   // membership_types/profiles) — see the comment at the call site for why
   // this is cast rather than trusted from supabase-js's own inference.
@@ -36,7 +37,7 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
          emergency_contact_name, emergency_contact_phone, address, notes,
          memberships (
            id, membership_number, start_date, end_date, price, discount, final_price,
-           payment_method, status, session_count, coach_id, membership_types (name), coach:profiles!memberships_coach_id_fkey (full_name)
+           payment_method, status, session_count, coach_id, program_type, membership_types (name), coach:profiles!memberships_coach_id_fkey (full_name)
          )`,
       )
       .eq("id", memberId)
@@ -89,6 +90,7 @@ export class SupabaseMemberDetailRepository implements MemberDetailRepository {
         coachId: m.coach_id,
         coachFullName: m.coach?.full_name ?? null,
         sessionCount: m.session_count,
+        programType: m.program_type,
       })),
     });
   }

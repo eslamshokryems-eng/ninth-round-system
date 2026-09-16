@@ -58,6 +58,7 @@ export type { MemberSearchResult, MembershipStatus } from "./domain/member-searc
 export type {
   Gender,
   PaymentMethod,
+  ProgramType,
   RegisterMembershipInput,
   RegisterMembershipOutput,
 } from "./domain/registration";

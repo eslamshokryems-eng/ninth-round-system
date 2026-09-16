@@ -2,10 +2,10 @@ import { domainError, err, ok } from "@9thround/shared-kernel";
 import type { Result } from "@9thround/shared-kernel";
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import type { ReceiptRepository } from "../domain/receipt-repository";
-import type { Receipt } from "../domain/receipt";
+import type { Receipt, ReceiptFilters } from "../domain/receipt";
 
 const RECEIPT_COLUMNS = `id, payment_date, amount, payment_method,
-         memberships!inner (branch_id, receipt_number, membership_number, members (full_name))`;
+         memberships!inner (branch_id, receipt_number, membership_number, program_type, coach_id, members (full_name), coach:profiles!memberships_coach_id_fkey (full_name))`;
 
 interface ReceiptRow {
   id: string;
@@ -15,7 +15,10 @@ interface ReceiptRow {
   memberships: {
     receipt_number: string;
     membership_number: string;
+    program_type: Receipt["programType"];
+    coach_id: string | null;
     members: { full_name: string };
+    coach: { full_name: string | null } | null;
   };
 }
 
@@ -36,6 +39,9 @@ function toReceipt(row: ReceiptRow): Receipt {
     amount: row.amount,
     paymentMethod: row.payment_method,
     paymentDate: row.payment_date,
+    programType: membership?.program_type ?? null,
+    coachId: membership?.coach_id ?? null,
+    coachFullName: membership?.coach?.full_name ?? null,
   };
 }
 
@@ -65,15 +71,27 @@ export class SupabaseReceiptRepository implements ReceiptRepository {
     return ok((data as unknown as ReceiptRow[]).map(toReceipt));
   }
 
-  async listByDateRange(branchId: string, startDate: string, endDate: string): Promise<Result<Receipt[]>> {
-    const { data, error } = await this.client
+  async listByDateRange(
+    branchId: string,
+    startDate: string,
+    endDate: string,
+    filters: ReceiptFilters = {},
+  ): Promise<Result<Receipt[]>> {
+    let query = this.client
       .from("membership_payments")
       .select(RECEIPT_COLUMNS)
       .eq("memberships.branch_id", branchId)
       .gte("payment_date", startDate)
-      .lte("payment_date", `${endDate}T23:59:59.999`)
-      .order("payment_date", { ascending: true })
-      .limit(1000);
+      .lte("payment_date", `${endDate}T23:59:59.999`);
+
+    if (filters.programType) {
+      query = query.eq("memberships.program_type", filters.programType);
+    }
+    if (filters.coachId) {
+      query = query.eq("memberships.coach_id", filters.coachId);
+    }
+
+    const { data, error } = await query.order("payment_date", { ascending: true }).limit(1000);
 
     if (error) {
       return err(domainError("LIST_RECEIPTS_FAILED", error.message));

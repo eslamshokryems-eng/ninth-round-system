@@ -22,6 +22,7 @@ describe("GetMemberDetailUseCase", () => {
           coachId: null,
           coachFullName: null,
           sessionCount: null,
+          programType: null,
         },
       ],
     });

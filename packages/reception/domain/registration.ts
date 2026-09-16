@@ -1,5 +1,7 @@
 export type Gender = "female" | "male" | "unspecified";
 export type PaymentMethod = "cash" | "visa" | "instapay" | "vodafone_cash";
+/** The sport/program a membership is for — orthogonal to MembershipType (duration/price package). Never backfilled on historical rows; null means unclassified. */
+export type ProgramType = "ninth_round" | "boxing" | "kickboxing" | "mma";
 
 export interface RegisterMembershipInput {
   branchId: string;
@@ -22,6 +24,7 @@ export interface RegisterMembershipInput {
   /** No usage tracking — a plain recorded number, see supabase/migrations/20260812000002_membership_coach_assignment.sql. */
   coachId: string | null;
   sessionCount: number | null;
+  programType: ProgramType | null;
 }
 
 export interface RegisterMembershipOutput {

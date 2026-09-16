@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import type { CheckInHistoryEntry, Gender, MemberDetail, MembershipType, PaymentMethod } from "@9thround/reception";
+import type { CheckInHistoryEntry, Gender, MemberDetail, MembershipType, PaymentMethod, ProgramType } from "@9thround/reception";
 import type { StaffCandidate } from "@9thround/identity";
 import { useAuthStore } from "../../../../src/features/auth/store";
 import { getReceptionModule } from "../../../../src/lib/composition-root";
@@ -29,6 +29,17 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "instapay", label: "Instapay" },
   { value: "vodafone_cash", label: "Vodafone Cash" },
 ];
+
+const PROGRAM_TYPES: { value: ProgramType; label: string }[] = [
+  { value: "ninth_round", label: "9th Round" },
+  { value: "boxing", label: "Boxing" },
+  { value: "kickboxing", label: "Kickboxing" },
+  { value: "mma", label: "MMA" },
+];
+
+function programLabel(programType: ProgramType | null): string {
+  return PROGRAM_TYPES.find((option) => option.value === programType)?.label ?? "—";
+}
 
 export default function MemberDetailPage() {
   const params = useParams<{ memberId: string }>();
@@ -81,6 +92,7 @@ export default function MemberDetailPage() {
   const [renewWantsCoach, setRenewWantsCoach] = useState(false);
   const [renewCoach, setRenewCoach] = useState<StaffCandidate | null>(null);
   const [renewSessionCountText, setRenewSessionCountText] = useState("");
+  const [renewProgramType, setRenewProgramType] = useState<ProgramType | null>(null);
 
   const [isAddPackageOpen, setIsAddPackageOpen] = useState(false);
   const [addPackageTypeId, setAddPackageTypeId] = useState<string | null>(null);
@@ -96,10 +108,12 @@ export default function MemberDetailPage() {
   const [addPackageWantsCoach, setAddPackageWantsCoach] = useState(false);
   const [addPackageCoach, setAddPackageCoach] = useState<StaffCandidate | null>(null);
   const [addPackageSessionCountText, setAddPackageSessionCountText] = useState("");
+  const [addPackageProgramType, setAddPackageProgramType] = useState<ProgramType | null>(null);
 
   const [isEditingCoach, setIsEditingCoach] = useState(false);
   const [coachPick, setCoachPick] = useState<StaffCandidate | null>(null);
   const [coachSessionCountText, setCoachSessionCountText] = useState("");
+  const [coachProgramType, setCoachProgramType] = useState<ProgramType | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
   const [isSavingCoach, setIsSavingCoach] = useState(false);
 
@@ -204,6 +218,7 @@ export default function MemberDetailPage() {
       notes: null,
       coachId: renewWantsCoach ? (renewCoach?.profileId ?? null) : null,
       sessionCount: renewWantsCoach && renewSessionCountText.trim() ? Number(renewSessionCountText) : null,
+      programType: renewProgramType,
     });
 
     setIsRenewing(false);
@@ -218,6 +233,7 @@ export default function MemberDetailPage() {
     setRenewWantsCoach(false);
     setRenewCoach(null);
     setRenewSessionCountText("");
+    setRenewProgramType(null);
     void loadDetail();
   }
 
@@ -243,6 +259,7 @@ export default function MemberDetailPage() {
       notes: null,
       coachId: addPackageWantsCoach ? (addPackageCoach?.profileId ?? null) : null,
       sessionCount: addPackageWantsCoach && addPackageSessionCountText.trim() ? Number(addPackageSessionCountText) : null,
+      programType: addPackageProgramType,
     });
 
     setIsAddingPackage(false);
@@ -262,6 +279,7 @@ export default function MemberDetailPage() {
     setAddPackageWantsCoach(false);
     setAddPackageCoach(null);
     setAddPackageSessionCountText("");
+    setAddPackageProgramType(null);
     void loadDetail();
   }
 
@@ -275,6 +293,7 @@ export default function MemberDetailPage() {
         : null,
     );
     setCoachSessionCountText(activeMembership.sessionCount ? String(activeMembership.sessionCount) : "");
+    setCoachProgramType(activeMembership.programType);
     setCoachError(null);
     setIsEditingCoach(true);
   }
@@ -288,6 +307,7 @@ export default function MemberDetailPage() {
       membershipId: activeMembership.membershipId,
       coachId: coachPick?.profileId ?? null,
       sessionCount: coachPick && coachSessionCountText.trim() ? Number(coachSessionCountText) : null,
+      programType: coachProgramType,
     });
 
     setIsSavingCoach(false);
@@ -427,6 +447,19 @@ export default function MemberDetailPage() {
               />
             ))}
           </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted">Program</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PROGRAM_TYPES.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  label={option.label}
+                  isSelected={renewProgramType === option.value}
+                  onClick={() => setRenewProgramType((current) => (current === option.value ? null : option.value))}
+                />
+              ))}
+            </div>
+          </div>
           <label className="flex items-center gap-2 text-sm font-medium text-ink">
             <input
               type="checkbox"
@@ -521,6 +554,21 @@ export default function MemberDetailPage() {
               />
             ))}
           </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted">Program</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PROGRAM_TYPES.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  label={option.label}
+                  isSelected={addPackageProgramType === option.value}
+                  onClick={() =>
+                    setAddPackageProgramType((current) => (current === option.value ? null : option.value))
+                  }
+                />
+              ))}
+            </div>
+          </div>
           <label className="flex items-center gap-2 text-sm font-medium text-ink">
             <input
               type="checkbox"
@@ -591,9 +639,22 @@ export default function MemberDetailPage() {
 
       {activeMembership ? (
         <Card className="space-y-3">
-          <h2 className="text-sm font-semibold text-ink">Coach</h2>
+          <h2 className="text-sm font-semibold text-ink">Program &amp; Coach</h2>
           {isEditingCoach ? (
             <div className="space-y-3">
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted">Program</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {PROGRAM_TYPES.map((option) => (
+                    <OptionCard
+                      key={option.value}
+                      label={option.label}
+                      isSelected={coachProgramType === option.value}
+                      onClick={() => setCoachProgramType((current) => (current === option.value ? null : option.value))}
+                    />
+                  ))}
+                </div>
+              </div>
               <StaffPicker selected={coachPick} onSelect={setCoachPick} roleFilter="coach" label="Coach" />
               {coachPick ? (
                 <TextField
@@ -617,6 +678,8 @@ export default function MemberDetailPage() {
           ) : (
             <div className="flex items-center justify-between">
               <p className="text-sm text-ink">
+                {programLabel(activeMembership.programType)}
+                {" — "}
                 {activeMembership.coachFullName
                   ? `${activeMembership.coachFullName}${
                       activeMembership.sessionCount ? ` (${activeMembership.sessionCount} sessions)` : ""
@@ -624,7 +687,7 @@ export default function MemberDetailPage() {
                   : <span className="text-muted">No coach assigned to the current membership.</span>}
               </p>
               <Button variant="secondary" onClick={startEditCoach}>
-                {activeMembership.coachFullName ? "Change Coach" : "Assign a Coach"}
+                {activeMembership.coachFullName ? "Change" : "Assign"}
               </Button>
             </div>
           )}
@@ -641,6 +704,7 @@ export default function MemberDetailPage() {
               <thead className="text-xs uppercase text-muted">
                 <tr>
                   <th className="py-2 pr-4">Type</th>
+                  <th className="py-2 pr-4">Program</th>
                   <th className="py-2 pr-4">Number</th>
                   <th className="py-2 pr-4">Period</th>
                   <th className="py-2 pr-4">Price</th>
@@ -653,6 +717,7 @@ export default function MemberDetailPage() {
                 {detail.membershipHistory.map((entry) => (
                   <tr key={entry.membershipId} className="border-t border-white/5">
                     <td className="py-2 pr-4">{entry.membershipTypeName}</td>
+                    <td className="py-2 pr-4 text-muted">{programLabel(entry.programType)}</td>
                     <td className="py-2 pr-4 text-muted">{entry.membershipNumber}</td>
                     <td className="py-2 pr-4 text-muted">
                       {entry.startDate} → {entry.endDate}

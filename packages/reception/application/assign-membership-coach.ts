@@ -1,17 +1,19 @@
 import type { Result, UseCase } from "@9thround/shared-kernel";
 import type { MembershipCoachRepository } from "../domain/membership-coach-repository";
+import type { ProgramType } from "../domain/registration";
 
 export interface AssignMembershipCoachInput {
   membershipId: string;
   coachId: string | null;
   sessionCount: number | null;
+  programType: ProgramType | null;
 }
 
-/** Assigns, changes, or clears the coach on an existing membership (not tied to registration/renewal). */
+/** Assigns, changes, or clears the coach and/or program on an existing membership (not tied to registration/renewal). */
 export class AssignMembershipCoachUseCase implements UseCase<AssignMembershipCoachInput, void> {
   constructor(private readonly memberships: MembershipCoachRepository) {}
 
   async execute(input: AssignMembershipCoachInput): Promise<Result<void>> {
-    return this.memberships.assignCoach(input.membershipId, input.coachId, input.sessionCount);
+    return this.memberships.assignCoach(input.membershipId, input.coachId, input.sessionCount, input.programType);
   }
 }
