@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import type { Gender, MembershipType, PaymentMethod } from "@9thround/reception";
+import type { Gender, MembershipType, PaymentMethod, ProgramType } from "@9thround/reception";
 import type { StaffCandidate } from "@9thround/identity";
 import { useAuthStore } from "../../../../src/features/auth/store";
 import { getReceptionModule } from "../../../../src/lib/composition-root";
@@ -25,6 +25,13 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "visa", label: "Visa" },
   { value: "instapay", label: "Instapay" },
   { value: "vodafone_cash", label: "Vodafone Cash" },
+];
+
+const PROGRAM_TYPES: { value: ProgramType; label: string }[] = [
+  { value: "ninth_round", label: "9th Round" },
+  { value: "boxing", label: "Boxing" },
+  { value: "kickboxing", label: "Kickboxing" },
+  { value: "mma", label: "MMA" },
 ];
 
 function todayIso(): string {
@@ -72,6 +79,7 @@ export default function AddMemberPage() {
   const [wantsCoach, setWantsCoach] = useState(false);
   const [coach, setCoach] = useState<StaffCandidate | null>(null);
   const [sessionCountText, setSessionCountText] = useState("");
+  const [programType, setProgramType] = useState<ProgramType | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -179,6 +187,7 @@ export default function AddMemberPage() {
       photoUrl,
       coachId: wantsCoach ? (coach?.profileId ?? null) : null,
       sessionCount: wantsCoach && sessionCountText.trim() ? Number(sessionCountText) : null,
+      programType,
     });
 
     setIsSaving(false);
@@ -286,6 +295,20 @@ export default function AddMemberPage() {
         <div className="flex items-center justify-between rounded-lg bg-black/30 px-4 py-3">
           <span className="text-sm text-muted">Final Price</span>
           <span className="text-lg font-semibold text-gold">{finalPrice.toLocaleString()} EGP</span>
+        </div>
+      </Card>
+
+      <Card className="space-y-4">
+        <h2 className="text-sm font-semibold text-ink">Program</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {PROGRAM_TYPES.map((option) => (
+            <OptionCard
+              key={option.value}
+              label={option.label}
+              isSelected={programType === option.value}
+              onClick={() => setProgramType((current) => (current === option.value ? null : option.value))}
+            />
+          ))}
         </div>
       </Card>
 

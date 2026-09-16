@@ -82,10 +82,12 @@ export default function RenewMembershipScreen() {
       discount,
       paymentMethod,
       notes: notes.trim() || null,
-      // Coach assignment (supabase/migrations/20260812000002) is a
-      // web-only Reception feature for now — no mobile UI for it yet.
+      // Coach assignment (supabase/migrations/20260812000002) and Program
+      // classification (supabase/migrations/20260916000001) are web-only
+      // Reception features for now — no mobile UI for either yet.
       coachId: null,
       sessionCount: null,
+      programType: null,
     });
 
     setIsSaving(false);

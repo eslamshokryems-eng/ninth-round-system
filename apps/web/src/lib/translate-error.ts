@@ -18,6 +18,8 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   INVALID_DISCOUNT: "Discount must be between 0 and the price.",
   PHONE_ALREADY_REGISTERED: "This phone number is already registered to another member.",
   RECEIPT_NUMBER_TAKEN: "This receipt number has already been used.",
+  ACTIVE_MEMBERSHIP_OF_TYPE_EXISTS: "This member already has an active membership of this type.",
+  SELL_ADDITIONAL_MEMBERSHIP_FAILED: "Could not add this package. Please try again.",
   NOT_AUTHORIZED_FOR_BRANCH:
     "Your account cannot register members right now — it may be inactive, or assigned to a different branch. Check Manage Staff, or contact your Branch Manager or Super Admin.",
   DELETE_MEMBER_FAILED: "Could not delete this member. Only Branch Manager and Super Admin accounts can delete members.",

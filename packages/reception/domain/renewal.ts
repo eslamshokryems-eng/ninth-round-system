@@ -1,4 +1,4 @@
-import type { PaymentMethod } from "./registration";
+import type { PaymentMethod, ProgramType } from "./registration";
 
 export interface RenewMembershipInput {
   memberId: string;
@@ -10,6 +10,7 @@ export interface RenewMembershipInput {
   notes: string | null;
   coachId: string | null;
   sessionCount: number | null;
+  programType: ProgramType | null;
 }
 
 export interface RenewMembershipOutput {

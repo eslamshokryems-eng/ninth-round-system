@@ -42,6 +42,7 @@ export class SupabaseRegistrationRepository implements RegistrationRepository {
         p_photo_url: input.photoUrl,
         p_coach_id: input.coachId,
         p_session_count: input.sessionCount,
+        p_program_type: input.programType,
       })
       .single();
 
