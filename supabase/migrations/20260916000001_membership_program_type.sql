@@ -13,10 +13,12 @@ alter table memberships add column program_type program_type;
 create index idx_memberships_program_type on memberships (program_type);
 
 -- register_membership() — add p_program_type, defaulted so every existing
--- caller keeps working unchanged.
+-- caller keeps working unchanged. Rebuilt from the audit-log-aware version
+-- in 20260815000001 (not the older 20260812000002 base), so the
+-- log_audit_event('create_membership', ...) call it added is preserved.
 drop function if exists register_membership(
   uuid, text, text, gender, date, text, uuid, text, numeric, numeric, date, membership_payment_method, text,
-  text, text, text, uuid, integer
+  text, text, text, text, uuid, integer
 );
 
 create function register_membership(
@@ -90,11 +92,23 @@ begin
   insert into membership_payments (membership_id, amount, payment_method, received_by)
   values (v_membership_id, greatest(p_price - p_discount, 0), p_payment_method, auth.uid());
 
+  perform log_audit_event(
+    'create_membership', 'membership', v_membership_id, null,
+    jsonb_build_object(
+      'member_id', v_member_id, 'membership_number', v_membership_number,
+      'coach_id', p_coach_id, 'session_count', p_session_count,
+      'price', p_price, 'discount', p_discount, 'start_date', p_start_date, 'end_date', v_end_date
+    ),
+    '{}'::jsonb
+  );
+
   return query select v_member_id, v_membership_id, v_membership_number, v_qr_code;
 end;
 $$;
 
--- renew_membership() — same addition.
+-- renew_membership() — same addition. Rebuilt from the audit-log-aware
+-- version in 20260815000001, preserving its
+-- log_audit_event('renew_membership', ...) call.
 drop function if exists renew_membership(
   uuid, uuid, text, numeric, numeric, membership_payment_method, text, uuid, integer
 );
@@ -157,6 +171,17 @@ begin
 
   insert into membership_payments (membership_id, amount, payment_method, received_by)
   values (v_membership_id, greatest(p_price - p_discount, 0), p_payment_method, auth.uid());
+
+  perform log_audit_event(
+    'renew_membership', 'membership', v_membership_id,
+    jsonb_build_object('previous_end_date', v_current_end_date),
+    jsonb_build_object(
+      'member_id', p_member_id, 'membership_number', v_membership_number,
+      'coach_id', p_coach_id, 'session_count', p_session_count,
+      'price', p_price, 'discount', p_discount, 'start_date', v_start_date, 'end_date', v_end_date
+    ),
+    '{}'::jsonb
+  );
 
   return query select v_membership_id, v_membership_number, v_start_date, v_end_date;
 end;
