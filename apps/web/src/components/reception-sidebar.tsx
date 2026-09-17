@@ -147,6 +147,7 @@ const SALES_NAV_ITEMS: NavItem[] = [{ href: "/sales", label: "Sales", icon: Sale
  */
 const OWNER_NAV_ITEMS: NavItem[] = [
   { href: "/receipts", label: "Payments / Receipts", icon: CalendarIcon },
+  { href: "/performance", label: "Performance" },
   { href: "/staff", label: "Manage Staff" },
 ];
 

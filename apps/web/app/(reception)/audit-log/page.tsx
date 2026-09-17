@@ -34,6 +34,9 @@ const ACTIONS = [
   "convert_lead",
   "create_lead_followup",
   "update_lead_followup",
+  "create_performance_target",
+  "update_performance_target",
+  "delete_performance_target",
 ];
 
 const ENTITY_TYPES = [
@@ -47,6 +50,7 @@ const ENTITY_TYPES = [
   "user_permission_overrides",
   "lead",
   "lead_followup",
+  "performance_target",
 ];
 
 const ROLES = ["member", "coach", "reception", "sales_employee", "branch_manager", "super_admin"];

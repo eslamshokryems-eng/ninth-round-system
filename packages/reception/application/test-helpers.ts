@@ -23,6 +23,15 @@ import type { ExpenseRepository } from "../domain/expense-repository";
 import type { Expense, RecordExpenseInput } from "../domain/expense";
 import type { EquipmentSaleRepository } from "../domain/equipment-sale-repository";
 import type { EquipmentSale, RecordEquipmentSaleInput } from "../domain/equipment-sale";
+import type { PerformanceReportRepository } from "../domain/performance-report-repository";
+import type { PerformanceReportInput, PerformanceRow } from "../domain/performance-report";
+import type { PerformanceTargetRepository } from "../domain/performance-target-repository";
+import type {
+  CreatePerformanceTargetInput,
+  ListPerformanceTargetsInput,
+  PerformanceTarget,
+  UpdatePerformanceTargetInput,
+} from "../domain/performance-target";
 
 export function buildDashboardStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
@@ -452,4 +461,97 @@ export function buildEquipmentSale(overrides: Partial<EquipmentSale> = {}): Equi
 
 export function fakeEquipmentSaleRepository(overrides: Partial<EquipmentSale> = {}): FakeEquipmentSaleRepository {
   return new FakeEquipmentSaleRepository(ok(buildEquipmentSale(overrides)));
+}
+
+export function buildPerformanceRow(overrides: Partial<PerformanceRow> = {}): PerformanceRow {
+  return {
+    staffId: "staff-1",
+    staffName: "Sara Ahmed",
+    transactionCount: 3,
+    grossRevenue: 3000,
+    discountTotal: 200,
+    netRevenue: 2800,
+    collectedRevenue: 2800,
+    ...overrides,
+  };
+}
+
+export class FakePerformanceReportRepository implements PerformanceReportRepository {
+  public lastSalesInput: PerformanceReportInput | null = null;
+  public lastCoachInput: PerformanceReportInput | null = null;
+  constructor(private result: Result<PerformanceRow[]> = ok([buildPerformanceRow()])) {}
+
+  async getSalesPerformance(input: PerformanceReportInput): Promise<Result<PerformanceRow[]>> {
+    this.lastSalesInput = input;
+    return this.result;
+  }
+
+  async getCoachPerformance(input: PerformanceReportInput): Promise<Result<PerformanceRow[]>> {
+    this.lastCoachInput = input;
+    return this.result;
+  }
+}
+
+export function fakePerformanceReportRepository(
+  result: Result<PerformanceRow[]> = ok([buildPerformanceRow()]),
+): FakePerformanceReportRepository {
+  return new FakePerformanceReportRepository(result);
+}
+
+export function buildPerformanceTarget(overrides: Partial<PerformanceTarget> = {}): PerformanceTarget {
+  return {
+    id: "target-1",
+    staffId: "staff-1",
+    staffName: "Sara Ahmed",
+    branchId: "branch-1",
+    category: "sales",
+    periodType: "monthly",
+    periodStart: "2026-09-01",
+    periodEnd: "2026-09-30",
+    targetAmount: 10000,
+    notes: null,
+    createdAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: "2026-09-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+export class FakePerformanceTargetRepository implements PerformanceTargetRepository {
+  public lastListInput: ListPerformanceTargetsInput | null = null;
+  public lastCreateInput: CreatePerformanceTargetInput | null = null;
+  public lastUpdateInput: UpdatePerformanceTargetInput | null = null;
+  public lastRemovedId: string | null = null;
+  constructor(
+    private listResult: Result<PerformanceTarget[]> = ok([buildPerformanceTarget()]),
+    private writeResult: Result<PerformanceTarget> = ok(buildPerformanceTarget()),
+    private removeResult: Result<void> = ok(undefined),
+  ) {}
+
+  async list(input: ListPerformanceTargetsInput): Promise<Result<PerformanceTarget[]>> {
+    this.lastListInput = input;
+    return this.listResult;
+  }
+
+  async create(input: CreatePerformanceTargetInput): Promise<Result<PerformanceTarget>> {
+    this.lastCreateInput = input;
+    return this.writeResult;
+  }
+
+  async update(input: UpdatePerformanceTargetInput): Promise<Result<PerformanceTarget>> {
+    this.lastUpdateInput = input;
+    return this.writeResult;
+  }
+
+  async remove(id: string): Promise<Result<void>> {
+    this.lastRemovedId = id;
+    return this.removeResult;
+  }
+}
+
+export function fakePerformanceTargetRepository(
+  listResult: Result<PerformanceTarget[]> = ok([buildPerformanceTarget()]),
+  writeResult: Result<PerformanceTarget> = ok(buildPerformanceTarget()),
+  removeResult: Result<void> = ok(undefined),
+): FakePerformanceTargetRepository {
+  return new FakePerformanceTargetRepository(listResult, writeResult, removeResult);
 }
