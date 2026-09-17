@@ -20,6 +20,7 @@ export interface SellAdditionalMembershipInput {
   coachId: string | null;
   sessionCount: number | null;
   programType: ProgramType | null;
+  soldBy: string | null;
 }
 
 export interface SellAdditionalMembershipOutput {

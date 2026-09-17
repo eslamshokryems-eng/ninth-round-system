@@ -80,6 +80,7 @@ export default function AddMemberPage() {
   const [coach, setCoach] = useState<StaffCandidate | null>(null);
   const [sessionCountText, setSessionCountText] = useState("");
   const [programType, setProgramType] = useState<ProgramType | null>(null);
+  const [salesPerson, setSalesPerson] = useState<StaffCandidate | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -135,10 +136,11 @@ export default function AddMemberPage() {
     receiptNumber.trim().length > 0 &&
     membershipTypeId !== null &&
     paymentMethod !== null &&
+    salesPerson !== null &&
     price >= 0;
 
   async function handleSave() {
-    if (!branchId || !membershipTypeId || !paymentMethod) return;
+    if (!branchId || !membershipTypeId || !paymentMethod || !salesPerson) return;
 
     setErrorMessage(null);
     setErrorDetail(null);
@@ -188,6 +190,7 @@ export default function AddMemberPage() {
       coachId: wantsCoach ? (coach?.profileId ?? null) : null,
       sessionCount: wantsCoach && sessionCountText.trim() ? Number(sessionCountText) : null,
       programType,
+      soldBy: salesPerson.profileId,
     });
 
     setIsSaving(false);
@@ -310,6 +313,11 @@ export default function AddMemberPage() {
             />
           ))}
         </div>
+      </Card>
+
+      <Card className="space-y-4">
+        <h2 className="text-sm font-semibold text-ink">Sales Person</h2>
+        <StaffPicker selected={salesPerson} onSelect={setSalesPerson} label="Sold By" />
       </Card>
 
       <Card className="space-y-4">
