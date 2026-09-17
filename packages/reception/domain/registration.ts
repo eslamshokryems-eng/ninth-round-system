@@ -25,6 +25,14 @@ export interface RegisterMembershipInput {
   coachId: string | null;
   sessionCount: number | null;
   programType: ProgramType | null;
+  /**
+   * Who sold this membership — any staff account, not just sales_employee.
+   * Required by the web Reception UI (Save is disabled until one is
+   * picked), but typed nullable here to match coachId/programType's shape:
+   * the column stays nullable at the DB level (no backfill on historical
+   * rows), and apps/mobile has no picker for this yet.
+   */
+  soldBy: string | null;
 }
 
 export interface RegisterMembershipOutput {

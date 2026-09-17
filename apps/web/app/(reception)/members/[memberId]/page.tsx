@@ -93,6 +93,7 @@ export default function MemberDetailPage() {
   const [renewCoach, setRenewCoach] = useState<StaffCandidate | null>(null);
   const [renewSessionCountText, setRenewSessionCountText] = useState("");
   const [renewProgramType, setRenewProgramType] = useState<ProgramType | null>(null);
+  const [renewSalesPerson, setRenewSalesPerson] = useState<StaffCandidate | null>(null);
 
   const [isAddPackageOpen, setIsAddPackageOpen] = useState(false);
   const [addPackageTypeId, setAddPackageTypeId] = useState<string | null>(null);
@@ -109,6 +110,7 @@ export default function MemberDetailPage() {
   const [addPackageCoach, setAddPackageCoach] = useState<StaffCandidate | null>(null);
   const [addPackageSessionCountText, setAddPackageSessionCountText] = useState("");
   const [addPackageProgramType, setAddPackageProgramType] = useState<ProgramType | null>(null);
+  const [addPackageSalesPerson, setAddPackageSalesPerson] = useState<StaffCandidate | null>(null);
 
   const [isEditingCoach, setIsEditingCoach] = useState(false);
   const [coachPick, setCoachPick] = useState<StaffCandidate | null>(null);
@@ -204,7 +206,7 @@ export default function MemberDetailPage() {
   }
 
   async function handleRenew() {
-    if (!renewTypeId || !renewPaymentMethod) return;
+    if (!renewTypeId || !renewPaymentMethod || !renewSalesPerson) return;
     setRenewError(null);
     setIsRenewing(true);
 
@@ -219,6 +221,7 @@ export default function MemberDetailPage() {
       coachId: renewWantsCoach ? (renewCoach?.profileId ?? null) : null,
       sessionCount: renewWantsCoach && renewSessionCountText.trim() ? Number(renewSessionCountText) : null,
       programType: renewProgramType,
+      soldBy: renewSalesPerson.profileId,
     });
 
     setIsRenewing(false);
@@ -234,6 +237,7 @@ export default function MemberDetailPage() {
     setRenewCoach(null);
     setRenewSessionCountText("");
     setRenewProgramType(null);
+    setRenewSalesPerson(null);
     void loadDetail();
   }
 
@@ -244,7 +248,7 @@ export default function MemberDetailPage() {
    * supabase/migrations/20260915000001.
    */
   async function handleAddPackage() {
-    if (!addPackageTypeId || !addPackagePaymentMethod) return;
+    if (!addPackageTypeId || !addPackagePaymentMethod || !addPackageSalesPerson) return;
     setAddPackageError(null);
     setIsAddingPackage(true);
 
@@ -260,6 +264,7 @@ export default function MemberDetailPage() {
       coachId: addPackageWantsCoach ? (addPackageCoach?.profileId ?? null) : null,
       sessionCount: addPackageWantsCoach && addPackageSessionCountText.trim() ? Number(addPackageSessionCountText) : null,
       programType: addPackageProgramType,
+      soldBy: addPackageSalesPerson.profileId,
     });
 
     setIsAddingPackage(false);
@@ -280,6 +285,7 @@ export default function MemberDetailPage() {
     setAddPackageCoach(null);
     setAddPackageSessionCountText("");
     setAddPackageProgramType(null);
+    setAddPackageSalesPerson(null);
     void loadDetail();
   }
 
@@ -489,11 +495,12 @@ export default function MemberDetailPage() {
               />
             </div>
           ) : null}
+          <StaffPicker selected={renewSalesPerson} onSelect={setRenewSalesPerson} label="Sold By" />
           {renewError ? <p className="text-sm text-red-400">{renewError}</p> : null}
           <Button
             onClick={() => void handleRenew()}
             isLoading={isRenewing}
-            disabled={!renewTypeId || !renewPaymentMethod || !renewReceiptNumber.trim()}
+            disabled={!renewTypeId || !renewPaymentMethod || !renewSalesPerson || !renewReceiptNumber.trim()}
           >
             Confirm Renewal
           </Button>
@@ -598,11 +605,12 @@ export default function MemberDetailPage() {
               />
             </div>
           ) : null}
+          <StaffPicker selected={addPackageSalesPerson} onSelect={setAddPackageSalesPerson} label="Sold By" />
           {addPackageError ? <p className="text-sm text-red-400">{addPackageError}</p> : null}
           <Button
             onClick={() => void handleAddPackage()}
             isLoading={isAddingPackage}
-            disabled={!addPackageTypeId || !addPackagePaymentMethod || !addPackageReceiptNumber.trim()}
+            disabled={!addPackageTypeId || !addPackagePaymentMethod || !addPackageSalesPerson || !addPackageReceiptNumber.trim()}
           >
             Confirm
           </Button>

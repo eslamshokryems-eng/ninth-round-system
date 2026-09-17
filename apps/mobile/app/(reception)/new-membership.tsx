@@ -184,12 +184,14 @@ export default function NewMembershipScreen() {
       emergencyContactName: emergencyContactName.trim() || null,
       emergencyContactPhone: emergencyContactPhone.trim() || null,
       photoUrl,
-      // Coach assignment (supabase/migrations/20260812000002) and Program
-      // classification (supabase/migrations/20260916000001) are web-only
-      // Reception features for now — no mobile UI for either yet.
+      // Coach assignment (supabase/migrations/20260812000002), Program
+      // classification (supabase/migrations/20260916000001), and Sales
+      // Person attribution (supabase/migrations/20260917000001) are
+      // web-only Reception features for now — no mobile UI for any yet.
       coachId: null,
       sessionCount: null,
       programType: null,
+      soldBy: null,
     });
 
     setIsSaving(false);
