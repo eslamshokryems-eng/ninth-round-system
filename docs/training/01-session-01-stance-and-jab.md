@@ -50,7 +50,7 @@
 |---|---|---|
 | نط حبل — إيقاع هادي | 3 × 40 ث / 20 ث راحة | مين ركبته تعبانة → **Shadow Skipping** (نفس الحركة بدون حبل) |
 
-🔗 [نط الحبل للمبتدئين — شرح تفصيلي](https://www.youtube.com/results?search_query=jump+rope+for+boxing+beginners+tutorial)
+🔗 [نط الحبل للمبتدئين — شرح تفصيلي](https://www.youtube.com/results?search_query=jump+rope+for+boxing+beginners+tutorial&sp=EgIYAQ%3D%3D)
 
 ### A2 — Joint Prep Flow (3 د) — تسلسل متصل بدون راحة
 
@@ -65,7 +65,7 @@
 | Ankle rocks (ركبة فوق الصباع) | 12 كل رجل |
 | Neck — nods + rotations (بطيء جداً) | 8 كل اتجاه |
 
-🔗 [Joint Prep / Mobility Flow قبل التدريب](https://www.youtube.com/results?search_query=full+body+joint+mobility+warm+up+routine+athletes)
+🔗 [Joint Prep / Mobility Flow قبل التدريب](https://www.youtube.com/results?search_query=full+body+joint+mobility+warm+up+routine+athletes&sp=EgIYAQ%3D%3D)
 
 ### A3 — Activation (2 د)
 
@@ -75,7 +75,7 @@
 | Dead Bug | 8 كل جهة | ثبات الكور |
 | Band Pull-Apart (أو Scapular Push-up) | 15 | حماية الكتف |
 
-🔗 [Dead Bug — الأداء الصحيح](https://www.youtube.com/results?search_query=dead+bug+exercise+proper+form)
+🔗 [Dead Bug — الأداء الصحيح](https://www.youtube.com/results?search_query=dead+bug+exercise+proper+form&sp=EgIYAQ%3D%3D)
 
 ---
 
@@ -95,7 +95,7 @@
 
 **اختبار الوقفة (The Push Test):** الكابتن يدفع اللاعب خفيف من الكتف — لو اتزحزح، الوقفة غلط. كرر.
 
-🔗 [Boxing Stance — الشرح الكامل](https://www.youtube.com/results?search_query=how+to+stand+in+boxing+stance+beginner+tutorial)
+🔗 [Boxing Stance — الشرح الكامل](https://www.youtube.com/results?search_query=how+to+stand+in+boxing+stance+beginner+tutorial&sp=EgIYAQ%3D%3D)
 
 ### B2 — Footwork Basics (6 د) — الفريق في صفين، الكابتن قدام
 
@@ -106,7 +106,7 @@
 | Pivot على القدم الأمامية | 90 ث | 45° ثم 90°. الجارد فوق |
 | **Mirror Drill (زوجي)** | 90 ث | لاعب يقود، التاني يقلد. تبديل بعد 45 ث |
 
-🔗 [Basic Boxing Footwork Drills](https://www.youtube.com/results?search_query=basic+boxing+footwork+drills+for+beginners)
+🔗 [Basic Boxing Footwork Drills](https://www.youtube.com/results?search_query=basic+boxing+footwork+drills+for+beginners&sp=EgIYAQ%3D%3D)
 
 > 🎯 **Coach Note:** في الـ Mirror Drill حط أقوى لاعب مع أضعف لاعب. ده بيرفع مستوى الاتنين.
 
@@ -129,8 +129,8 @@
 
 **+ التنفس:** زفير قصير وحاد مع كل لكمة — "تسس". ده مش رفاهية، ده بيشد الكور ويمنع الإرهاق المبكر.
 
-🔗 [How to Throw a Jab — Step by Step](https://www.youtube.com/results?search_query=how+to+throw+a+jab+boxing+technique+breakdown)
-🔗 [أخطاء الجاب الشائعة](https://www.youtube.com/results?search_query=common+jab+mistakes+boxing+beginners)
+🔗 [How to Throw a Jab — Step by Step](https://www.youtube.com/results?search_query=how+to+throw+a+jab+boxing+technique+breakdown&sp=EgIYAQ%3D%3D)
+🔗 [أخطاء الجاب الشائعة](https://www.youtube.com/results?search_query=common+jab+mistakes+boxing+beginners&sp=EgIYAQ%3D%3D)
 
 ### C2 — التدرج (11 د)
 
@@ -166,8 +166,8 @@
 
 **نسبة العمل:الراحة = 2:1** — سخية عن قصد للوحدة الأولى.
 
-🔗 [Beginner Focus Mitt / Pad Drills](https://www.youtube.com/results?search_query=beginner+focus+mitt+pad+drills+jab)
-🔗 [Heavy Bag — Jab Work للمبتدئين](https://www.youtube.com/results?search_query=heavy+bag+jab+drills+for+beginners)
+🔗 [Beginner Focus Mitt / Pad Drills](https://www.youtube.com/results?search_query=beginner+focus+mitt+pad+drills+jab&sp=EgIYAQ%3D%3D)
+🔗 [Heavy Bag — Jab Work للمبتدئين](https://www.youtube.com/results?search_query=heavy+bag+jab+drills+for+beginners&sp=EgIYAQ%3D%3D)
 
 > ⚠️ **حامل الباد:** الباد يستقبل اللكمة وميروحش ناحيتها بقوة. اصطدام معاكس = إصابة رسغ للاتنين.
 
@@ -186,7 +186,7 @@
 
 ثم **Finisher جماعي — 30 ثانية:** الفريق كله في دايرة، جاب متواصل، الكابتن بيعد تنازلي بصوت عالي. الوحدة بتقفل بطاقة، مش بانهيار.
 
-🔗 [Boxing Conditioning Circuit — Low Impact](https://www.youtube.com/results?search_query=low+impact+boxing+conditioning+circuit+beginners)
+🔗 [Boxing Conditioning Circuit — Low Impact](https://www.youtube.com/results?search_query=low+impact+boxing+conditioning+circuit+beginners&sp=EgIYAQ%3D%3D)
 
 > 🎯 **Coach Note:** ممنوع Burpees أو قفز في الوحدة الأولى مع الفئة دي. الركبة والأخيل لسه متعودوش.
 
@@ -206,7 +206,7 @@
 | Neck — جانبي | 20 ث كل جهة |
 | تنفس أنفي عميق (4 ثواني شهيق / 6 زفير) | 60 ث |
 
-🔗 [Post-Workout Stretching Routine](https://www.youtube.com/results?search_query=post+workout+full+body+stretching+routine+10+minutes)
+🔗 [Post-Workout Stretching Routine](https://www.youtube.com/results?search_query=post+workout+full+body+stretching+routine+10+minutes&sp=EgIYAQ%3D%3D)
 
 ### F2 — Debrief (2 د) — الفريق في دايرة
 

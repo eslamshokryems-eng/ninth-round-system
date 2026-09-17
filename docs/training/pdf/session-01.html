@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>9th Round — الوحدة التدريبية 01</title>
+<style>
+  @page { size: A4; margin: 14mm 12mm 16mm 12mm; }
+  @page :first { margin: 0; }
+
+  :root{
+    --black:#0A0A0A; --ink:#141414; --red:#E10600; --deepred:#B00400;
+    --grey:#6B6B6B; --line:#E2E2E2; --soft:#F6F6F6;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:'Cairo', sans-serif; color:var(--ink);
+    font-size:10.2pt; line-height:1.65; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .en{ font-family:'Oswald', sans-serif; letter-spacing:.04em; }
+
+  /* ---------- COVER ---------- */
+  .cover{
+    height:297mm; width:210mm; background:var(--black); color:#fff;
+    position:relative; overflow:hidden; page-break-after:always;
+    display:flex; flex-direction:column; justify-content:center; padding:0 22mm;
+  }
+  .cover::before{
+    content:""; position:absolute; top:0; left:0; width:14mm; height:100%;
+    background:linear-gradient(180deg,var(--red) 0%,var(--deepred) 100%);
+  }
+  .cover::after{
+    content:""; position:absolute; bottom:-60mm; right:-40mm;
+    width:150mm; height:150mm; border:1.2mm solid rgba(225,6,0,.22);
+    border-radius:50%;
+  }
+  .brand{ font-family:'Oswald',sans-serif; font-size:13pt; letter-spacing:.42em;
+          color:var(--red); font-weight:600; margin-bottom:6mm; }
+  .unit{ font-family:'Oswald',sans-serif; font-size:11pt; letter-spacing:.3em;
+         color:#9A9A9A; margin-bottom:3mm; }
+  .cover h1{ font-family:'Oswald',sans-serif; font-size:52pt; line-height:.95;
+             font-weight:700; letter-spacing:.02em; }
+  .cover h1 em{ font-style:normal; color:var(--red); }
+  .cover .ar-sub{ font-size:16pt; font-weight:700; margin-top:5mm; color:#EDEDED; }
+  .rule{ width:34mm; height:1.6mm; background:var(--red); margin:8mm 0; }
+  .meta{ display:flex; gap:12mm; flex-wrap:wrap; margin-top:2mm; }
+  .meta div span{ display:block; font-size:8.5pt; letter-spacing:.18em;
+                  color:var(--red); font-family:'Oswald',sans-serif; }
+  .meta div b{ font-size:12pt; color:#fff; font-weight:700; }
+  .cover footer{ position:absolute; bottom:18mm; right:22mm; left:22mm;
+                 font-family:'Oswald',sans-serif; font-size:9pt; letter-spacing:.3em;
+                 color:#6F6F6F; border-top:.3mm solid #2A2A2A; padding-top:4mm; }
+
+  /* ---------- BLOCK HEADERS ---------- */
+  .block{ page-break-inside:avoid; margin-bottom:7mm; }
+  .bh{ background:var(--black); color:#fff; padding:3mm 5mm; display:flex;
+       align-items:center; gap:4mm; border-right:1.6mm solid var(--red); }
+  .bh .tag{ font-family:'Oswald',sans-serif; font-size:9pt; letter-spacing:.2em;
+            color:var(--red); }
+  .bh h2{ font-size:13pt; font-weight:700; flex:1; }
+  .bh .time{ font-family:'Oswald',sans-serif; font-size:12pt; color:#fff;
+             background:var(--red); padding:.6mm 3mm; border-radius:1mm; }
+  .goal{ background:var(--soft); border-right:.8mm solid var(--red);
+         padding:2.5mm 4mm; font-size:9.6pt; margin-top:2mm; }
+
+  h3{ font-size:11pt; margin:5mm 0 2mm; color:var(--black);
+      border-bottom:.4mm solid var(--line); padding-bottom:1.5mm; }
+  h3 .n{ color:var(--red); font-family:'Oswald',sans-serif; margin-left:2mm; }
+  p{ margin-bottom:2mm; }
+  ol,ul{ margin:0 5mm 2mm 0; }
+  li{ margin-bottom:1.2mm; }
+
+  /* ---------- TABLES ---------- */
+  table{ width:100%; border-collapse:collapse; margin:2mm 0 3mm; font-size:9.4pt;
+         page-break-inside:avoid; }
+  th{ background:var(--black); color:#fff; font-weight:700; padding:2mm 3mm;
+      text-align:right; font-size:9pt; }
+  td{ padding:1.9mm 3mm; border-bottom:.3mm solid var(--line); vertical-align:top; }
+  tbody tr:nth-child(even) td{ background:#FAFAFA; }
+  td.c,th.c{ text-align:center; }
+  .num{ font-family:'Oswald',sans-serif; color:var(--red); font-weight:600; }
+
+  /* ---------- VIDEO LINK ---------- */
+  .vid{ display:inline-block; margin:1.2mm 0 2.5mm; font-size:9pt;
+        background:#FFF1F0; border:.3mm solid #F5C4C2; border-right:1.4mm solid var(--red);
+        padding:1.6mm 3.5mm; border-radius:1mm; text-decoration:none; color:var(--deepred);
+        font-weight:600; white-space:nowrap; }
+  
+  .vid .sh{ font-family:'Oswald',sans-serif; font-size:7pt; color:#9A9A9A;
+            letter-spacing:.08em; margin-left:2.5mm; display:inline-block; }
+
+  /* ---------- NOTES ---------- */
+  .note{ background:#FFFBEA; border-right:1.4mm solid #E8A800; padding:2.5mm 4mm;
+         font-size:9.4pt; margin:2.5mm 0; page-break-inside:avoid; }
+  .warn{ background:#FFF1F0; border-right:1.4mm solid var(--red); padding:2.5mm 4mm;
+         font-size:9.4pt; margin:2.5mm 0; page-break-inside:avoid; }
+  .note b,.warn b{ display:block; margin-bottom:1mm; }
+
+  .quote{ background:var(--black); color:#fff; padding:4mm 5mm; text-align:center;
+          font-size:11.5pt; font-weight:700; margin:4mm 0; border-right:1.6mm solid var(--red); }
+
+  .pagebreak{ page-break-before:always; }
+  .footer-note{ text-align:center; font-family:'Oswald',sans-serif; font-size:8pt;
+                letter-spacing:.3em; color:var(--grey); margin-top:8mm;
+                border-top:.3mm solid var(--line); padding-top:3mm; }
+  .box-grid{ display:flex; gap:3mm; }
+  .box-grid > div{ flex:1; background:var(--soft); padding:3mm; border-top:1mm solid var(--red); }
+  .box-grid h4{ font-size:9.5pt; margin-bottom:1.5mm; }
+  .box-grid p{ font-size:9pt; color:#3A3A3A; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <div class="brand">9TH ROUND</div>
+  <div class="unit">SESSION 01 &nbsp;/&nbsp; MASTERS PROGRAM</div>
+  <h1>THE<br><em>FOUNDATION</em></h1>
+  <div class="ar-sub">الوقفة · الجارد · الجاب</div>
+  <div class="rule"></div>
+  <div class="meta">
+    <div><span>DURATION</span><b>60 دقيقة</b></div>
+    <div><span>ATHLETES</span><b>10 لاعبين</b></div>
+    <div><span>LEVEL</span><b>مبتدئ · 30+</b></div>
+    <div><span>BLOCKS</span><b>6 بلوكات</b></div>
+  </div>
+  <footer dir="ltr">NO CLASSES. NO WAITING. JUST ACTION.</footer>
+</section>
+
+<!-- ============ PAGE 1 ============ -->
+<div class="block">
+  <div class="bh"><span class="tag">OVERVIEW</span><h2>خريطة الوحدة</h2><span class="time">60′</span></div>
+</div>
+
+<table>
+  <thead><tr><th class="c">البلوك</th><th>المحتوى</th><th class="c">المدة</th><th class="c">التراكمي</th></tr></thead>
+  <tbody>
+    <tr><td class="c num">0</td><td>Brief &amp; Screening — قواعد السلامة والفحص</td><td class="c">3 د</td><td class="c">0:03</td></tr>
+    <tr><td class="c num">A</td><td>Raise &amp; Joint Prep — إحماء بدني ومفصلي</td><td class="c">8 د</td><td class="c">0:11</td></tr>
+    <tr><td class="c num">B</td><td>Skill Warm-Up — إحماء مهاري</td><td class="c">10 د</td><td class="c">0:21</td></tr>
+    <tr><td class="c num">C</td><td>Technical Block — الجاب</td><td class="c">15 د</td><td class="c">0:36</td></tr>
+    <tr><td class="c num">D</td><td>Application — باد وشكاير</td><td class="c">12 د</td><td class="c">0:48</td></tr>
+    <tr><td class="c num">E</td><td>Conditioning Finisher</td><td class="c">6 د</td><td class="c">0:54</td></tr>
+    <tr><td class="c num">F</td><td>Cooldown &amp; Debrief</td><td class="c">6 د</td><td class="c">1:00</td></tr>
+  </tbody>
+</table>
+
+<div class="box-grid">
+  <div><h4>الهدف التقني</h4><p>وقفة ثابتة + جارد سليم + جاب صحيح ميكانيكياً.</p></div>
+  <div><h4>الهدف البدني</h4><p>إحماء مفصلي كامل + قاعدة هوائية + تحمل الرسط والكتف.</p></div>
+  <div><h4>الأدوات</h4><p>5 حبال نط · 5 أزواج باد · 5 شكاير · 10 لفافات رسط · تايمر على الشاشة.</p></div>
+</div>
+
+<div class="warn">
+  <b>⚠‏ قبل ما تبدأ — لف الرسط</b>
+  أي لاعب هيمسك باد أو شكارة لازم رسطه يكون ملفوف صح. ده أول سطر دفاع ضد إصابة المبتدئين.
+  <br><a class="vid" href="https://www.youtube.com/results?search_query=how+to+wrap+your+hands+for+boxing&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ طريقة لف الرسط الصحيحة</a>
+</div>
+
+<!-- ============ BLOCK 0 ============ -->
+<div class="block">
+  <div class="bh"><span class="tag">BLOCK 0</span><h2>BRIEF &amp; SCREENING</h2><span class="time">3′</span></div>
+  <div class="goal">الفريق واقف نص دايرة. مفيش كلام كتير — 3 نقط بس.</div>
+</div>
+<ol>
+  <li><b>تثبيت التوقع:</b> «النهاردة مش هنتعب. النهاردة هنتعلم نقف.»</li>
+  <li><b>قواعد السلامة:</b> STOP = توقف فوري للكل · ممنوع لكم على الراس · الرسط ملفوف · ألم مفصلي ≠ تعب عضلي · مياه كل 10 دقايق.</li>
+  <li><b>السؤال الطبي:</b> ضغط؟ سكر؟ إصابة ركبة/كتف/ضهر؟ عملية؟ — سجّلها في كارت اللاعب.</li>
+</ol>
+<div class="note"><b>🎯‏ Coach Note</b> أي لاعب يبلّغ عن إصابة → يمشي على مسار التعديل (Regression) في آخر الملف. متستبعدوش — عدّل له.</div>
+
+<!-- ============ BLOCK A ============ -->
+<div class="pagebreak"></div>
+<div class="block">
+  <div class="bh"><span class="tag">BLOCK A</span><h2>RAISE &amp; JOINT PREP</h2><span class="time">8′</span></div>
+  <div class="goal">رفع حرارة الجسم + فتح المفاصل اللي الجاب محتاجها: رسغ · كتف · فقري صدري · حوض · كاحل.</div>
+</div>
+
+<h3><span class="n">A1</span> Raise — 3 دقايق</h3>
+<table>
+  <thead><tr><th>التمرين</th><th class="c">الزمن</th><th>ملاحظة</th></tr></thead>
+  <tbody>
+    <tr><td>نط حبل — إيقاع هادي</td><td class="c">3 × 40 ث / 20 ث راحة</td><td>مين ركبته تعبانة → Shadow Skipping (نفس الحركة بدون حبل)</td></tr>
+  </tbody>
+</table>
+<a class="vid" href="https://www.youtube.com/results?search_query=jump+rope+for+boxing+beginners+tutorial&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ نط الحبل للمبتدئين</a>
+
+<h3><span class="n">A2</span> Joint Prep Flow — 3 دقايق · تسلسل متصل بدون راحة</h3>
+<table>
+  <thead><tr><th>الحركة</th><th class="c">العدد</th><th>الهدف</th></tr></thead>
+  <tbody>
+    <tr><td>Wrist circles + flexion/extension</td><td class="c">10 كل اتجاه</td><td>تجهيز الرسغ للصدمة</td></tr>
+    <tr><td>Shoulder rolls (أمام/خلف)</td><td class="c">10 + 10</td><td>فك الكتف</td></tr>
+    <tr><td>Arm swings / Scapular retraction</td><td class="c">15</td><td>تفعيل لوح الكتف</td></tr>
+    <tr><td>T-Spine rotation (إيد على الصدر)</td><td class="c">10 كل جهة</td><td>مصدر دوران اللكمة</td></tr>
+    <tr><td>Hip circles</td><td class="c">10 كل اتجاه</td><td>فتح الحوض</td></tr>
+    <tr><td>World's Greatest Stretch</td><td class="c">5 كل جهة</td><td>إطالة ديناميكية شاملة</td></tr>
+    <tr><td>Ankle rocks (ركبة فوق الصباع)</td><td class="c">12 كل رجل</td><td>حماية وتر أخيل</td></tr>
+    <tr><td>Neck — nods + rotations (بطيء جداً)</td><td class="c">8 كل اتجاه</td><td>تجهيز الرقبة</td></tr>
+  </tbody>
+</table>
+<a class="vid" href="https://www.youtube.com/results?search_query=quick+joint+mobility+warm+up+routine&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Joint Prep / Mobility Flow</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=wrist+warm+up+exercises+for+punching&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ إحماء الرسغ قبل اللكم</a>
+
+<h3><span class="n">A3</span> Activation — 2 دقيقة</h3>
+<table>
+  <thead><tr><th>التمرين</th><th class="c">العدد</th><th>ليه</th><th class="c">فيديو</th></tr></thead>
+  <tbody>
+    <tr><td>Glute Bridge</td><td class="c">15</td><td>تفعيل الحوض — مصدر دوران اللكمة</td>
+        <td class="c"><a class="vid" style="margin:0;padding:.8mm 2mm;" href="https://www.youtube.com/results?search_query=glute+bridge+proper+form&amp;sp=EgIYAQ%3D%3D">▶</a></td></tr>
+    <tr><td>Dead Bug</td><td class="c">8 كل جهة</td><td>ثبات الكور</td>
+        <td class="c"><a class="vid" style="margin:0;padding:.8mm 2mm;" href="https://www.youtube.com/results?search_query=dead+bug+exercise+proper+form&amp;sp=EgIYAQ%3D%3D">▶</a></td></tr>
+    <tr><td>Band Pull-Apart / Scapular Push-up</td><td class="c">15</td><td>حماية الكتف</td>
+        <td class="c"><a class="vid" style="margin:0;padding:.8mm 2mm;" href="https://www.youtube.com/results?search_query=band+pull+apart+shoulder+exercise&amp;sp=EgIYAQ%3D%3D">▶</a></td></tr>
+  </tbody>
+</table>
+
+<!-- ============ BLOCK B ============ -->
+<div class="pagebreak"></div>
+<div class="block">
+  <div class="bh"><span class="tag">BLOCK B</span><h2>SKILL WARM-UP</h2><span class="time">10′</span></div>
+  <div class="goal">الجسم يتعلم يقف ويتحرك زي الملاكم — قبل ما يلكم.</div>
+</div>
+
+<h3><span class="n">B1</span> بناء الـ Stance — 4 دقايق</h3>
+<p>اشرح كل نقطة، نفّذها، صححها — قبل ما تعدي للي بعدها.</p>
+<table>
+  <thead><tr><th class="c">#</th><th>النقطة</th><th>التفصيل</th></tr></thead>
+  <tbody>
+    <tr><td class="c num">1</td><td>القدمين</td><td>عرض الكتفين → خطوة أمامية بالقدم الأمامية (اليسار للـ Orthodox) + عرض جانبي بسيط للتوازن</td></tr>
+    <tr><td class="c num">2</td><td>الزاوية</td><td>الأمامية 45° للداخل · الخلفية 45° للخارج · الكعب الخلفي مرفوع خفيف</td></tr>
+    <tr><td class="c num">3</td><td>الوزن</td><td>50/50 — على مشط القدم مش الكعب</td></tr>
+    <tr><td class="c num">4</td><td>الركب</td><td>مثنية خفيف، <b>مش مقفولة</b> — أهم نقطة لفئة الـ 30+</td></tr>
+    <tr><td class="c num">5</td><td>الجسم</td><td>نص التفاتة — مش مواجهة كاملة</td></tr>
+    <tr><td class="c num">6</td><td>الجارد</td><td>الإيدين عند عظمة الوجنة · الكوعين على الجنب · الذقن لتحت · العينين لفوق من تحت الحواجب</td></tr>
+  </tbody>
+</table>
+<div class="note"><b>✅‏ اختبار الوقفة — The Push Test</b> ادفع اللاعب خفيف من الكتف. لو اتزحزح → الوقفة غلط. كرّر.</div>
+<a class="vid" href="https://www.youtube.com/results?search_query=boxing+stance+for+beginners&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Boxing Stance — الشرح الكامل</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=boxing+guard+hands+up+beginner&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ الجارد الصحيح</a>
+
+<h3><span class="n">B2</span> Footwork Basics — 6 دقايق · الفريق في صفين</h3>
+<table>
+  <thead><tr><th>الدريل</th><th class="c">الزمن</th><th>النقطة الحرجة</th></tr></thead>
+  <tbody>
+    <tr><td>Step &amp; Slide — أمام / خلف</td><td class="c">90 ث</td><td>القدم اللي ناحية الحركة تتحرك الأول. الوقفة متتكسرش</td></tr>
+    <tr><td>Step &amp; Slide — يمين / شمال</td><td class="c">90 ث</td><td>الرجلين متتقاطعش أبداً</td></tr>
+    <tr><td>Pivot على القدم الأمامية</td><td class="c">90 ث</td><td>45° ثم 90° · الجارد فوق</td></tr>
+    <tr><td><b>Mirror Drill</b> (زوجي)</td><td class="c">90 ث</td><td>لاعب يقود والتاني يقلد · تبديل بعد 45 ث</td></tr>
+  </tbody>
+</table>
+<a class="vid" href="https://www.youtube.com/results?search_query=basic+boxing+footwork+drills+beginners&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Basic Footwork Drills</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=boxing+pivot+technique&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ الـ Pivot</a>
+<div class="note"><b>🎯‏ Coach Note</b> في الـ Mirror Drill حط أقوى لاعب مع أضعف لاعب. ده بيرفع مستوى الاتنين.</div>
+
+<!-- ============ BLOCK C ============ -->
+<div class="pagebreak"></div>
+<div class="block">
+  <div class="bh"><span class="tag">BLOCK C</span><h2>THE JAB</h2><span class="time">15′</span></div>
+  <div class="goal">اللكمة الأهم في الملاكمة — 70% من شغل الوحدات الجاية هيتبني عليها.</div>
+</div>
+
+<h3><span class="n">C1</span> التفكيك — 4 دقايق</h3>
+<table>
+  <thead><tr><th class="c">#</th><th>النقطة الصحيحة</th><th>الخطأ الشائع</th></tr></thead>
+  <tbody>
+    <tr><td class="c num">1</td><td>اللكمة تخرج من الذقن في <b>خط مستقيم</b></td><td>تنزل تحت قبل ما تخرج (Telegraphing)</td></tr>
+    <tr><td class="c num">2</td><td>دوران الرسغ للأسفل عند الوصول (Corkscrew)</td><td>ضرب والرسغ مفتوح → إصابة</td></tr>
+    <tr><td class="c num">3</td><td>الكتف يرتفع لحماية الذقن</td><td>الذقن مكشوف</td></tr>
+    <tr><td class="c num">4</td><td>الإيد التانية متتحركش من على الوش</td><td>تنزل مع كل لكمة</td></tr>
+    <tr><td class="c num">5</td><td>الرجوع أسرع من الخروج</td><td>ترك الإيد ممدودة</td></tr>
+  </tbody>
+</table>
+<div class="note"><b>🫁‏ التنفس</b> زفير قصير وحاد مع كل لكمة — «تسس». ده مش رفاهية: بيشد الكور ويمنع الإرهاق المبكر.</div>
+<a class="vid" href="https://www.youtube.com/results?search_query=how+to+throw+a+jab+boxing+technique&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ How to Throw a Jab</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=common+jab+mistakes+boxing+beginners&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ أخطاء الجاب الشائعة</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=boxing+breathing+technique+when+punching&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ التنفس مع اللكمة</a>
+
+<h3><span class="n">C2</span> التدرج — 11 دقيقة</h3>
+<table>
+  <thead><tr><th class="c">م</th><th>المرحلة</th><th>الشكل</th><th class="c">الزمن</th><th>التركيز</th></tr></thead>
+  <tbody>
+    <tr><td class="c num">1</td><td>Static Slow</td><td>وقوف ثابت · جاب بطيء جداً</td><td class="c">2 د</td><td>المسار والرسغ</td></tr>
+    <tr><td class="c num">2</td><td>Static Rhythm</td><td>جاب على عدّ الكابتن</td><td class="c">2 د</td><td>الرجوع السريع + الإيد التانية</td></tr>
+    <tr><td class="c num">3</td><td>Double Jab</td><td>1-1 متتالي</td><td class="c">2 د</td><td>إيقاع واحد — مش لكمتين منفصلتين</td></tr>
+    <tr><td class="c num">4</td><td>Jab + Step</td><td>خطوة أمامية مع اللكمة</td><td class="c">3 د</td><td>القدم تنزل <b>قبل</b> ما اللكمة توصل</td></tr>
+    <tr><td class="c num">5</td><td>Shadow Free</td><td>2 راوند × 1 د (30 ث راحة)</td><td class="c">2 د</td><td>حرية + وقفة سليمة</td></tr>
+  </tbody>
+</table>
+<a class="vid" href="https://www.youtube.com/results?search_query=double+jab+drill+boxing&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Double Jab Drill</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=jab+with+step+forward+boxing+drill&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Jab + Step</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=shadow+boxing+jab+drill+beginner&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Shadow Boxing — جاب</a>
+
+<div class="quote">«اللكمة بتبدأ من رجلك الخلفية — مش من كتفك.»</div>
+<div class="note"><b>🎯‏ أهم تصحيح في الوحدة دي</b> لاعب فوق الـ 30 بيميل يلكم بالدراع بس. كرّر الجملة اللي فوق كل شوية — هي مفتاح الوحدة.</div>
+
+<!-- ============ BLOCK D ============ -->
+<div class="pagebreak"></div>
+<div class="block">
+  <div class="bh"><span class="tag">BLOCK D</span><h2>APPLICATION</h2><span class="time">12′</span></div>
+  <div class="goal">5 أزواج × محطتين — تبديل كل راوند. نسبة عمل : راحة = 2 : 1 (سخية عن قصد للوحدة الأولى).</div>
+</div>
+
+<div class="box-grid" style="margin-bottom:3mm;">
+  <div><h4>المحطة 1 — PADS</h4><p>5 أزواج بالتبادل · لاعب يلكم ولاعب يمسك</p></div>
+  <div><h4>المحطة 2 — HEAVY BAG</h4><p>5 شكاير · لاعب لكل شكارة</p></div>
+</div>
+
+<table>
+  <thead><tr><th class="c">الراوند</th><th class="c">المدة</th><th class="c">الراحة</th><th>المحتوى</th></tr></thead>
+  <tbody>
+    <tr><td class="c num">R1</td><td class="c">90 ث</td><td class="c">45 ث</td><td>جاب مفرد على أمر الحامل / الشكارة</td></tr>
+    <tr><td class="c num">R2</td><td class="c">90 ث</td><td class="c">45 ث</td><td>دبل جاب + حركة بعد اللكمة</td></tr>
+    <tr><td class="c num">R3</td><td class="c">90 ث</td><td class="c">45 ث</td><td>جاب + خطوة للداخل، خطوة للخارج</td></tr>
+    <tr><td class="c num">R4</td><td class="c">90 ث</td><td class="c">45 ث</td><td>حر — جاب فقط + Footwork</td></tr>
+  </tbody>
+</table>
+
+<a class="vid" href="https://www.youtube.com/results?search_query=beginner+focus+mitt+jab+drills&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Focus Mitt / Pad Drills</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=heavy+bag+jab+drills+for+beginners&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Heavy Bag — شغل الجاب</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=how+to+hold+focus+mitts+correctly&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ طريقة مسك الباد الصحيحة</a>
+
+<div class="warn"><b>⚠‏ حامل الباد</b> الباد <b>يستقبل</b> اللكمة — ميروحش ناحيتها بقوة. اصطدام معاكس = إصابة رسغ للاتنين.</div>
+
+<!-- ============ BLOCK E ============ -->
+<div class="block">
+  <div class="bh"><span class="tag">BLOCK E</span><h2>THE FIRST ROUND</h2><span class="time">6′</span></div>
+  <div class="goal">أول تحدي جماعي للفريق — 3 جولات · 40 ثانية عمل / 40 ثانية راحة.</div>
+</div>
+<table>
+  <thead><tr><th class="c">الجولة</th><th>التمرين</th><th>التركيز</th><th class="c">فيديو</th></tr></thead>
+  <tbody>
+    <tr><td class="c num">1</td><td>Shadow Boxing — جاب متواصل بإيقاع عالي</td><td>تحمل الكتف</td>
+        <td class="c"><a class="vid" style="margin:0;padding:.8mm 2mm;" href="https://www.youtube.com/results?search_query=shadow+boxing+workout+round&amp;sp=EgIYAQ%3D%3D">▶</a></td></tr>
+    <tr><td class="c num">2</td><td>Bodyweight Squats بإيقاع مضبوط</td><td>الرجلين</td>
+        <td class="c"><a class="vid" style="margin:0;padding:.8mm 2mm;" href="https://www.youtube.com/results?search_query=bodyweight+squat+proper+form&amp;sp=EgIYAQ%3D%3D">▶</a></td></tr>
+    <tr><td class="c num">3</td><td>Plank + Shoulder Taps</td><td>الكور والثبات</td>
+        <td class="c"><a class="vid" style="margin:0;padding:.8mm 2mm;" href="https://www.youtube.com/results?search_query=plank+shoulder+taps+exercise&amp;sp=EgIYAQ%3D%3D">▶</a></td></tr>
+  </tbody>
+</table>
+<p><b>Finisher جماعي — 30 ثانية:</b> الفريق كله في دايرة · جاب متواصل · الكابتن بيعد تنازلي بصوت عالي. الوحدة بتقفل بطاقة — مش بانهيار.</p>
+<div class="warn"><b>⚠‏ ممنوع في الوحدة الأولى</b> Burpees · قفز · أي Plyometrics. الركبة ووتر أخيل لسه متعودوش.</div>
+
+<!-- ============ BLOCK F ============ -->
+<div class="pagebreak"></div>
+<div class="block">
+  <div class="bh"><span class="tag">BLOCK F</span><h2>COOLDOWN &amp; DEBRIEF</h2><span class="time">6′</span></div>
+  <div class="goal">استشفاء + تثبيت نقطة اليوم + تحضير الوحدة الجاية.</div>
+</div>
+
+<h3><span class="n">F1</span> Cooldown — 4 دقايق</h3>
+<table>
+  <thead><tr><th>الإطالة</th><th class="c">المدة</th><th>الإطالة</th><th class="c">المدة</th></tr></thead>
+  <tbody>
+    <tr><td>Chest / Doorway</td><td class="c">30 ث كل جهة</td><td>Hamstring</td><td class="c">30 ث كل رجل</td></tr>
+    <tr><td>Lat stretch</td><td class="c">30 ث كل جهة</td><td>Calf / Achilles</td><td class="c">30 ث كل رجل</td></tr>
+    <tr><td>Hip Flexor</td><td class="c">40 ث كل جهة</td><td>Neck — جانبي</td><td class="c">20 ث كل جهة</td></tr>
+    <tr><td colspan="4">تنفس أنفي عميق — 4 ثواني شهيق / 6 ثواني زفير — لمدة 60 ثانية</td></tr>
+  </tbody>
+</table>
+<a class="vid" href="https://www.youtube.com/results?search_query=post+workout+stretching+routine+5+minutes&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ Cooldown Stretching</a>
+<a class="vid" href="https://www.youtube.com/results?search_query=box+breathing+recovery+after+workout&amp;sp=EgIYAQ%3D%3D"><span class="sh" dir="ltr">YOUTUBE · SHORT</span>▶ تمرين التنفس للاستشفاء</a>
+
+<h3><span class="n">F2</span> Debrief — 2 دقيقة · الفريق في دايرة</h3>
+<ol>
+  <li><b>نقطة اليوم:</b> «الجاب مش لكمة — الجاب هو اللي بيفتحلك كل حاجة.»</li>
+  <li><b>واجب بيتي:</b> 3 دقايق Shadow Jab قدام المراية يومياً + تمرين الرسغ.</li>
+  <li><b>تحضير الوحدة الجاية:</b> «المرة الجاية بنضيف الـ Cross. اللي وقفته مظبوطة النهاردة، ضربته هتكون قوية الأسبوع الجاي.»</li>
+  <li><b>Team Call:</b> الفريق كله — إيد في النص — <b>«NINTH ROUND!»</b></li>
+</ol>
+
+<!-- ============ REGRESSIONS ============ -->
+<div class="block" style="margin-top:6mm;">
+  <div class="bh"><span class="tag">ANNEX 1</span><h2>التعديلات — Regressions</h2><span class="time">30+</span></div>
+</div>
+<table>
+  <thead><tr><th>الحالة</th><th>التعديل</th></tr></thead>
+  <tbody>
+    <tr><td>إصابة كتف</td><td>جاب بمدى نصفي · بدون باد · شكارة خفيفة فقط</td></tr>
+    <tr><td>إصابة ركبة / وزن زايد</td><td>إلغاء النط → March in place أو Step-touch · Footwork بدون Pivot</td></tr>
+    <tr><td>ألم رسغ</td><td>مراجعة لف الرسط أولاً · لو استمر → Open-palm jab على الباد</td></tr>
+    <tr><td>ضغط مرتفع</td><td>راحة إضافية 15 ث كل راوند · ممنوع Plank طويل أو حبس النفس</td></tr>
+    <tr><td>لاعب متقدم</td><td>يبقى Pad Holder للزوج + Double/Triple jab + جاب على الجسم</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ EVAL CARD ============ -->
+<div class="block" style="margin-top:6mm;">
+  <div class="bh"><span class="tag">ANNEX 2</span><h2>كارت تقييم الكابتن</h2><span class="time">POST</span></div>
+  <div class="goal">يتملّى فوراً بعد الوحدة — الوحدة الجاية تتبني على بيانات، مش على إحساس.</div>
+</div>
+<table>
+  <thead><tr><th>العنصر</th><th class="c">✅</th><th class="c">⚠</th><th class="c">❌</th><th>ملاحظة</th></tr></thead>
+  <tbody>
+    <tr><td>الفريق فهم الوقفة</td><td class="c">☐</td><td class="c">☐</td><td class="c">☐</td><td></td></tr>
+    <tr><td>الجارد فضل فوق أثناء اللكم</td><td class="c">☐</td><td class="c">☐</td><td class="c">☐</td><td></td></tr>
+    <tr><td>الإيد بترجع بسرعة</td><td class="c">☐</td><td class="c">☐</td><td class="c">☐</td><td></td></tr>
+    <tr><td>التنفس مع اللكمة</td><td class="c">☐</td><td class="c">☐</td><td class="c">☐</td><td></td></tr>
+    <tr><td>مستوى اللياقة العام</td><td class="c">☐</td><td class="c">☐</td><td class="c">☐</td><td></td></tr>
+    <tr><td>عدد اللاعبين المحتاجين Regression</td><td class="c" colspan="3">______</td><td></td></tr>
+    <tr><td>أعلى 3 لاعبين</td><td class="c" colspan="4" style="text-align:right;">1. ____________  2. ____________  3. ____________</td></tr>
+    <tr><td>أضعف 3 (تركيز الوحدة الجاية)</td><td class="c" colspan="4" style="text-align:right;">1. ____________  2. ____________  3. ____________</td></tr>
+  </tbody>
+</table>
+
+<div class="footer-note" dir="ltr">9TH ROUND &nbsp;·&nbsp; SESSION 01 &nbsp;·&nbsp; NO CLASSES. NO WAITING. JUST ACTION.</div>
+
+</body>
+</html>
