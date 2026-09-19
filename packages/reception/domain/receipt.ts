@@ -11,6 +11,8 @@ export interface Receipt {
   programType: ProgramType | null;
   coachId: string | null;
   coachFullName: string | null;
+  soldById: string | null;
+  soldByFullName: string | null;
 }
 
 /** Combinable filters for the Receipts page — future coach-commission/revenue reporting by program and/or coach. */
