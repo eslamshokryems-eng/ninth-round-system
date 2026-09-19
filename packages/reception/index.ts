@@ -30,6 +30,12 @@ import { GetNextMembershipNumberUseCase } from "./application/get-next-membershi
 import { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 import { GetRevenueReportUseCase } from "./application/get-revenue-report";
 import { GetMembershipsReportUseCase } from "./application/get-memberships-report";
+import { GetSalesPerformanceUseCase } from "./application/get-sales-performance";
+import { GetCoachPerformanceUseCase } from "./application/get-coach-performance";
+import { ListPerformanceTargetsUseCase } from "./application/list-performance-targets";
+import { CreatePerformanceTargetUseCase } from "./application/create-performance-target";
+import { UpdatePerformanceTargetUseCase } from "./application/update-performance-target";
+import { DeletePerformanceTargetUseCase } from "./application/delete-performance-target";
 import { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 import { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 import { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -50,6 +56,8 @@ import { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-
 import { SupabaseTrainerRepository } from "./infrastructure/supabase-trainer-repository";
 import { SupabaseRevenueReportRepository } from "./infrastructure/supabase-revenue-report-repository";
 import { SupabaseMembershipsReportRepository } from "./infrastructure/supabase-memberships-report-repository";
+import { SupabasePerformanceReportRepository } from "./infrastructure/supabase-performance-report-repository";
+import { SupabasePerformanceTargetRepository } from "./infrastructure/supabase-performance-target-repository";
 
 export type { DashboardStats } from "./domain/dashboard-stats";
 export type { DashboardRepository } from "./domain/dashboard-repository";
@@ -77,6 +85,15 @@ export type { Receipt } from "./domain/receipt";
 export type { ExpiringMembership } from "./domain/expiring-membership";
 export type { RevenueReport, RevenueReportInput, RevenueReportRow, RevenueBreakdownEntry, RevenueTrendPoint } from "./domain/revenue-report";
 export type { MembershipsReport, MembershipsReportInput, MembershipsReportRow, MembershipsBreakdownEntry } from "./domain/memberships-report";
+export type { PerformanceReportInput, PerformanceRow } from "./domain/performance-report";
+export type {
+  PerformanceCategory,
+  PerformancePeriodType,
+  PerformanceTarget,
+  ListPerformanceTargetsInput,
+  CreatePerformanceTargetInput,
+  UpdatePerformanceTargetInput,
+} from "./domain/performance-target";
 export {
   GetDashboardStatsUseCase,
   type GetDashboardStatsOutput,
@@ -121,6 +138,12 @@ export { GetNextMembershipNumberUseCase } from "./application/get-next-membershi
 export { ListExpiringMembershipsUseCase } from "./application/list-expiring-memberships";
 export { GetRevenueReportUseCase } from "./application/get-revenue-report";
 export { GetMembershipsReportUseCase } from "./application/get-memberships-report";
+export { GetSalesPerformanceUseCase } from "./application/get-sales-performance";
+export { GetCoachPerformanceUseCase } from "./application/get-coach-performance";
+export { ListPerformanceTargetsUseCase } from "./application/list-performance-targets";
+export { CreatePerformanceTargetUseCase } from "./application/create-performance-target";
+export { UpdatePerformanceTargetUseCase } from "./application/update-performance-target";
+export { DeletePerformanceTargetUseCase } from "./application/delete-performance-target";
 export { SupabaseDashboardRepository } from "./infrastructure/supabase-dashboard-repository";
 export { SupabaseRegistrationRepository } from "./infrastructure/supabase-registration-repository";
 export { SupabaseMembershipTypesRepository } from "./infrastructure/supabase-membership-types-repository";
@@ -141,6 +164,8 @@ export { SupabaseExpiringMembershipRepository } from "./infrastructure/supabase-
 export { SupabaseTrainerRepository } from "./infrastructure/supabase-trainer-repository";
 export { SupabaseRevenueReportRepository } from "./infrastructure/supabase-revenue-report-repository";
 export { SupabaseMembershipsReportRepository } from "./infrastructure/supabase-memberships-report-repository";
+export { SupabasePerformanceReportRepository } from "./infrastructure/supabase-performance-report-repository";
+export { SupabasePerformanceTargetRepository } from "./infrastructure/supabase-performance-target-repository";
 
 /**
  * The Reception context's composition root — mirrors
@@ -170,6 +195,8 @@ export function createReceptionModule(client: TypedSupabaseClient) {
   const trainerRepository = new SupabaseTrainerRepository(client);
   const revenueReportRepository = new SupabaseRevenueReportRepository(client);
   const membershipsReportRepository = new SupabaseMembershipsReportRepository(client);
+  const performanceReportRepository = new SupabasePerformanceReportRepository(client);
+  const performanceTargetRepository = new SupabasePerformanceTargetRepository(client);
   return {
     getDashboardStats: new GetDashboardStatsUseCase(dashboardRepository),
     registerMembership: new RegisterMembershipUseCase(registrationRepository),
@@ -202,5 +229,11 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listTrainerPlayers: new ListTrainerPlayersUseCase(trainerRepository),
     getRevenueReport: new GetRevenueReportUseCase(revenueReportRepository),
     getMembershipsReport: new GetMembershipsReportUseCase(membershipsReportRepository),
+    getSalesPerformance: new GetSalesPerformanceUseCase(performanceReportRepository),
+    getCoachPerformance: new GetCoachPerformanceUseCase(performanceReportRepository),
+    listPerformanceTargets: new ListPerformanceTargetsUseCase(performanceTargetRepository),
+    createPerformanceTarget: new CreatePerformanceTargetUseCase(performanceTargetRepository),
+    updatePerformanceTarget: new UpdatePerformanceTargetUseCase(performanceTargetRepository),
+    deletePerformanceTarget: new DeletePerformanceTargetUseCase(performanceTargetRepository),
   };
 }

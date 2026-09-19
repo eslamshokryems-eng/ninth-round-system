@@ -86,6 +86,13 @@ const ERROR_CODE_TO_MESSAGE: Record<string, string> = {
   REVENUE_REPORT_FAILED: "Could not load the revenue report. Please try again.",
   MEMBERSHIPS_REPORT_FAILED: "Could not load the memberships report. Please try again.",
   SALES_REPORT_FAILED: "Could not load the sales report. Please try again.",
+  SALES_PERFORMANCE_REPORT_FAILED: "Could not load sales performance. Please try again.",
+  COACH_PERFORMANCE_REPORT_FAILED: "Could not load coach performance. Please try again.",
+  LIST_PERFORMANCE_TARGETS_FAILED: "Could not load targets. Please try again.",
+  CREATE_PERFORMANCE_TARGET_FAILED: "Could not save the target. Please try again.",
+  TARGET_ALREADY_EXISTS: "A target for this employee, category, and period already exists.",
+  UPDATE_PERFORMANCE_TARGET_FAILED: "Could not update the target. Please try again.",
+  DELETE_PERFORMANCE_TARGET_FAILED: "Could not delete the target. Please try again.",
   GEOLOCATION_PERMISSION_DENIED: "Location access is off. Enable it for this site in your browser/phone settings, then try again.",
   GEOLOCATION_UNAVAILABLE: "Could not get your location. Check your device's location/GPS is on and try again.",
   // TOO_FAR_FROM_BRANCH's real message (built server-side, includes the
