@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuthStore } from "../../../src/features/auth/store";
+import { Card } from "../../../src/components/ui/card";
 import { AttendanceTab } from "./attendance-tab";
 import { ScheduleTab } from "./schedule-tab";
 import { LeaveTab } from "./leave-tab";
@@ -11,6 +12,8 @@ import { EmployeesTab } from "./employees-tab";
 type Tab = "attendance" | "schedule" | "leave" | "payroll" | "employees";
 
 const isAdmin = (role: string | null) => role === "branch_manager" || role === "super_admin";
+/** coach/sales_employee never had a real reason to be here — the nav link is hidden for them too (reception-sidebar.tsx), this is the same defense-in-depth gate Reports already uses for direct-URL access. */
+const CANNOT_VIEW_HR = new Set(["coach", "sales_employee"]);
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "attendance", label: "Attendance" },
@@ -30,6 +33,16 @@ export default function HrPage() {
     if (t.id === "employees") return isAdmin(role);
     return true;
   });
+
+  if (role && CANNOT_VIEW_HR.has(role)) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card>
+          <p className="text-ink">HR is not available for your account.</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl">

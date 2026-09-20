@@ -16,6 +16,8 @@ import { QrCodeImage } from "../../../../src/components/ui/qr-code";
 import { StaffPicker } from "../../../../src/components/staff-picker";
 
 const CAN_DELETE_MEMBER = new Set(["branch_manager", "super_admin"]);
+/** Coach/sales_employee accounts can't complete a renewal/add-package anyway (RLS blocks their memberships insert), and shouldn't see membership pricing here — they get a read-only view of membership status/dates, same as Trainers/Expiring already give them. */
+const CAN_MANAGE_PAYMENTS = new Set(["reception", "branch_manager", "super_admin"]);
 
 const GENDERS: { value: Gender; label: string }[] = [
   { value: "female", label: "Female" },
@@ -374,12 +376,16 @@ export default function MemberDetailPage() {
         <Button variant="secondary" onClick={() => setIsQrVisible((visible) => !visible)}>
           {isQrVisible ? "Hide QR Code" : "Show QR Code"}
         </Button>
-        <Button variant="secondary" onClick={() => setIsRenewOpen((open) => !open)}>
-          {isRenewOpen ? "Cancel Renewal" : "Renew Membership"}
-        </Button>
-        <Button variant="secondary" onClick={() => setIsAddPackageOpen((open) => !open)}>
-          {isAddPackageOpen ? "Cancel" : "+ Add Package"}
-        </Button>
+        {role && CAN_MANAGE_PAYMENTS.has(role) ? (
+          <Button variant="secondary" onClick={() => setIsRenewOpen((open) => !open)}>
+            {isRenewOpen ? "Cancel Renewal" : "Renew Membership"}
+          </Button>
+        ) : null}
+        {role && CAN_MANAGE_PAYMENTS.has(role) ? (
+          <Button variant="secondary" onClick={() => setIsAddPackageOpen((open) => !open)}>
+            {isAddPackageOpen ? "Cancel" : "+ Add Package"}
+          </Button>
+        ) : null}
         {role && CAN_DELETE_MEMBER.has(role) ? (
           <Button variant="danger" onClick={() => setIsDeleteConfirmOpen((open) => !open)}>
             Delete Member
@@ -715,7 +721,7 @@ export default function MemberDetailPage() {
                   <th className="py-2 pr-4">Program</th>
                   <th className="py-2 pr-4">Number</th>
                   <th className="py-2 pr-4">Period</th>
-                  <th className="py-2 pr-4">Price</th>
+                  {role && CAN_MANAGE_PAYMENTS.has(role) ? <th className="py-2 pr-4">Price</th> : null}
                   <th className="py-2 pr-4">Payment</th>
                   <th className="py-2 pr-4">Coach</th>
                   <th className="py-2 pr-4">Status</th>
@@ -730,7 +736,9 @@ export default function MemberDetailPage() {
                     <td className="py-2 pr-4 text-muted">
                       {entry.startDate} → {entry.endDate}
                     </td>
-                    <td className="py-2 pr-4 text-gold">{entry.finalPrice.toLocaleString()} EGP</td>
+                    {role && CAN_MANAGE_PAYMENTS.has(role) ? (
+                      <td className="py-2 pr-4 text-gold">{entry.finalPrice.toLocaleString()} EGP</td>
+                    ) : null}
                     <td className="py-2 pr-4 text-muted capitalize">{entry.paymentMethod.replace("_", " ")}</td>
                     <td className="py-2 pr-4 text-muted">
                       {entry.coachFullName

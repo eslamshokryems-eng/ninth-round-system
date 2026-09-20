@@ -119,6 +119,18 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
+ * Add Member requires entering price/discount (coach/sales_employee
+ * shouldn't see membership pricing) and neither role can actually complete
+ * it anyway — RLS only allows reception/branch_manager/super_admin to
+ * insert members/memberships. HR has nothing either role needs and
+ * exposes other employees' schedules/leave. Both pages also gate
+ * themselves for direct-URL access (members/new/page.tsx, hr/page.tsx) —
+ * this hides the link so neither role sees one they'd be turned away
+ * from, same reasoning as CHECK_IN_NAV_ITEMS/OWNER_NAV_ITEMS above.
+ */
+const RESTRICTED_FOR_COACH_AND_SALES: ReadonlySet<string> = new Set(["/members/new", "/hr"]);
+
+/**
  * Check-in-capable roles only — matches check_in_member()'s own RLS
  * exactly (20260806000006_check_ins.sql: reception/branch_manager/
  * super_admin; sales_employee is deliberately excluded from check-in).
@@ -171,7 +183,10 @@ const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
  * a new tier is one `if`, not a rewrite of nested branches.
  */
 function navItemsForRole(role: string | null): NavItem[] {
-  const items = [...NAV_ITEMS];
+  let items = [...NAV_ITEMS];
+  if (role === "coach" || role === "sales_employee") {
+    items = items.filter((item) => !RESTRICTED_FOR_COACH_AND_SALES.has(item.href));
+  }
   // Inserted right after Dashboard — a fast-path daily action, not buried below Reports/Profile.
   if (role && role !== "sales_employee") items.splice(1, 0, ...CHECK_IN_NAV_ITEMS);
   if (role === "sales_employee" || role === "branch_manager" || role === "super_admin") {
