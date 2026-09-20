@@ -51,8 +51,12 @@ interface SuccessState {
 }
 
 /** Add Member (Phase 6) — the first operational Reception workflow: create a member, their first membership, and its payment record together via register_membership(). */
+/** coach/sales_employee can't complete this anyway — RLS only allows reception/branch_manager/super_admin to insert members/memberships — and it requires entering price/discount, which those two roles shouldn't see. Same defense-in-depth gate as HR; the nav link is hidden for them too (reception-sidebar.tsx). */
+const CANNOT_ADD_MEMBER = new Set(["coach", "sales_employee"]);
+
 export default function AddMemberPage() {
   const branchId = useAuthStore((state) => state.branchId);
+  const role = useAuthStore((state) => state.role);
 
   const [previewNumber, setPreviewNumber] = useState<string | null>(null);
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
@@ -204,6 +208,16 @@ export default function AddMemberPage() {
     }
 
     setSuccess({ membershipNumber: result.value.membershipNumber, qrCode: result.value.memberQrCode });
+  }
+
+  if (role && CANNOT_ADD_MEMBER.has(role)) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card>
+          <p className="text-ink">Add Member is not available for your account.</p>
+        </Card>
+      </div>
+    );
   }
 
   if (success) {

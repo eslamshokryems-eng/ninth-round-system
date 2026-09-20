@@ -32,6 +32,9 @@ import { GetRevenueReportUseCase } from "./application/get-revenue-report";
 import { GetMembershipsReportUseCase } from "./application/get-memberships-report";
 import { GetSalesPerformanceUseCase } from "./application/get-sales-performance";
 import { GetCoachPerformanceUseCase } from "./application/get-coach-performance";
+import { GetSalesDailyTrendUseCase } from "./application/get-sales-daily-trend";
+import { GetSalesByProgramUseCase } from "./application/get-sales-by-program";
+import { GetSalesTransactionsUseCase } from "./application/get-sales-transactions";
 import { ListPerformanceTargetsUseCase } from "./application/list-performance-targets";
 import { CreatePerformanceTargetUseCase } from "./application/create-performance-target";
 import { UpdatePerformanceTargetUseCase } from "./application/update-performance-target";
@@ -85,7 +88,14 @@ export type { Receipt } from "./domain/receipt";
 export type { ExpiringMembership } from "./domain/expiring-membership";
 export type { RevenueReport, RevenueReportInput, RevenueReportRow, RevenueBreakdownEntry, RevenueTrendPoint } from "./domain/revenue-report";
 export type { MembershipsReport, MembershipsReportInput, MembershipsReportRow, MembershipsBreakdownEntry } from "./domain/memberships-report";
-export type { PerformanceReportInput, PerformanceRow } from "./domain/performance-report";
+export type {
+  PerformanceReportInput,
+  PerformanceRow,
+  SalesDailyTrendPoint,
+  SalesByProgramEntry,
+  SalesTransaction,
+  SalesTransactionsInput,
+} from "./domain/performance-report";
 export type {
   PerformanceCategory,
   PerformancePeriodType,
@@ -140,6 +150,9 @@ export { GetRevenueReportUseCase } from "./application/get-revenue-report";
 export { GetMembershipsReportUseCase } from "./application/get-memberships-report";
 export { GetSalesPerformanceUseCase } from "./application/get-sales-performance";
 export { GetCoachPerformanceUseCase } from "./application/get-coach-performance";
+export { GetSalesDailyTrendUseCase } from "./application/get-sales-daily-trend";
+export { GetSalesByProgramUseCase } from "./application/get-sales-by-program";
+export { GetSalesTransactionsUseCase } from "./application/get-sales-transactions";
 export { ListPerformanceTargetsUseCase } from "./application/list-performance-targets";
 export { CreatePerformanceTargetUseCase } from "./application/create-performance-target";
 export { UpdatePerformanceTargetUseCase } from "./application/update-performance-target";
@@ -231,6 +244,9 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     getMembershipsReport: new GetMembershipsReportUseCase(membershipsReportRepository),
     getSalesPerformance: new GetSalesPerformanceUseCase(performanceReportRepository),
     getCoachPerformance: new GetCoachPerformanceUseCase(performanceReportRepository),
+    getSalesDailyTrend: new GetSalesDailyTrendUseCase(performanceReportRepository),
+    getSalesByProgram: new GetSalesByProgramUseCase(performanceReportRepository),
+    getSalesTransactions: new GetSalesTransactionsUseCase(performanceReportRepository),
     listPerformanceTargets: new ListPerformanceTargetsUseCase(performanceTargetRepository),
     createPerformanceTarget: new CreatePerformanceTargetUseCase(performanceTargetRepository),
     updatePerformanceTarget: new UpdatePerformanceTargetUseCase(performanceTargetRepository),

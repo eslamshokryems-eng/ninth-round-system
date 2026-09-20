@@ -11,6 +11,7 @@ import { Card } from "../../../src/components/ui/card";
 import { TextField } from "../../../src/components/ui/text-field";
 import { OptionCard } from "../../../src/components/ui/option-card";
 import { StaffPicker } from "../../../src/components/staff-picker";
+import { BreakdownBars } from "../../../src/components/breakdown-bars";
 
 const today = new Date();
 
@@ -130,6 +131,24 @@ export default function ReceiptsPage() {
     : receipts;
   const totalForView = visibleReceipts.reduce((sum, r) => sum + r.amount, 0);
 
+  const byCoach = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const receipt of visibleReceipts) {
+      const label = receipt.coachFullName ?? "Unassigned";
+      totals.set(label, (totals.get(label) ?? 0) + receipt.amount);
+    }
+    return [...totals.entries()].map(([label, value]) => ({ label, value }));
+  }, [visibleReceipts]);
+
+  const bySalesPerson = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const receipt of visibleReceipts) {
+      const label = receipt.soldByFullName ?? "Unassigned";
+      totals.set(label, (totals.get(label) ?? 0) + receipt.amount);
+    }
+    return [...totals.entries()].map(([label, value]) => ({ label, value }));
+  }, [visibleReceipts]);
+
   if (role !== "branch_manager" && role !== "super_admin") {
     return (
       <div className="mx-auto max-w-2xl">
@@ -171,7 +190,7 @@ export default function ReceiptsPage() {
       </div>
 
       <Card className="mb-6 space-y-3">
-        <p className="text-xs font-medium text-muted">Filter by Program and/or Coach — combinable, future coach-commission reporting.</p>
+        <p className="text-xs font-medium text-muted">Filter by Program and/or Coach — combinable. The breakdown below always reflects every coach and sales person, filtered or not.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <p className="mb-2 text-xs font-medium text-muted">Program</p>
@@ -202,6 +221,19 @@ export default function ReceiptsPage() {
         ) : null}
       </Card>
 
+      {!isLoading && !errorMessage && visibleReceipts.length > 0 ? (
+        <div className="mb-6 grid gap-4 md:grid-cols-2">
+          <Card>
+            <h2 className="mb-4 text-sm font-semibold text-ink">By Coach</h2>
+            <BreakdownBars entries={byCoach} formatValue={(v) => `${v.toLocaleString()} EGP`} />
+          </Card>
+          <Card>
+            <h2 className="mb-4 text-sm font-semibold text-ink">By Sales Person</h2>
+            <BreakdownBars entries={bySalesPerson} formatValue={(v) => `${v.toLocaleString()} EGP`} />
+          </Card>
+        </div>
+      ) : null}
+
       {isLoading ? (
         <p className="text-muted">Loading…</p>
       ) : errorMessage ? (
@@ -219,6 +251,7 @@ export default function ReceiptsPage() {
                 <th className="px-4 py-3">Membership #</th>
                 <th className="px-4 py-3">Program</th>
                 <th className="px-4 py-3">Coach</th>
+                <th className="px-4 py-3">Sales Person</th>
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3 text-right">Amount</th>
               </tr>
@@ -272,6 +305,7 @@ export default function ReceiptsPage() {
                   <td className="px-4 py-3 text-muted">{receipt.membershipNumber}</td>
                   <td className="px-4 py-3 text-muted">{programLabel(receipt.programType)}</td>
                   <td className="px-4 py-3 text-muted">{receipt.coachFullName ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted">{receipt.soldByFullName ?? "—"}</td>
                   <td className="px-4 py-3 text-muted capitalize">{receipt.paymentMethod.replace("_", " ")}</td>
                   <td className="px-4 py-3 text-right font-medium text-gold">{receipt.amount.toLocaleString()} EGP</td>
                 </tr>

@@ -5,7 +5,7 @@ import type { ReceiptRepository } from "../domain/receipt-repository";
 import type { Receipt, ReceiptFilters } from "../domain/receipt";
 
 const RECEIPT_COLUMNS = `id, payment_date, amount, payment_method,
-         memberships!inner (branch_id, receipt_number, membership_number, program_type, coach_id, members (full_name), coach:profiles!memberships_coach_id_fkey (full_name))`;
+         memberships!inner (branch_id, receipt_number, membership_number, program_type, coach_id, sold_by, members (full_name), coach:profiles!memberships_coach_id_fkey (full_name), sold_by_staff:profiles!memberships_sold_by_fkey (full_name))`;
 
 interface ReceiptRow {
   id: string;
@@ -17,8 +17,10 @@ interface ReceiptRow {
     membership_number: string;
     program_type: Receipt["programType"];
     coach_id: string | null;
+    sold_by: string | null;
     members: { full_name: string };
     coach: { full_name: string | null } | null;
+    sold_by_staff: { full_name: string | null } | null;
   };
 }
 
@@ -42,6 +44,8 @@ function toReceipt(row: ReceiptRow): Receipt {
     programType: membership?.program_type ?? null,
     coachId: membership?.coach_id ?? null,
     coachFullName: membership?.coach?.full_name ?? null,
+    soldById: membership?.sold_by ?? null,
+    soldByFullName: membership?.sold_by_staff?.full_name ?? null,
   };
 }
 

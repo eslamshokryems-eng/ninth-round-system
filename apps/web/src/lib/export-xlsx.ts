@@ -14,3 +14,16 @@ export function exportToExcel(filename: string, sheets: ExportSheet[]): void {
   }
   XLSX.writeFile(workbook, filename);
 }
+
+/** Same client-side approach as exportToExcel, one sheet's worth as plain .csv — reuses the same `xlsx` dependency rather than adding a new one. */
+export function exportToCsv(filename: string, rows: Record<string, string | number>[]): void {
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const csv = XLSX.utils.sheet_to_csv(worksheet);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}

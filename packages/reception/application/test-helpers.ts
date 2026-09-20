@@ -24,7 +24,14 @@ import type { Expense, RecordExpenseInput } from "../domain/expense";
 import type { EquipmentSaleRepository } from "../domain/equipment-sale-repository";
 import type { EquipmentSale, RecordEquipmentSaleInput } from "../domain/equipment-sale";
 import type { PerformanceReportRepository } from "../domain/performance-report-repository";
-import type { PerformanceReportInput, PerformanceRow } from "../domain/performance-report";
+import type {
+  PerformanceReportInput,
+  PerformanceRow,
+  SalesByProgramEntry,
+  SalesDailyTrendPoint,
+  SalesTransaction,
+  SalesTransactionsInput,
+} from "../domain/performance-report";
 import type { PerformanceTargetRepository } from "../domain/performance-target-repository";
 import type {
   CreatePerformanceTargetInput,
@@ -476,10 +483,42 @@ export function buildPerformanceRow(overrides: Partial<PerformanceRow> = {}): Pe
   };
 }
 
+export function buildSalesDailyTrendPoint(overrides: Partial<SalesDailyTrendPoint> = {}): SalesDailyTrendPoint {
+  return { date: "2026-09-01", collectedRevenue: 1000, ...overrides };
+}
+
+export function buildSalesByProgramEntry(overrides: Partial<SalesByProgramEntry> = {}): SalesByProgramEntry {
+  return { programType: "boxing", membershipCount: 3, collectedRevenue: 3000, ...overrides };
+}
+
+export function buildSalesTransaction(overrides: Partial<SalesTransaction> = {}): SalesTransaction {
+  return {
+    paymentId: "payment-1",
+    paymentDate: "2026-09-01",
+    memberFullName: "Omar Khaled",
+    membershipNumber: "M-0001",
+    programType: "boxing",
+    price: 1000,
+    discount: 0,
+    finalPrice: 1000,
+    collectedAmount: 1000,
+    receiptNumber: "R-0001",
+    ...overrides,
+  };
+}
+
 export class FakePerformanceReportRepository implements PerformanceReportRepository {
   public lastSalesInput: PerformanceReportInput | null = null;
   public lastCoachInput: PerformanceReportInput | null = null;
-  constructor(private result: Result<PerformanceRow[]> = ok([buildPerformanceRow()])) {}
+  public lastDailyTrendInput: PerformanceReportInput | null = null;
+  public lastByProgramInput: PerformanceReportInput | null = null;
+  public lastTransactionsInput: SalesTransactionsInput | null = null;
+  constructor(
+    private result: Result<PerformanceRow[]> = ok([buildPerformanceRow()]),
+    private dailyTrendResult: Result<SalesDailyTrendPoint[]> = ok([buildSalesDailyTrendPoint()]),
+    private byProgramResult: Result<SalesByProgramEntry[]> = ok([buildSalesByProgramEntry()]),
+    private transactionsResult: Result<SalesTransaction[]> = ok([buildSalesTransaction()]),
+  ) {}
 
   async getSalesPerformance(input: PerformanceReportInput): Promise<Result<PerformanceRow[]>> {
     this.lastSalesInput = input;
@@ -490,12 +529,30 @@ export class FakePerformanceReportRepository implements PerformanceReportReposit
     this.lastCoachInput = input;
     return this.result;
   }
+
+  async getSalesDailyTrend(input: PerformanceReportInput): Promise<Result<SalesDailyTrendPoint[]>> {
+    this.lastDailyTrendInput = input;
+    return this.dailyTrendResult;
+  }
+
+  async getSalesByProgram(input: PerformanceReportInput): Promise<Result<SalesByProgramEntry[]>> {
+    this.lastByProgramInput = input;
+    return this.byProgramResult;
+  }
+
+  async getSalesTransactions(input: SalesTransactionsInput): Promise<Result<SalesTransaction[]>> {
+    this.lastTransactionsInput = input;
+    return this.transactionsResult;
+  }
 }
 
 export function fakePerformanceReportRepository(
   result: Result<PerformanceRow[]> = ok([buildPerformanceRow()]),
+  dailyTrendResult: Result<SalesDailyTrendPoint[]> = ok([buildSalesDailyTrendPoint()]),
+  byProgramResult: Result<SalesByProgramEntry[]> = ok([buildSalesByProgramEntry()]),
+  transactionsResult: Result<SalesTransaction[]> = ok([buildSalesTransaction()]),
 ): FakePerformanceReportRepository {
-  return new FakePerformanceReportRepository(result);
+  return new FakePerformanceReportRepository(result, dailyTrendResult, byProgramResult, transactionsResult);
 }
 
 export function buildPerformanceTarget(overrides: Partial<PerformanceTarget> = {}): PerformanceTarget {
