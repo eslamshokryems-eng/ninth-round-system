@@ -1,0 +1,29 @@
+-- Fixes production bug: the Sales Person picker in Add Member/Renew/Add
+-- Package (memberships.sold_by, 20260917000001) silently shows only
+-- coaches and never lets a reception/coach/sales_employee account select a
+-- real sales_employee/reception/branch_manager coworker as the seller.
+--
+-- Root cause: profiles' RLS lets a non-admin caller (reception, coach,
+-- sales_employee) read only their own row, or (since 20260912000001) a
+-- coworker's row if that coworker's role is 'coach' — added back then
+-- specifically for the "Assign a Coach" picker. No equivalent policy was
+-- ever added for the other operational roles, so when the Sales Person
+-- picker was built this session (intentionally unrestricted — "any staff
+-- member" per its own migration comment), it inherited the exact same
+-- visibility gap 20260912000001 already fixed once for coach. The query
+-- succeeds and returns no error; Postgres just silently drops every row
+-- the caller isn't allowed to see, which looks like "the Sales picker
+-- shows coaches" (the only coworkers visible) and "selecting a Sales
+-- person doesn't work" (they never appear in the list to click).
+--
+-- Fix: widen coworker visibility to every operational staff role — coach,
+-- reception, sales_employee, branch_manager — scoped the same way the
+-- coach-only policy already is: same branch only (is_branch_staff), never
+-- another branch, and never a 'member' (club customer) profile.
+-- super_admin needs no new policy here — already fully covered by
+-- "admins manage all profiles". This is additive only: no existing policy
+-- is changed or removed, no column or table is added, and no existing
+-- production behavior changes other than these previously-hidden rows now
+-- being visible to the same branch's own staff.
+create policy "branch staff read staff profiles for attribution" on profiles for select
+  using (role in ('coach', 'reception', 'sales_employee', 'branch_manager') and is_branch_staff(branch_id));
