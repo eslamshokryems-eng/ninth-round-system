@@ -22,8 +22,15 @@ function monthRangeFor(date: Date, monthOffset = 0): DateRange {
   return { startDate: toDateKey(start), endDate: toDateKey(end) };
 }
 
+function yesterday(): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d;
+}
+
 const PRESETS: { label: string; range: () => DateRange }[] = [
   { label: "Today", range: () => ({ startDate: toDateKey(new Date()), endDate: toDateKey(new Date()) }) },
+  { label: "Yesterday", range: () => ({ startDate: toDateKey(yesterday()), endDate: toDateKey(yesterday()) }) },
   { label: "This Week", range: () => ({ startDate: toDateKey(startOfWeek(new Date())), endDate: toDateKey(new Date()) }) },
   { label: "This Month", range: () => monthRangeFor(new Date()) },
   { label: "Last Month", range: () => monthRangeFor(new Date(), -1) },

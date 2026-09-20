@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { RevenueTrendPoint } from "@9thround/reception";
 
 interface RevenueTrendChartProps {
   points: RevenueTrendPoint[];
+  /** Defaults to the app's usual gold accent — pass a different hex to match a page's own accent (e.g. the Sales Performance dashboard's red), without duplicating this chart's SVG logic. */
+  color?: string;
 }
 
 const WIDTH = 600;
@@ -15,8 +17,9 @@ const PAD_BOTTOM = 24;
 const MAX_LABELS = 7;
 
 /** Same single-series line style as CheckInTrendChart — one series, no legend needed, labeled by the section title. */
-export function RevenueTrendChart({ points }: RevenueTrendChartProps) {
+export function RevenueTrendChart({ points, color = "#d4af37" }: RevenueTrendChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const gradientId = `revenue-trend-fill-${useId()}`;
 
   if (points.length === 0) {
     return <p className="text-sm text-muted">No revenue in this range.</p>;
@@ -61,13 +64,13 @@ export function RevenueTrendChart({ points }: RevenueTrendChartProps) {
           />
         ))}
 
-        <path d={areaPath} fill="url(#revenue-trend-fill)" />
-        <path d={linePath} fill="none" stroke="#d4af37" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
 
         <defs>
-          <linearGradient id="revenue-trend-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d4af37" stopOpacity={0.25} />
-            <stop offset="100%" stopColor="#d4af37" stopOpacity={0} />
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
 
@@ -94,7 +97,7 @@ export function RevenueTrendChart({ points }: RevenueTrendChartProps) {
         {hovered ? (
           <>
             <line x1={hovered.x} x2={hovered.x} y1={PAD_TOP} y2={PAD_TOP + plotHeight} stroke="currentColor" className="text-white/15" strokeWidth={1} />
-            <circle cx={hovered.x} cy={hovered.y} r={4} fill="#d4af37" stroke="#0b0b0d" strokeWidth={2} />
+            <circle cx={hovered.x} cy={hovered.y} r={4} fill={color} stroke="#0b0b0d" strokeWidth={2} />
           </>
         ) : null}
       </svg>

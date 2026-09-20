@@ -22,3 +22,38 @@ export interface PerformanceRow {
   /** Sum of what was actually paid via membership_payments — the primary KPI. */
   collectedRevenue: number;
 }
+
+export interface SalesDailyTrendPoint {
+  /** "YYYY-MM-DD". */
+  date: string;
+  collectedRevenue: number;
+}
+
+export interface SalesByProgramEntry {
+  /** Null means unclassified (never backfilled on historical rows) — the UI shows this as "Other" using real data, not an invented category. */
+  programType: ProgramType | null;
+  membershipCount: number;
+  collectedRevenue: number;
+}
+
+export interface SalesTransaction {
+  paymentId: string;
+  paymentDate: string;
+  memberFullName: string;
+  membershipNumber: string;
+  programType: ProgramType | null;
+  price: number;
+  discount: number;
+  finalPrice: number;
+  collectedAmount: number;
+  receiptNumber: string;
+}
+
+export interface SalesTransactionsInput {
+  branchId: string;
+  startDate: string;
+  endDate: string;
+  /** Required — this report is always scoped to one employee. */
+  staffId: string;
+  programType?: ProgramType | null;
+}
