@@ -1,0 +1,22 @@
+-- Fixes production bug: creating a Lead ("+ New Lead") or scheduling a
+-- follow-up always fails with a generic "Could not create..." error, for
+-- every role including super_admin.
+--
+-- Root cause: the INSERT policies on `leads` and `lead_followups`
+-- (20260821000001_sales_leads_crm.sql) both require `created_by =
+-- auth.uid()`, but packages/sales's repositories write these tables via a
+-- plain client-side `.insert()` that never includes `created_by` at all —
+-- unlike every other `created_by` column in this schema, which is set by
+-- `auth.uid()` inside a SECURITY INVOKER SQL function (e.g.
+-- register_membership()). leads/lead_followups are the only tables
+-- written directly from the client with no RPC function, so nothing ever
+-- supplied that value. With no default, it comes through NULL, `created_by
+-- = auth.uid()` is never true, and RLS silently rejects the insert.
+--
+-- Fix: give both columns a database default, the same effective mechanism
+-- every other created_by column already relies on. No RLS change, no
+-- application code change, no existing rows touched — this only affects
+-- new inserts that don't explicitly supply created_by, which is exactly
+-- today's (broken) behavior.
+alter table leads alter column created_by set default auth.uid();
+alter table lead_followups alter column created_by set default auth.uid();
