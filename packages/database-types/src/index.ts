@@ -241,6 +241,38 @@ export interface OtherSaleRow {
   updated_at: string;
 }
 
+// --- Login Verification & Trusted Devices (device_verification migration) ---
+
+export interface SecuritySettingRow {
+  id: string;
+  key: string;
+  value: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface TrustedDeviceRow {
+  id: string;
+  user_id: string;
+  device_token_hash: string;
+  device_name: string | null;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+}
+
+export interface DeviceVerificationCodeRow {
+  id: string;
+  user_id: string;
+  code_hash: string;
+  attempts: number;
+  max_attempts: number;
+  expires_at: string;
+  consumed_at: string | null;
+  created_at: string;
+}
+
 export interface ReceptionDashboardStatsRow {
   active_members: number;
   new_members_today: number;
@@ -373,6 +405,31 @@ export interface Database {
         Insert: Partial<UserPermissionOverrideRow> &
           Pick<UserPermissionOverrideRow, "profile_id" | "permission_key" | "granted">;
         Update: Partial<UserPermissionOverrideRow>;
+        Relationships: [];
+      };
+      // security_settings/trusted_devices/device_verification_codes carry
+      // zero RLS policies beyond security_settings' own super_admin-only
+      // select/update (see 20260922000001_device_verification.sql) — every
+      // read/write to all three goes through a service-role Route Handler
+      // under apps/web/app/api/auth/device/*, never a direct client call.
+      security_settings: {
+        Row: SecuritySettingRow;
+        Insert: Partial<SecuritySettingRow> & Pick<SecuritySettingRow, "key" | "value">;
+        Update: Partial<SecuritySettingRow>;
+        Relationships: [];
+      };
+      trusted_devices: {
+        Row: TrustedDeviceRow;
+        Insert: Partial<TrustedDeviceRow> &
+          Pick<TrustedDeviceRow, "user_id" | "device_token_hash" | "expires_at">;
+        Update: Partial<TrustedDeviceRow>;
+        Relationships: [];
+      };
+      device_verification_codes: {
+        Row: DeviceVerificationCodeRow;
+        Insert: Partial<DeviceVerificationCodeRow> &
+          Pick<DeviceVerificationCodeRow, "user_id" | "code_hash" | "expires_at">;
+        Update: Partial<DeviceVerificationCodeRow>;
         Relationships: [];
       };
     };

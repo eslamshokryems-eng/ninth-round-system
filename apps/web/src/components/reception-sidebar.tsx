@@ -84,6 +84,21 @@ function HistoryIcon() {
   );
 }
 
+function SecurityIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
+      <path
+        d="M10 2.5l6 2.2v4.7c0 4-2.6 6.9-6 8.1-3.4-1.2-6-4.1-6-8.1V4.7z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="10" cy="9.5" r="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 11v2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function TrainersIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 flex-shrink-0" aria-hidden="true">
@@ -174,6 +189,7 @@ const OWNER_NAV_ITEMS: NavItem[] = [
 const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { href: "/audit-log", label: "Audit Log", icon: AuditLogIcon },
   { href: "/permissions", label: "Permissions", icon: PermissionsIcon },
+  { href: "/security", label: "Security", icon: SecurityIcon },
 ];
 
 /**
