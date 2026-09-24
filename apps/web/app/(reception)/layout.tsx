@@ -8,6 +8,8 @@ import { useAuthStore } from "../../src/features/auth/store";
 import { STAFF_ROLES } from "../../src/lib/staff-roles";
 import { ReceptionSidebar } from "../../src/components/reception-sidebar";
 import { getIdentityModule } from "../../src/lib/composition-root";
+import { checkDeviceTrust } from "../../src/lib/device-verification-client";
+import { DeviceVerificationScreen } from "./device-verification-screen";
 import { AttendanceTab } from "./hr/attendance-tab";
 
 /**
@@ -26,12 +28,40 @@ export default function ReceptionLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [deviceStatus, setDeviceStatus] = useState<"checking" | "trusted" | "needs-verification" | "error">(
+    "checking",
+  );
 
   useEffect(() => {
     if (status === "signedOut") {
       router.replace("/login");
     }
   }, [status, router]);
+
+  // Runs once per mount, right after a staff sign-in — checks the `td`
+  // HttpOnly cookie (attached automatically by the browser, never read by
+  // this client code) against this employee's own trusted_devices rows.
+  // Login Verification + Trusted Device system: an app-layer gate, not an
+  // RLS-level one — see the architecture review delivered earlier in this
+  // session for why Supabase MFA doesn't fit and what this does and
+  // doesn't protect against.
+  useEffect(() => {
+    if (status !== "signedIn" || !role || !STAFF_ROLES.has(role) || deviceStatus !== "checking") return;
+    let isMounted = true;
+    async function run() {
+      const result = await checkDeviceTrust();
+      if (!isMounted) return;
+      if ("error" in result) {
+        setDeviceStatus("error");
+        return;
+      }
+      setDeviceStatus(result.trusted ? "trusted" : "needs-verification");
+    }
+    void run();
+    return () => {
+      isMounted = false;
+    };
+  }, [status, role, deviceStatus]);
 
   // Close the drawer whenever the route changes (e.g. via browser back/forward, not just a nav click).
   useEffect(() => {
@@ -65,6 +95,29 @@ export default function ReceptionLayout({ children }: { children: ReactNode }) {
         <div>
           <p className="text-lg font-semibold text-ink">This account isn&apos;t authorized for Reception.</p>
           <p className="mt-2 text-sm text-muted">Sign in with a Reception, Branch Manager, or Super Admin account.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (deviceStatus === "checking") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-bg">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (deviceStatus === "needs-verification") {
+    return <DeviceVerificationScreen onVerified={() => setDeviceStatus("trusted")} />;
+  }
+
+  if (deviceStatus === "error") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-bg px-4 text-center">
+        <div>
+          <p className="text-lg font-semibold text-ink">Couldn&apos;t verify this device.</p>
+          <p className="mt-2 text-sm text-muted">Check your connection and reload the page.</p>
         </div>
       </div>
     );
