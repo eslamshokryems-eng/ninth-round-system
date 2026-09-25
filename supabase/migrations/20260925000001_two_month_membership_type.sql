@@ -1,0 +1,23 @@
+-- Adds a "Two Months" purchasable membership type so Reception can renew a
+-- member for 2 months from the existing Renew Membership panel, the same
+-- way "One Month" (already seeded, 20260806000003) works today.
+--
+-- Data-only: membership_types already supports arbitrary rows (no schema
+-- change), and every existing renewal/registration code path already
+-- reads whatever's in this table — nothing else changes.
+--
+-- Deliberately NOT adding a duplicate "1 Month" row: "One Month" (30 days)
+-- already exists and already satisfies that need; adding a second
+-- 30-day row with a different name would just be a confusing duplicate
+-- in the Renew panel's option list.
+--
+-- Note (documented in the read-only investigation this migration follows
+-- from): renew_membership()/register_membership() add a fixed day count
+-- (v_end_date := v_start_date + v_duration_days), not calendar months, so
+-- "2 months" here means +60 days from the current expiry — the same
+-- day-based approach every existing type already uses, not exact
+-- same-day-next-month-twice arithmetic. That would require changing the
+-- shared renew_membership()/register_membership() functions themselves,
+-- which was explicitly out of scope for this change.
+insert into membership_types (name, duration_days) values
+  ('Two Months', 60);
