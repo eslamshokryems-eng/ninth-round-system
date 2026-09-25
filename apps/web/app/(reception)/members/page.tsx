@@ -31,6 +31,8 @@ export default function MembersPage() {
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [results, setResults] = useState<MemberSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -76,19 +78,33 @@ export default function MembersPage() {
   const isFiltering = query.trim().length >= 2;
   const baseRows = isFiltering ? results : allMembers;
   const rows = useMemo(() => {
-    if (statusFilter === "all") return baseRows;
-    return baseRows.filter(
-      (member) => deriveStatus(member.activeMembershipStatus, member.activeMembershipEndDate).text === statusFilter,
-    );
-  }, [baseRows, statusFilter]);
+    return baseRows.filter((member) => {
+      if (statusFilter !== "all") {
+        const status = deriveStatus(member.activeMembershipStatus, member.activeMembershipEndDate).text;
+        if (status !== statusFilter) return false;
+      }
+      if (fromDate || toDate) {
+        // Both the DB's end_date and <input type="date">'s value are plain
+        // "YYYY-MM-DD" strings, so comparing them lexicographically covers
+        // a full local calendar day with no Date object / timezone involved.
+        const endDate = member.activeMembershipEndDate;
+        if (!endDate) return false;
+        if (fromDate && endDate < fromDate) return false;
+        if (toDate && endDate > toDate) return false;
+      }
+      return true;
+    });
+  }, [baseRows, statusFilter, fromDate, toDate]);
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const hasActiveFilters = statusFilter !== "all";
+  const hasActiveFilters = statusFilter !== "all" || fromDate !== "" || toDate !== "";
 
   function clearFilters() {
     setStatusFilter("all");
+    setFromDate("");
+    setToDate("");
     setPage(1);
   }
 
@@ -139,6 +155,26 @@ export default function MembersPage() {
             </option>
           ))}
         </SelectField>
+        <TextField
+          label="Expiration From"
+          type="date"
+          value={fromDate}
+          onChange={(event) => {
+            setFromDate(event.target.value);
+            setPage(1);
+          }}
+          className="w-40"
+        />
+        <TextField
+          label="Expiration To"
+          type="date"
+          value={toDate}
+          onChange={(event) => {
+            setToDate(event.target.value);
+            setPage(1);
+          }}
+          className="w-40"
+        />
       </FilterBar>
 
       {currentError ? (
