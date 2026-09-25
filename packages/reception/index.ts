@@ -24,6 +24,7 @@ import { ListEquipmentSalesUseCase } from "./application/list-equipment-sales";
 import { ListReceiptsUseCase } from "./application/list-receipts";
 import { ListReceiptsByDateRangeUseCase } from "./application/list-receipts-by-date-range";
 import { UpdateReceiptDateUseCase } from "./application/update-receipt-date";
+import { DeleteReceiptUseCase } from "./application/delete-receipt";
 import { ListTrainersUseCase } from "./application/list-trainers";
 import { ListTrainerPlayersUseCase } from "./application/list-trainer-players";
 import { GetNextMembershipNumberUseCase } from "./application/get-next-membership-number";
@@ -141,6 +142,7 @@ export {
   type ListReceiptsByDateRangeInput,
 } from "./application/list-receipts-by-date-range";
 export { UpdateReceiptDateUseCase, type UpdateReceiptDateInput } from "./application/update-receipt-date";
+export { DeleteReceiptUseCase, type DeleteReceiptInput } from "./application/delete-receipt";
 export { ListTrainersUseCase } from "./application/list-trainers";
 export { ListTrainerPlayersUseCase, type ListTrainerPlayersInput } from "./application/list-trainer-players";
 export type { TrainerSummary, TrainerPlayer } from "./domain/trainer";
@@ -236,6 +238,7 @@ export function createReceptionModule(client: TypedSupabaseClient) {
     listReceipts: new ListReceiptsUseCase(receiptRepository),
     listReceiptsByDateRange: new ListReceiptsByDateRangeUseCase(receiptRepository),
     updateReceiptDate: new UpdateReceiptDateUseCase(receiptRepository),
+    deleteReceipt: new DeleteReceiptUseCase(receiptRepository),
     getNextMembershipNumber: new GetNextMembershipNumberUseCase(membershipNumberRepository),
     listExpiringMemberships: new ListExpiringMembershipsUseCase(expiringMembershipRepository),
     listTrainers: new ListTrainersUseCase(trainerRepository),

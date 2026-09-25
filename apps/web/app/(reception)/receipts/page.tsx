@@ -8,7 +8,7 @@ import { getReceptionModule } from "../../../src/lib/composition-root";
 import { ReceiptsCalendar, monthRange, toDateKey } from "../../../src/components/receipts-calendar";
 import { Button } from "../../../src/components/ui/button";
 import { Card } from "../../../src/components/ui/card";
-import { TextField } from "../../../src/components/ui/text-field";
+import { TextField, TextAreaField } from "../../../src/components/ui/text-field";
 import { OptionCard } from "../../../src/components/ui/option-card";
 import { StaffPicker } from "../../../src/components/staff-picker";
 import { BreakdownBars } from "../../../src/components/breakdown-bars";
@@ -41,6 +41,12 @@ export default function ReceiptsPage() {
   const [editDateValue, setEditDateValue] = useState("");
   const [isSavingDate, setIsSavingDate] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<Receipt | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
 
   const [filterProgramType, setFilterProgramType] = useState<ProgramType | null>(null);
   const [filterCoach, setFilterCoach] = useState<StaffCandidate | null>(null);
@@ -116,6 +122,37 @@ export default function ReceiptsPage() {
       return;
     }
     setEditingPaymentId(null);
+    await load();
+  }
+
+  function openDeleteConfirm(receipt: Receipt) {
+    setDeleteTarget(receipt);
+    setDeleteReason("");
+    setDeleteError(null);
+  }
+
+  function cancelDelete() {
+    setDeleteTarget(null);
+    setDeleteReason("");
+    setDeleteError(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    const result = await getReceptionModule().deleteReceipt.execute({
+      paymentId: deleteTarget.paymentId,
+      reason: deleteReason,
+    });
+    setIsDeleting(false);
+    if (result.isErr) {
+      setDeleteError(result.error.message);
+      return;
+    }
+    setDeleteSuccess(`Receipt ${deleteTarget.receiptNumber} for ${deleteTarget.memberFullName} was deleted.`);
+    setDeleteTarget(null);
+    setDeleteReason("");
     await load();
   }
 
@@ -221,6 +258,54 @@ export default function ReceiptsPage() {
         ) : null}
       </Card>
 
+      {deleteSuccess ? <p className="mb-4 text-sm text-gold">{deleteSuccess}</p> : null}
+
+      {deleteTarget ? (
+        <Card className="mb-6 space-y-3 border-red-500/40">
+          <p className="text-sm font-semibold text-red-400">Delete this receipt?</p>
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
+            <p>
+              <span className="text-muted">Member: </span>
+              <span className="text-ink">{deleteTarget.memberFullName}</span>
+            </p>
+            <p>
+              <span className="text-muted">Receipt #: </span>
+              <span className="text-ink">{deleteTarget.receiptNumber}</span>
+            </p>
+            <p>
+              <span className="text-muted">Payment Date: </span>
+              <span className="text-ink">{deleteTarget.paymentDate}</span>
+            </p>
+            <p>
+              <span className="text-muted">Amount: </span>
+              <span className="text-ink">{deleteTarget.amount.toLocaleString()} EGP</span>
+            </p>
+          </div>
+          <p className="text-sm text-muted">
+            This will permanently delete this receipt/payment record. This action cannot be undone.
+          </p>
+          <TextAreaField
+            label="Reason for deletion"
+            value={deleteReason}
+            onChange={(event) => setDeleteReason(event.target.value)}
+          />
+          {deleteError ? <p className="text-sm text-red-400">{deleteError}</p> : null}
+          <div className="flex gap-3">
+            <Button
+              variant="danger"
+              onClick={() => void confirmDelete()}
+              isLoading={isDeleting}
+              disabled={isDeleting || !deleteReason.trim()}
+            >
+              Yes, Delete Permanently
+            </Button>
+            <Button variant="secondary" type="button" onClick={cancelDelete} disabled={isDeleting}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
       {!isLoading && !errorMessage && visibleReceipts.length > 0 ? (
         <div className="mb-6 grid gap-4 md:grid-cols-2">
           <Card>
@@ -254,6 +339,7 @@ export default function ReceiptsPage() {
                 <th className="px-4 py-3">Sales Person</th>
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3 text-right">Amount</th>
+                {role === "super_admin" ? <th className="px-4 py-3">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -308,6 +394,17 @@ export default function ReceiptsPage() {
                   <td className="px-4 py-3 text-muted">{receipt.soldByFullName ?? "—"}</td>
                   <td className="px-4 py-3 text-muted capitalize">{receipt.paymentMethod.replace("_", " ")}</td>
                   <td className="px-4 py-3 text-right font-medium text-gold">{receipt.amount.toLocaleString()} EGP</td>
+                  {role === "super_admin" ? (
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => openDeleteConfirm(receipt)}
+                        className="text-xs font-medium text-red-400 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

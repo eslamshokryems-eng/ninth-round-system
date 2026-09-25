@@ -531,6 +531,10 @@ export interface Database {
         Args: { p_profile_id: string; p_permission_key: string };
         Returns: undefined;
       };
+      delete_receipt: {
+        Args: { p_payment_id: string; p_reason: string };
+        Returns: undefined;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
