@@ -12,6 +12,7 @@ import { Card } from "../../../src/components/ui/card";
 import { Button } from "../../../src/components/ui/button";
 import { SelectField } from "../../../src/components/ui/select-field";
 import { TextField } from "../../../src/components/ui/text-field";
+import { EmptyState } from "../../../src/components/ui/empty-state";
 import { StaffPicker } from "../../../src/components/staff-picker";
 import { DateRangePicker, type DateRange } from "../../../src/components/date-range-picker";
 import { RevenueTrendChart } from "../../../src/components/revenue-trend-chart";
@@ -254,7 +255,7 @@ export function SalesPerformanceTab() {
           ))}
         </div>
       ) : errorMessage ? (
-        <p className="text-red-400">{errorMessage}</p>
+        <EmptyState variant="error" message={errorMessage} actionLabel="Try Again" onAction={() => void load()} />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

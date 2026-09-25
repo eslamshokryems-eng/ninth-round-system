@@ -8,6 +8,10 @@ import { getReceptionModule } from "../../../src/lib/composition-root";
 import { StatCard } from "../../../src/components/ui/stat-card";
 import { Button } from "../../../src/components/ui/button";
 import { Card } from "../../../src/components/ui/card";
+import { PageHeader } from "../../../src/components/ui/page-header";
+import { SectionHeader } from "../../../src/components/ui/section-header";
+import { EmptyState } from "../../../src/components/ui/empty-state";
+import { SkeletonCardRow } from "../../../src/components/ui/loading-skeleton";
 import { CheckInTrendChart } from "../../../src/components/check-in-trend-chart";
 import { DashboardCheckInBox } from "../../../src/components/dashboard-check-in-box";
 
@@ -75,6 +79,15 @@ function ReportsIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" aria-hidden="true">
       <path d="M4 16.5V9M10 16.5V4M16 16.5v-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ExpiredIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" aria-hidden="true">
+      <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M7.5 7.5l5 5M12.5 7.5l-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -160,31 +173,53 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Dashboard</h1>
+      <PageHeader title="Dashboard" subtitle="Today's activity at a glance." />
 
       {isLoadingStats ? (
-        <p className="text-muted">Loading…</p>
+        <SkeletonCardRow count={canSeeRevenue(role) ? 6 : 5} />
       ) : stats ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           <StatCard
             label="Today's Check-Ins"
             value={isLoadingTrend ? "…" : todayCheckIns.length}
+            tone="success"
             icon={CheckInIcon}
           />
           <StatCard label="Active Members" value={stats.activeMembers} icon={MembersIcon} />
-          <StatCard label="Expiring Soon" value={stats.expiringThisWeek} tone="warning" hint="Next 7 days" icon={CalendarIcon} />
+          <StatCard
+            label="Expiring Soon"
+            value={stats.expiringThisWeek}
+            tone="warning"
+            hint="Next 7 days"
+            icon={CalendarIcon}
+          />
+          <StatCard
+            label="Expired Memberships"
+            value={stats.expiredMemberships}
+            tone="danger"
+            icon={ExpiredIcon}
+          />
           {canSeeRevenue(role) ? (
-            <StatCard
-              label="Today's Revenue"
-              value={`${stats.dailyRevenue.toLocaleString()} EGP`}
-              icon={WalletIcon}
-            />
+            <>
+              <StatCard
+                label="Today's Revenue"
+                value={`${stats.dailyRevenue.toLocaleString()} EGP`}
+                tone="brand"
+                icon={WalletIcon}
+              />
+              <StatCard
+                label="This Month's Revenue"
+                value={`${stats.monthlyRevenue.toLocaleString()} EGP`}
+                tone="brand"
+                icon={WalletIcon}
+              />
+            </>
           ) : (
-            <StatCard label="New Members Today" value={stats.newMembersToday} icon={AddMemberIcon} />
+            <StatCard label="New Members Today" value={stats.newMembersToday} tone="info" icon={AddMemberIcon} />
           )}
         </div>
       ) : (
-        <p className="text-red-400">Could not load dashboard data.</p>
+        <EmptyState variant="error" message="Could not load dashboard data." actionLabel="Try Again" onAction={loadStats} />
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -212,16 +247,18 @@ export default function DashboardPage() {
         </div>
 
         <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Recent Check-Ins</h2>
-            <Link href="/members" className="text-xs font-medium text-gold hover:text-gold-soft">
-              View all
-            </Link>
-          </div>
+          <SectionHeader
+            title="Recent Check-Ins"
+            action={
+              <Link href="/members" className="text-xs font-medium text-gold hover:text-gold-soft">
+                View all
+              </Link>
+            }
+          />
           {isLoadingRecent ? (
             <p className="text-sm text-muted">Loading…</p>
           ) : recentCheckIns.length === 0 ? (
-            <p className="text-sm text-muted">No check-ins yet today.</p>
+            <EmptyState message="No check-ins yet today." />
           ) : (
             <ul className="divide-y divide-white/5">
               {recentCheckIns.slice(0, 8).map((entry) => (
@@ -247,16 +284,18 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Memberships Expiring Soon</h2>
-            <Link href="/expiring" className="text-xs font-medium text-gold hover:text-gold-soft">
-              View all
-            </Link>
-          </div>
+          <SectionHeader
+            title="Memberships Expiring Soon"
+            action={
+              <Link href="/expiring" className="text-xs font-medium text-gold hover:text-gold-soft">
+                View all
+              </Link>
+            }
+          />
           {isLoadingExpiring ? (
             <p className="text-sm text-muted">Loading…</p>
           ) : expiring.length === 0 ? (
-            <p className="text-sm text-muted">No memberships expiring in the next 7 days.</p>
+            <EmptyState message="No memberships expiring in the next 7 days." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">

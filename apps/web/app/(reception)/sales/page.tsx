@@ -9,6 +9,9 @@ import { translateErrorCode } from "../../../src/lib/translate-error";
 import { StatCard } from "../../../src/components/ui/stat-card";
 import { Button } from "../../../src/components/ui/button";
 import { Card } from "../../../src/components/ui/card";
+import { PageHeader } from "../../../src/components/ui/page-header";
+import { EmptyState } from "../../../src/components/ui/empty-state";
+import { SkeletonCardRow } from "../../../src/components/ui/loading-skeleton";
 import { SALES_ROLES } from "../../../src/lib/staff-roles";
 
 /** Sales Dashboard (Phase 6) — real counts from `leads`/`lead_followups`, RLS-scoped: a sales_employee sees only their own numbers, branch_manager/super_admin see the whole branch. */
@@ -46,36 +49,34 @@ export default function SalesDashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-ink">Sales</h1>
-        <div className="flex gap-3">
-          <Link href="/sales/leads/new">
-            <Button>+ New Lead</Button>
-          </Link>
-          <Link href="/sales/leads">
-            <Button variant="secondary">View Leads</Button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Sales"
+        subtitle="Track leads, follow-ups and conversion activity."
+        action={
+          <div className="flex gap-3">
+            <Link href="/sales/leads/new">
+              <Button>+ New Lead</Button>
+            </Link>
+            <Link href="/sales/leads">
+              <Button variant="secondary">View Leads</Button>
+            </Link>
+          </div>
+        }
+      />
 
       {isLoading ? (
-        <p className="text-muted">Loading…</p>
+        <SkeletonCardRow count={7} />
       ) : errorMessage ? (
-        <div className="flex flex-col items-start gap-3">
-          <p className="text-red-400">{errorMessage}</p>
-          <Button variant="secondary" onClick={() => void load()}>
-            Retry
-          </Button>
-        </div>
+        <EmptyState variant="error" message={errorMessage} actionLabel="Try Again" onAction={() => void load()} />
       ) : stats ? (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Total Leads" value={stats.totalLeads} />
-            <StatCard label="New Today" value={stats.newLeadsToday} />
+            <StatCard label="Total Leads" value={stats.totalLeads} tone="info" />
+            <StatCard label="New Today" value={stats.newLeadsToday} tone="brand" />
             <StatCard label="Follow-ups Due Today" value={stats.followUpsDueToday} tone="warning" />
-            <StatCard label="Overdue Follow-ups" value={stats.overdueFollowUps} tone="warning" />
-            <StatCard label="Converted This Month" value={stats.convertedThisMonth} />
-            <StatCard label="Lost This Month" value={stats.lostThisMonth} tone="warning" />
+            <StatCard label="Overdue Follow-ups" value={stats.overdueFollowUps} tone="danger" />
+            <StatCard label="Converted This Month" value={stats.convertedThisMonth} tone="success" />
+            <StatCard label="Lost This Month" value={stats.lostThisMonth} tone="danger" />
             <StatCard label="Conversion Rate" value={`${stats.conversionRatePercent}%`} />
           </div>
 

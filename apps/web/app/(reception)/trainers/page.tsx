@@ -9,6 +9,10 @@ import { Card } from "../../../src/components/ui/card";
 import { SelectField } from "../../../src/components/ui/select-field";
 import { TextField } from "../../../src/components/ui/text-field";
 import { StatCard } from "../../../src/components/ui/stat-card";
+import { PageHeader } from "../../../src/components/ui/page-header";
+import { EmptyState } from "../../../src/components/ui/empty-state";
+import { StatusBadge, membershipStatusTone } from "../../../src/components/ui/status-badge";
+import { SkeletonTable } from "../../../src/components/ui/loading-skeleton";
 
 type SortMode = "soonest" | "latest" | "name";
 
@@ -110,7 +114,7 @@ export default function TrainersPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Trainers</h1>
+      <PageHeader title="Trainers" subtitle="View-only — coach assignments happen at registration or renewal." />
 
       <Card>
         <SelectField
@@ -131,9 +135,9 @@ export default function TrainersPage() {
         isLoadingTrainers ? (
           <p className="text-muted">Loading…</p>
         ) : trainersError ? (
-          <p className="text-red-400">{trainersError}</p>
+          <EmptyState variant="error" message={trainersError} actionLabel="Try Again" onAction={() => void loadTrainers()} />
         ) : trainers.length === 0 ? (
-          <p className="text-muted">No trainers found for this branch.</p>
+          <EmptyState message="No trainers found for this branch." />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {trainers.map((trainer) => (
@@ -159,9 +163,9 @@ export default function TrainersPage() {
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatCard label="Total Players" value={summary.total} />
-            <StatCard label="Active" value={summary.active} />
+            <StatCard label="Active" value={summary.active} tone="success" />
             <StatCard label="Expiring Soon" value={summary.expiringSoon} tone="warning" />
-            <StatCard label="Expired" value={summary.expired} tone="warning" />
+            <StatCard label="Expired" value={summary.expired} tone="danger" />
           </div>
 
           <Card>
@@ -189,15 +193,25 @@ export default function TrainersPage() {
           </Card>
 
           {isLoadingPlayers ? (
-            <p className="text-muted">Loading…</p>
+            <div className="overflow-x-auto rounded-card border border-white/5">
+              <table className="w-full text-left text-sm">
+                <tbody>
+                  <SkeletonTable rows={4} columns={4} />
+                </tbody>
+              </table>
+            </div>
           ) : playersError ? (
-            <p className="text-red-400">{playersError}</p>
+            <EmptyState variant="error" message={playersError} actionLabel="Try Again" onAction={() => void loadPlayers()} />
           ) : filteredPlayers.length === 0 ? (
-            <p className="text-muted">
-              {players.length === 0
-                ? "No players are currently assigned to this trainer."
-                : "No players match your search."}
-            </p>
+            <EmptyState
+              message={
+                players.length === 0
+                  ? "No players are currently assigned to this trainer."
+                  : "No players match your search."
+              }
+              actionLabel={players.length > 0 && search ? "Clear Search" : undefined}
+              onAction={players.length > 0 && search ? () => setSearch("") : undefined}
+            />
           ) : (
             <div className="overflow-x-auto rounded-card border border-white/5">
               <table className="w-full text-left text-sm">
@@ -217,7 +231,9 @@ export default function TrainersPage() {
                         <td className="px-4 py-3 text-ink">{player.memberFullName}</td>
                         <td className="px-4 py-3 text-muted">{formatDate(player.startDate)}</td>
                         <td className="px-4 py-3 text-muted">{formatDate(player.endDate)}</td>
-                        <td className={`px-4 py-3 font-medium ${status.className}`}>{status.text}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge label={status.text} tone={membershipStatusTone(status.text)} />
+                        </td>
                       </tr>
                     );
                   })}
