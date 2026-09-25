@@ -20,6 +20,14 @@ export function deriveMembershipStatus(
   if (status === "expired" || status === "cancelled") return { text: "Expired", className: "text-red-400" };
   if (endDate) {
     const daysLeft = Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    // A negative daysLeft means end_date has already passed. This has to be
+    // checked before the "expiring soon" window below — otherwise an
+    // already-expired membership (e.g. status still "active" because
+    // generate_membership_alerts() hasn't flipped it) satisfies
+    // `daysLeft <= 7` too and gets mislabeled "Expiring Soon" instead of
+    // "Expired", which is exactly the bug that made the Members page's
+    // "Expired" filter never match anything.
+    if (daysLeft < 0) return { text: "Expired", className: "text-red-400" };
     if (daysLeft <= 7) return { text: "Expiring Soon", className: "text-red-400" };
   }
   return { text: "Active", className: "text-gold" };

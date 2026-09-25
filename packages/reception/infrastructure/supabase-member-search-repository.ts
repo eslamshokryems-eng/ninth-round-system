@@ -13,18 +13,28 @@ interface MemberSearchRow {
 }
 
 // RLS's one-active-membership-per-member constraint means at most one
-// membership row here has status "active" — that's the one worth
-// surfacing; an expired/cancelled history entry isn't what Reception needs
-// at a glance in a search result or the members list.
-function toSearchResult(row: MemberSearchRow): MemberSearchResult {
-  const active = row.memberships.find((m) => m.status === "active");
+// membership row here has status "active" — prefer that one, since it's
+// what Reception needs at a glance. But a member's most recent period can
+// also be expired/cancelled (no active row at all), and that's still the
+// member's real current status — falling through to "no membership" for
+// them instead of "expired" is what broke the Members page's Expired
+// filter for anyone whose membership had actually lapsed. So when there's
+// no active row, fall back to the most recent one by end_date.
+export function toSearchResult(row: MemberSearchRow): MemberSearchResult {
+  const current =
+    row.memberships.find((m) => m.status === "active") ??
+    row.memberships.reduce<MemberSearchRow["memberships"][number] | null>((latest, m) => {
+      if (!m.end_date) return latest;
+      if (!latest || !latest.end_date || m.end_date > latest.end_date) return m;
+      return latest;
+    }, null);
   return {
     memberId: row.id,
     memberCode: row.member_code,
     fullName: row.full_name,
     phone: row.phone,
-    activeMembershipStatus: active?.status ?? null,
-    activeMembershipEndDate: active?.end_date ?? null,
+    activeMembershipStatus: current?.status ?? null,
+    activeMembershipEndDate: current?.end_date ?? null,
   };
 }
 
