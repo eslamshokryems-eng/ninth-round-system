@@ -10,6 +10,11 @@ import { Button } from "../../../../src/components/ui/button";
 import { Card } from "../../../../src/components/ui/card";
 import { TextField } from "../../../../src/components/ui/text-field";
 import { SelectField } from "../../../../src/components/ui/select-field";
+import { PageHeader } from "../../../../src/components/ui/page-header";
+import { FilterBar } from "../../../../src/components/ui/filter-bar";
+import { EmptyState } from "../../../../src/components/ui/empty-state";
+import { StatusBadge, type StatusTone } from "../../../../src/components/ui/status-badge";
+import { SkeletonTable } from "../../../../src/components/ui/loading-skeleton";
 import { SALES_ROLES } from "../../../../src/lib/staff-roles";
 
 const STATUS_LABEL: Record<LeadStatus, string> = {
@@ -20,12 +25,12 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
   lost: "Lost",
 };
 
-const STATUS_TONE: Record<LeadStatus, string> = {
-  new: "text-gold",
-  contacted: "text-ink",
-  follow_up: "text-ink",
-  converted: "text-green-400",
-  lost: "text-red-400",
+const STATUS_TONE: Record<LeadStatus, StatusTone> = {
+  new: "info",
+  contacted: "neutral",
+  follow_up: "warning",
+  converted: "success",
+  lost: "danger",
 };
 
 const SOURCE_LABEL: Record<LeadSource, string> = {
@@ -114,24 +119,39 @@ export default function LeadsPage() {
     );
   }
 
+  const hasActiveFilters = Boolean(statusFilter || sourceFilter);
+
+  function clearFilters() {
+    setStatusFilter("");
+    setSourceFilter("");
+    setPage(1);
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Leads</h1>
-        <Link href="/sales/leads/new">
-          <Button>+ New Lead</Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Leads"
+        action={
+          <Link href="/sales/leads/new">
+            <Button>+ New Lead</Button>
+          </Link>
+        }
+      />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-4">
+      <FilterBar hasActiveFilters={hasActiveFilters} onClear={clearFilters}>
         <TextField
           label="Search"
           placeholder="Search by name or phone"
           value={query}
           onChange={(event) => void runSearch(event.target.value)}
-          className="sm:col-span-2"
+          className="min-w-[14rem] flex-1"
         />
-        <SelectField label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as LeadStatus | "")}>
+        <SelectField
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as LeadStatus | "")}
+          className="w-40"
+        >
           <option value="">All statuses</option>
           {(Object.keys(STATUS_LABEL) as LeadStatus[]).map((status) => (
             <option key={status} value={status}>
@@ -139,12 +159,17 @@ export default function LeadsPage() {
             </option>
           ))}
         </SelectField>
-        <SelectField label="Sort" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+        <SelectField label="Sort" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-40">
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="name">Name (A–Z)</option>
         </SelectField>
-        <SelectField label="Source" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as LeadSource | "")}>
+        <SelectField
+          label="Source"
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value as LeadSource | "")}
+          className="w-40"
+        >
           <option value="">All sources</option>
           {(Object.keys(SOURCE_LABEL) as LeadSource[]).map((source) => (
             <option key={source} value={source}>
@@ -152,14 +177,26 @@ export default function LeadsPage() {
             </option>
           ))}
         </SelectField>
-      </div>
+      </FilterBar>
 
-      {isFiltering && isSearching ? (
-        <p className="text-muted">Searching…</p>
+      {loadError && !isFiltering ? (
+        <EmptyState variant="error" message={loadError} actionLabel="Try Again" onAction={load} />
+      ) : isFiltering && isSearching ? (
+        <div className="overflow-x-auto rounded-card border border-white/5">
+          <table className="w-full text-left text-sm">
+            <tbody>
+              <SkeletonTable rows={6} columns={7} />
+            </tbody>
+          </table>
+        </div>
       ) : !isFiltering && isLoadingAll ? (
-        <p className="text-muted">Loading…</p>
-      ) : loadError ? (
-        <p className="text-red-400">{loadError}</p>
+        <div className="overflow-x-auto rounded-card border border-white/5">
+          <table className="w-full text-left text-sm">
+            <tbody>
+              <SkeletonTable rows={6} columns={7} />
+            </tbody>
+          </table>
+        </div>
       ) : rows.length > 0 ? (
         <>
           <div className="overflow-x-auto rounded-card border border-white/5">
@@ -184,7 +221,9 @@ export default function LeadsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-muted">{lead.phone}</td>
-                    <td className={`px-4 py-3 font-medium ${STATUS_TONE[lead.status]}`}>{STATUS_LABEL[lead.status]}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge label={STATUS_LABEL[lead.status]} tone={STATUS_TONE[lead.status]} />
+                    </td>
                     <td className="px-4 py-3 text-muted">{SOURCE_LABEL[lead.source]}</td>
                     <td className="px-4 py-3 text-muted">{lead.interestedMembershipTypeName ?? "—"}</td>
                     <td className="px-4 py-3 text-muted">{lead.assignedToName ?? "Unassigned"}</td>
@@ -216,9 +255,11 @@ export default function LeadsPage() {
           ) : null}
         </>
       ) : isFiltering && hasSearched ? (
-        <p className="text-muted">No leads found.</p>
+        <EmptyState message="No leads found." />
+      ) : hasActiveFilters ? (
+        <EmptyState message="No leads match these filters." actionLabel="Clear Filters" onAction={clearFilters} />
       ) : (
-        <p className="text-muted">No leads yet — click + New Lead to add the first one.</p>
+        <EmptyState message="No leads yet — click + New Lead to add the first one." />
       )}
     </div>
   );

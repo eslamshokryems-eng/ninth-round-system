@@ -16,6 +16,28 @@ const config: Config = {
         muted: "#9A9A9A",
         gold: "#C9A227",
         "gold-soft": "#F4D976",
+        // Semantic status system (2026-09 UX redesign) — additive only,
+        // nothing above this line changed. One named token per meaning so
+        // every page reads status the same way instead of ad hoc
+        // Tailwind red/green/emerald picks. "brand" is 9th Round's actual
+        // marketing-identity red (see the 9th-round skill: black/red/white,
+        // "strong reds... premium"); it intentionally shares its hue family
+        // with "danger" (critical/expired/unpaid) — see the redesign
+        // report for how the two are kept visually distinct in practice
+        // (solid fill for brand emphasis vs. soft-background+icon for
+        // danger) rather than by using different colors for what a user
+        // would read as the same "red" regardless.
+        brand: "#DC2626",
+        "brand-soft": "#F87171",
+        success: "#22C55E",
+        "success-soft": "#4ADE80",
+        warning: "#F59E0B",
+        "warning-soft": "#FBBF24",
+        danger: "#DC2626",
+        "danger-soft": "#F87171",
+        info: "#3B82F6",
+        "info-soft": "#60A5FA",
+        "accent-purple": "#A855F7",
       },
       borderRadius: {
         card: "20px",
