@@ -29,8 +29,13 @@ const config: Config = {
         // would read as the same "red" regardless.
         brand: "#DC2626",
         "brand-soft": "#F87171",
-        success: "#22C55E",
-        "success-soft": "#4ADE80",
+        // "success" deliberately equals gold/gold-soft, not green — the
+        // brand owner asked for green out of the palette entirely; gold
+        // already reads as "good" in this app (it was the sole positive
+        // accent before this redesign), so Active/Paid/Completed states
+        // stay gold instead of introducing a color the brand doesn't want.
+        success: "#C9A227",
+        "success-soft": "#F4D976",
         warning: "#F59E0B",
         "warning-soft": "#FBBF24",
         danger: "#DC2626",

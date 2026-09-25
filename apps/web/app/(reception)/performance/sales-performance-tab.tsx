@@ -48,7 +48,7 @@ const today = new Date();
 
 function deltaLabel(pct: number | null): { text: string; tone: string } | null {
   if (pct === null) return null;
-  const tone = pct >= 0 ? "text-green-400" : "text-red-400";
+  const tone = pct >= 0 ? "text-gold" : "text-red-400";
   const arrow = pct >= 0 ? "↑" : "↓";
   return { text: `${arrow} ${Math.abs(pct)}% vs previous period`, tone };
 }
