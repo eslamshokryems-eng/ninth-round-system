@@ -114,6 +114,23 @@ export default function MemberDetailPage() {
   const [addPackageProgramType, setAddPackageProgramType] = useState<ProgramType | null>(null);
   const [addPackageSalesPerson, setAddPackageSalesPerson] = useState<StaffCandidate | null>(null);
 
+  // Upgrade Membership — a separate workflow from Renew/Add Package (see
+  // docs on the investigation this feature followed from): moves the
+  // member to a higher-duration package, reusing renewMembership.execute()
+  // exactly as Renew does (same close-old/insert-new/record-payment
+  // transaction), just with a different membershipTypeId and a
+  // notes breadcrumb. Two steps (form -> confirm) per the approved design.
+  const [upgradeStep, setUpgradeStep] = useState<"closed" | "form" | "confirm">("closed");
+  const [upgradeTypeId, setUpgradeTypeId] = useState<string | null>(null);
+  const [upgradePriceText, setUpgradePriceText] = useState("");
+  const [upgradeDiscountText, setUpgradeDiscountText] = useState("0");
+  const [upgradeReceiptNumber, setUpgradeReceiptNumber] = useState("");
+  const [upgradePaymentMethod, setUpgradePaymentMethod] = useState<PaymentMethod | null>(null);
+  const [upgradeSalesPerson, setUpgradeSalesPerson] = useState<StaffCandidate | null>(null);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
+
   const [isEditingCoach, setIsEditingCoach] = useState(false);
   const [coachPick, setCoachPick] = useState<StaffCandidate | null>(null);
   const [coachSessionCountText, setCoachSessionCountText] = useState("");
@@ -293,6 +310,82 @@ export default function MemberDetailPage() {
 
   const activeMembership = detail?.membershipHistory.find((m) => m.status === "active") ?? null;
 
+  // "Higher package" = greater duration_days, matched against membership_types
+  // by name (membership_types.name is unique) since MembershipHistoryEntry
+  // only carries the type's name, not its id — avoids touching the domain
+  // type/repository just to expose an id. membershipTypes is already
+  // filtered to is_active by listMembershipTypes.execute(), so inactive
+  // types are excluded automatically.
+  const currentMembershipType = activeMembership
+    ? (membershipTypes.find((t) => t.name === activeMembership.membershipTypeName) ?? null)
+    : null;
+  const eligibleUpgradeTypes = currentMembershipType
+    ? membershipTypes.filter((t) => t.durationDays > currentMembershipType.durationDays)
+    : [];
+  const selectedUpgradeType = membershipTypes.find((t) => t.id === upgradeTypeId) ?? null;
+
+  /** Preview only — mirrors renew_membership()'s own start_date/end_date arithmetic exactly (greatest(current end date, today) + new duration_days), so this matches what the server actually computes on submit. */
+  function computeUpgradeNewExpiry(): string | null {
+    if (!activeMembership || !selectedUpgradeType) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentEnd = new Date(activeMembership.endDate);
+    const startDate = currentEnd.getTime() > today.getTime() ? currentEnd : today;
+    const newEnd = new Date(startDate);
+    newEnd.setDate(newEnd.getDate() + selectedUpgradeType.durationDays);
+    return newEnd.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Upgrade Membership — reuses renewMembership.execute() (the exact same
+   * use case / RPC Renew already calls) with the higher-duration type's id;
+   * renew_membership() already does everything an upgrade needs (close the
+   * current active row, insert the new one, record the payment) — no new
+   * server-side logic. Coach/session/program carry over unchanged from the
+   * current membership (an upgrade changes duration, not coach assignment).
+   * `notes` gets an auto-filled breadcrumb since there's no dedicated
+   * upgrade-audit table — see the read-only investigation this followed.
+   */
+  async function handleUpgrade() {
+    if (isUpgrading) return;
+    if (!activeMembership || !upgradeTypeId || !upgradePaymentMethod || !upgradeSalesPerson || !selectedUpgradeType) return;
+    setUpgradeError(null);
+    setIsUpgrading(true);
+
+    const result = await getReceptionModule().renewMembership.execute({
+      memberId,
+      membershipTypeId: upgradeTypeId,
+      receiptNumber: upgradeReceiptNumber.trim(),
+      price: Number(upgradePriceText) || 0,
+      discount: Number(upgradeDiscountText) || 0,
+      paymentMethod: upgradePaymentMethod,
+      notes: `Upgraded from ${currentMembershipType?.name ?? activeMembership.membershipTypeName} to ${selectedUpgradeType.name}`,
+      coachId: activeMembership.coachId,
+      sessionCount: activeMembership.sessionCount,
+      programType: activeMembership.programType,
+      soldBy: upgradeSalesPerson.profileId,
+    });
+
+    setIsUpgrading(false);
+
+    if (result.isErr) {
+      setUpgradeError(translateErrorCode(result.error.code));
+      return;
+    }
+
+    setUpgradeSuccess(
+      `Upgraded to ${selectedUpgradeType.name} — new membership ${result.value.membershipNumber}, valid until ${result.value.endDate}.`,
+    );
+    setUpgradeStep("closed");
+    setUpgradeTypeId(null);
+    setUpgradePriceText("");
+    setUpgradeDiscountText("0");
+    setUpgradeReceiptNumber("");
+    setUpgradePaymentMethod(null);
+    setUpgradeSalesPerson(null);
+    void loadDetail();
+  }
+
   function startEditCoach() {
     if (!activeMembership) return;
     setCoachPick(
@@ -384,6 +477,15 @@ export default function MemberDetailPage() {
         {role && CAN_MANAGE_PAYMENTS.has(role) ? (
           <Button variant="secondary" onClick={() => setIsAddPackageOpen((open) => !open)}>
             {isAddPackageOpen ? "Cancel" : "+ Add Package"}
+          </Button>
+        ) : null}
+        {role && CAN_MANAGE_PAYMENTS.has(role) && activeMembership ? (
+          <Button
+            variant="secondary"
+            className="!border-brand !text-brand hover:!bg-brand/10"
+            onClick={() => setUpgradeStep((step) => (step === "closed" ? "form" : "closed"))}
+          >
+            {upgradeStep === "closed" ? "Upgrade Membership" : "Cancel Upgrade"}
           </Button>
         ) : null}
         {role && CAN_DELETE_MEMBER.has(role) ? (
@@ -620,6 +722,184 @@ export default function MemberDetailPage() {
           >
             Confirm
           </Button>
+        </Card>
+      ) : null}
+
+      {upgradeSuccess ? <p className="text-sm text-gold">{upgradeSuccess}</p> : null}
+
+      {upgradeStep === "form" && activeMembership ? (
+        <Card className="space-y-4 border-brand/30">
+          <div>
+            <h2 className="text-sm font-semibold text-brand">Upgrade Membership</h2>
+            <p className="text-sm text-muted">
+              Move this member to a higher membership package. Remaining time on their current package carries over
+              to the new expiry date — this is a separate action from Renew and does not affect it.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Current Package</p>
+              <p className="mt-1 text-sm font-medium text-ink">
+                {currentMembershipType?.name ?? activeMembership.membershipTypeName}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Current Expiry</p>
+              <p className="mt-1 text-sm font-medium text-ink">{activeMembership.endDate}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Status</p>
+              <p className="mt-1 text-sm font-medium capitalize text-gold">{activeMembership.status}</p>
+            </div>
+          </div>
+
+          {eligibleUpgradeTypes.length === 0 ? (
+            <p className="text-sm text-muted">
+              No upgrade options available. The member is already on the highest available package.
+            </p>
+          ) : (
+            <>
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted">Upgrade To</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {eligibleUpgradeTypes.map((type) => (
+                    <OptionCard
+                      key={type.id}
+                      label={type.name}
+                      isSelected={upgradeTypeId === type.id}
+                      onClick={() => {
+                        setUpgradeTypeId(type.id);
+                        if (type.price > 0) setUpgradePriceText(String(type.price));
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {selectedUpgradeType ? (
+                <>
+                  <div className="grid gap-3 rounded-lg border border-white/5 bg-black/20 p-4 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted">Current Package Price</p>
+                      <p className="mt-1 text-lg font-semibold text-ink">
+                        {activeMembership.finalPrice.toLocaleString()} EGP
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted">New Package Price</p>
+                      <p className="mt-1 text-lg font-semibold text-ink">
+                        {(Number(upgradePriceText) || 0).toLocaleString()} EGP
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted">Upgrade Difference</p>
+                      <p className="mt-1 text-lg font-semibold text-brand">
+                        {((Number(upgradePriceText) || 0) - activeMembership.finalPrice).toLocaleString()} EGP
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted">
+                    New Expiry: <span className="font-medium text-ink">{computeUpgradeNewExpiry()}</span>
+                  </p>
+                </>
+              ) : null}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField
+                  label="New Package Price"
+                  type="number"
+                  value={upgradePriceText}
+                  onChange={(e) => setUpgradePriceText(e.target.value)}
+                />
+                <TextField
+                  label="Discount"
+                  type="number"
+                  value={upgradeDiscountText}
+                  onChange={(e) => setUpgradeDiscountText(e.target.value)}
+                />
+              </div>
+              <TextField
+                label="Receipt Number"
+                value={upgradeReceiptNumber}
+                onChange={(e) => setUpgradeReceiptNumber(e.target.value)}
+              />
+              <div className="grid gap-3 sm:grid-cols-4">
+                {PAYMENT_METHODS.map((option) => (
+                  <OptionCard
+                    key={option.value}
+                    label={option.label}
+                    isSelected={upgradePaymentMethod === option.value}
+                    onClick={() => setUpgradePaymentMethod(option.value)}
+                  />
+                ))}
+              </div>
+              <StaffPicker selected={upgradeSalesPerson} onSelect={setUpgradeSalesPerson} label="Sold By" />
+
+              {upgradeError ? <p className="text-sm text-red-400">{upgradeError}</p> : null}
+
+              <div className="flex gap-3">
+                <Button variant="secondary" type="button" onClick={() => setUpgradeStep("closed")}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setUpgradeStep("confirm")}
+                  disabled={!upgradeTypeId || !upgradePaymentMethod || !upgradeSalesPerson || !upgradeReceiptNumber.trim()}
+                >
+                  Continue
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+      ) : null}
+
+      {upgradeStep === "confirm" && activeMembership && selectedUpgradeType ? (
+        <Card className="space-y-4 border-brand/40">
+          <h2 className="text-sm font-semibold text-brand">Confirm Membership Upgrade</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Member</p>
+              <p className="mt-1 text-sm font-medium text-ink">{detail.fullName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Current → New</p>
+              <p className="mt-1 text-sm font-medium text-ink">
+                {currentMembershipType?.name ?? activeMembership.membershipTypeName} → {selectedUpgradeType.name}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Current Expiry</p>
+              <p className="mt-1 text-sm font-medium text-ink">{activeMembership.endDate}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">New Expiry</p>
+              <p className="mt-1 text-sm font-medium text-ink">{computeUpgradeNewExpiry()}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Upgrade Difference</p>
+              <p className="mt-1 text-lg font-semibold text-brand">
+                {((Number(upgradePriceText) || 0) - activeMembership.finalPrice).toLocaleString()} EGP
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-muted">This action will upgrade the member&apos;s membership.</p>
+          {upgradeError ? <p className="text-sm text-red-400">{upgradeError}</p> : null}
+          <div className="flex gap-3">
+            <Button variant="secondary" type="button" onClick={() => setUpgradeStep("form")} disabled={isUpgrading}>
+              Back
+            </Button>
+            <Button
+              type="button"
+              className="!bg-brand !text-ink hover:!bg-brand-soft"
+              onClick={() => void handleUpgrade()}
+              isLoading={isUpgrading}
+              disabled={isUpgrading}
+            >
+              Confirm Upgrade
+            </Button>
+          </div>
         </Card>
       ) : null}
 
