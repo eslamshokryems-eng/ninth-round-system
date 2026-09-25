@@ -23,4 +23,13 @@ export interface ReceiptRepository {
    * field on a payment remains without an UPDATE path.
    */
   updateDate(paymentId: string, newDate: string): Promise<Result<void>>;
+  /**
+   * Permanently deletes a single payment/receipt record. Gated at the
+   * database level to super_admin only (delete_receipt(), 20260926000001)
+   * — a non-admin caller's call is rejected by the function itself, not
+   * by this layer. Deletes exactly the one payment row; never touches the
+   * parent membership, member, or any other record. The reason is
+   * recorded on the resulting audit-log entry.
+   */
+  delete(paymentId: string, reason: string): Promise<Result<void>>;
 }

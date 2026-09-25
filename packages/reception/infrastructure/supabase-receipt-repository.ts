@@ -117,4 +117,13 @@ export class SupabaseReceiptRepository implements ReceiptRepository {
     }
     return ok(undefined);
   }
+
+  async delete(paymentId: string, reason: string): Promise<Result<void>> {
+    const { error } = await this.client.rpc("delete_receipt", { p_payment_id: paymentId, p_reason: reason });
+
+    if (error) {
+      return err(domainError("DELETE_RECEIPT_FAILED", error.message));
+    }
+    return ok(undefined);
+  }
 }
