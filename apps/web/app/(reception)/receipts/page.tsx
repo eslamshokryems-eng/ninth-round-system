@@ -282,7 +282,9 @@ export default function ReceiptsPage() {
             </p>
           </div>
           <p className="text-sm text-muted">
-            This will permanently delete this receipt/payment record. This action cannot be undone.
+            This will permanently delete this receipt/payment record. If it was the only payment on the member&apos;s
+            most recent membership period, that membership period is removed too and the member reverts to their
+            prior membership (or to no membership, if this was their first). This action cannot be undone.
           </p>
           <TextAreaField
             label="Reason for deletion"
