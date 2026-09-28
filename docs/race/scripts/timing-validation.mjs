@@ -1,5 +1,5 @@
 // THE NINTH — timing model validation (docs/race/02-final-schema-and-timing.md §2).
-// Run: node docs/race/timing-validation.mjs [--md]
+// Run: node docs/race/scripts/timing-validation.mjs [--md]
 // Pure arithmetic, no dependencies. Every assertion below must pass before migrations.
 
 const W = 180_000;          // work
@@ -87,6 +87,14 @@ check(peakOnCourse <= STATIONS, "more athletes on course than stations");
 const overflowSlots = Math.floor(G / I) - 1;
 
 // ---- output -------------------------------------------------------------
+if (process.argv.includes("--csv")) {
+  // Machine-readable schedule for supabase/tests/race (SQL twin cross-check).
+  let no = 0;
+  for (const h of heats) for (const s of h.slots)
+    console.log([++no, h.h, s.k, s.start, s.bindAt, s.announceAt, s.stations[8].start, s.finish, h.anchor, h.lastStart, h.next ?? ""].join(","));
+  process.exit(failures.length ? 1 : 0);
+}
+
 const fmt = (ms) => {
   if (ms < 0) return `−${fmt(-ms)}`;
   const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;

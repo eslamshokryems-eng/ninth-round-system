@@ -1,7 +1,8 @@
 # THE NINTH — Final Schema & Timing Model (for review)
 
 **Status:** FINAL for sign-off (rev 2). No migration has been written or applied.
-**Timing validated:** [02-timing-validation-50-athletes.md](02-timing-validation-50-athletes.md), produced by `node docs/race/timing-validation.mjs` (all invariants pass).
+**Implemented:** Phase 3 migrations `20260928000001`–`20260928000005`. Test report and implementation notes (template seed tables, trimmed `race_action_status`, no change to `user_role`) in [03-phase-3-migration-report.md](03-phase-3-migration-report.md).
+**Timing validated:** [02-timing-validation-50-athletes.md](02-timing-validation-50-athletes.md), produced by `node docs/race/scripts/timing-validation.mjs` (all invariants pass).
 **Supersedes:** §14–§15 of [00-technical-report.md](00-technical-report.md) wherever they differ.
 **Based on:** the Phase 2 decisions (D-1 … D-12) and the final sign-off decisions (F-1 … F-7, §11).
 
