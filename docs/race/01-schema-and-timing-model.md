@@ -1,8 +1,9 @@
 # THE NINTH — Final Schema & Timing Model (for review)
 
-**Status:** Phase 2 design, for review before implementation. No migration has been written or applied.
+**Status:** FINAL for sign-off (rev 2). No migration has been written or applied.
+**Timing validated:** [02-timing-validation-50-athletes.md](02-timing-validation-50-athletes.md), produced by `node docs/race/timing-validation.mjs` (all invariants pass).
 **Supersedes:** §14–§15 of [00-technical-report.md](00-technical-report.md) wherever they differ.
-**Based on:** the Phase 2 decisions (numbered D-1 … D-12 below, in the order you gave them).
+**Based on:** the Phase 2 decisions (D-1 … D-12) and the final sign-off decisions (F-1 … F-7, §11).
 
 ---
 
@@ -44,12 +45,14 @@
 | `T` | `transition_ms` | 30 000 | locked |
 | `I` | `start_interval_ms` | 210 000 | **CHECK `I = W + T`** (D-1) |
 | `S` | `station_count` | 9 | fixed |
-| `G` | `heat_gap_ms` | 600 000 | configurable (D-2), `G ≥ 0` |
-| `F` | `first_start_offset_ms` | 60 000 | race time of heat 1, slot 0 (gives room for binding + announcement) |
+| `G` | `heat_gap_ms` | 600 000 | configurable (D-2). Measured from the **last athlete's start** (F-1). CHECK `G ≥ I`, so every station keeps ≥ 0:30 changeover |
+| `F` | `first_start_offset_ms` | 60 000 | START EVENT → first athlete start: the 60 s pre-race countdown (F-7) |
 | `B` | `bind_lead_ms` | 60 000 | slot is bound to an athlete this long before its start |
 | `A` | `announce_lead_ms` | 10 000 | voice + GET READY countdown |
 
-`A ≤ B` is enforced so an athlete is always named before the announcement.
+`A ≤ B ≤ F` is enforced. The athlete is always named before the announcement, and heat 1 slot 1 binds exactly at START EVENT.
+
+**Before START EVENT**, heat start times are *planned* from `race_events.planned_start_at` (the wall-clock time Master intends to press START). They are used for check-in deadlines and athlete communications. At START EVENT the real anchors replace them.
 
 ### 2.2 Race time
 
@@ -68,8 +71,9 @@ Each heat `h` has an **anchor** `anchor_h`: the race time of its slot 0. Anchors
 - **AUTO mode** (default). All anchors are written at START EVENT:
   ```
   anchor_1   = F
-  anchor_h+1 = anchor_h + N_h · I + G
+  anchor_h+1 = last_start_h + G  =  anchor_h + (N_h − 1) · I + G      (F-1)
   ```
+  For a full heat: last start = heat start + 28:00, and the next heat starts at heat start + 38:00.
 - **MANUAL mode** (D-3: "only when explicitly configured"). This is `race_events.heat_start_mode = 'MANUAL'`, or a per-heat override.
   - Heat `h+1` stays `AWAITING_START`. The race clock keeps running.
   - An authorized user presses **START NEXT HEAT**.
@@ -90,7 +94,9 @@ bind_at(h,k)            = slot_start(h,k) − B
 announce_at(h,k)        = slot_start(h,k) − A
 ```
 
-**Changeover check (why 3:30 works).** At any station, consecutive slots `k` and `k+1` are separated by `I − W = T = 30 s`. Across a heat boundary the separation is `30 s + G`. Station windows never overlap, by construction.
+**Changeover check (why 3:30 works).** At any station, consecutive slots `k` and `k+1` are separated by `I − W = T = 30 s`. Across a heat boundary the separation is `G − W = 7:00`. Station windows never overlap, by construction, and the validation script checks this on all 9 stations.
+
+**Heats overlap on the course, never on a station.** Heat 2 starts while heat 1's later athletes are still racing. At most 9 athletes are ever on course at once (validated).
 
 **Timeline for one athlete** (race time relative to slot start):
 
@@ -106,27 +112,29 @@ announce_at(h,k)        = slot_start(h,k) − A
 | 08 | 24:30 – 27:30 | 27:30 – 28:00 |
 | 09 | 28:00 – 31:00 | — |
 
-### 2.5 Worked event: 50 athletes (5 × 9 + 5), AUTO, G = 10:00
+### 2.5 Worked event: 50 athletes (5 × 9 + 5), AUTO, G = 10:00 — validated
 
-| Heat | N | Anchor (race time) | Last slot start | Last athlete finishes |
-|---|---|---|---|---|
-| 1 | 9 | 0:01:00 | 0:29:00 | 1:00:00 |
-| 2 | 9 | 0:42:30 | 1:10:30 | 1:41:30 |
-| 3 | 9 | 1:24:00 | 1:52:00 | 2:23:00 |
-| 4 | 9 | 2:05:30 | 2:33:30 | 3:04:30 |
-| 5 | 9 | 2:47:00 | 3:15:00 | 3:46:00 |
-| 6 | 5 | 3:28:30 | 3:42:30 | **4:13:30** |
+| Heat | N | Heat start | Last athlete start | Last athlete finish | Next heat start |
+|---|---|---|---|---|---|
+| 1 | 9 | 0:01:00 | 0:29:00 | 1:00:00 | 0:39:00 |
+| 2 | 9 | 0:39:00 | 1:07:00 | 1:38:00 | 1:17:00 |
+| 3 | 9 | 1:17:00 | 1:45:00 | 2:16:00 | 1:55:00 |
+| 4 | 9 | 1:55:00 | 2:23:00 | 2:54:00 | 2:33:00 |
+| 5 | 9 | 2:33:00 | 3:01:00 | 3:32:00 | 3:11:00 |
+| 6 | 5 | 3:11:00 | 3:25:00 | **3:56:00** | — |
 
-Wall-clock example: START EVENT at 09:00:00, then a 2:00 pause at race time 0:20:00. Every start after that point moves +2:00 on the wall clock. Nothing in the database changes except `race_pauses` and `paused_total_ms`.
+The full event finishes at **3:56:00** race time (12:56 if START EVENT is at 09:00). All 50 start slots are listed in [02-timing-validation-50-athletes.md](02-timing-validation-50-athletes.md).
+
+Pause example: a 2:00 pause at race time 0:20:00 moves every later wall-clock time +2:00. Nothing in the database changes except `race_pauses` and `paused_total_ms`.
 
 ### 2.6 Overflow buffer (late athletes, without moving anyone)
 
 A heat can take extra slots `k ≥ N_h` only while they stay clear of the next heat:
 ```
-(k + 1) · I ≤ N_h · I + G      ⇒      max overflow slots = floor(G / I) = floor(600/210) = 2
+(k + 1) · I ≤ (N_h − 1) · I + G      ⇒      max overflow slots = floor(G / I) − 1 = floor(600/210) − 1 = 1
 ```
 - The overflow slots fit inside the heat gap, so **nobody's start time changes** (D-5).
-- If both overflow slots are used, a further late athlete gets `NO_SLOT_AVAILABLE`. An Event Manager can then move them to a later heat (audited).
+- If the overflow slot is used, a further late athlete gets `NO_SLOT_AVAILABLE`. An Event Manager can then move them to a later heat (audited).
 - In MANUAL mode the limit is "until the next heat is started".
 
 ---
@@ -136,7 +144,7 @@ A heat can take extra slots `k ≥ N_h` only while they stay clear of the next h
 ### 3.1 Check-in (RPC `race_check_in`)
 1. Take an advisory lock on the athlete's heat: `pg_advisory_xact_lock(hash(heat_id))`.
 2. `checked_in_at := clock_timestamp()` **after** the lock. Check-in order within a heat is therefore strictly the order of commits (D-4).
-3. `kind = LATE` if `checked_in_at > heat_checkin_deadline`. The deadline is configurable (default: 15 min before the heat's projected first start).
+3. `kind = LATE` if `checked_in_at > heat_checkin_deadline`. The deadline is heat start − 15:00 (F-7, configurable). Before START EVENT it is computed from `planned_start_at`; after, from the frozen anchor. Heat 1's deadline always falls before START EVENT.
    - Registration status becomes `CHECKED_IN` or `LATE_CHECK_IN`.
 4. Audit: `race.checkin` or `race.checkin.late`.
 
@@ -191,8 +199,8 @@ The server computes `r = race_ms(clock_timestamp())` on receipt. Then:
 | Race is paused, `origin = ONLINE` | REJECTED `RACE_PAUSED` |
 | `r < station_start` | REJECTED `WINDOW_NOT_OPEN` |
 | Performance action, `station_start ≤ r < station_end` | **ACCEPTED** |
-| Performance action, `r ≥ station_end` | **PENDING_MASTER_REVIEW** (never auto-accepted, D-8) |
-| Scoring action (§4.3), `station_end ≤ r < transition_end` | **ACCEPTED** |
+| Performance action (REP, NO_REP, LAP, PENALTY, HOLD_*), `r ≥ station_end` | **PENDING_MASTER_REVIEW** (never auto-accepted, D-8). No REP or LAP is ever *accepted* after 3:00 (F-3) |
+| Scoring action (§4.3: S04/S07 technique, S09 photo/OCR), `station_start ≤ r < transition_end` | **ACCEPTED** (F-3). For S09 there is no next station, so the scoring window is `[end, end + 30 s)` too |
 | Scoring action, `r ≥ transition_end` | PENDING_MASTER_REVIEW |
 
 - Every row stores both the server race time (`server_race_ms`) and the device estimate (`device_race_ms`). The reviewer sees "device says 02:58.4, received 03:07.1".
@@ -211,7 +219,7 @@ The server computes `r = race_ms(clock_timestamp())` on receipt. Then:
 | `VOID` | same class as its target | all |
 
 - **Hold timing** uses `server_race_ms`.
-- Any `HOLD_*` action with `origin = OFFLINE_QUEUE` sends the whole station result to review, because the server can't time it honestly.
+- Any `HOLD_*` action with `origin = OFFLINE_QUEUE` puts the whole Masters hold result in `REVIEW_PENDING`. It is **never auto-accepted**, even if it syncs before lock (F-6), because the server can't time it honestly.
 
 ### 4.4 VOID LAST ACTION (D-9)
 - The judge sends `VOID`. The server picks the target: the latest ACCEPTED, non-voided action by that judge on that station result.
@@ -265,7 +273,7 @@ LOCKED → CORRECTED        any → VOID_DNS (athlete skipped)
 **Station score.** `official_score` is derived from the accepted and approved actions (minus voided ones), then corrections are applied. The result is **higher-is-better at all 9 stations**.
 
 **Station placement** (per station × category, across all heats):
-- Eligible: registrations with `race_status ∈ {FINISHED}` (DNF: see open item O-2).
+- Eligible: registrations with `race_status = FINISHED` only. **DNS (MISSED_START) and DNF are excluded from station and overall rankings** (D-7, F-2). Their ledger, results and history are kept and shown as DNS/DNF.
 - `placement = RANK() OVER (PARTITION BY station, category ORDER BY official_score DESC)` gives 1, 2, 2, 4 (D-6).
 
 **Overall.** `total_points = Σ placement` over the 9 stations, lowest wins. Then:
@@ -291,7 +299,7 @@ Athletes still equal after all of that share the rank (the tie is retained). **M
 | 03 | Sled push | 100 kg | 60 kg | 80 kg | completed 10 m laps |
 | 04 | Jab + Cross | — | — | — | valid combos (+ technique /10) |
 | 05 | Box jump | 50 cm | 40 cm | 40 cm | reps |
-| 06 | DB carry | 2×24 kg | 2×16 kg | 2×20 kg | laps minus penalty cancellations, floor 0 |
+| 06 | DB carry | 2×24 kg | 2×16 kg | 2×20 kg | Evaluated in order: each PENALTY cancels the last completed, not-yet-cancelled lap. With 0 laps it cancels nothing (no debt carried forward). Never negative (F-4) |
 | 07 | Front kick | — | — | — | valid kicks (+ technique /10). **Barrier rule: configurable text, no mechanics coded** |
 | 08 | Burpee + speed ball | — | — | — | complete cycles |
 | 09 | Row | damper 5 | damper 4 | damper 4 | metres (OCR confirmed) |
@@ -350,12 +358,13 @@ create table race_events (
   start_interval_ms int not null default 210000,
   station_count smallint not null default 9 check (station_count = 9),
   heat_size smallint not null default 9 check (heat_size between 1 and 9),
-  heat_gap_ms int not null default 600000 check (heat_gap_ms >= 0),
+  heat_gap_ms int not null default 600000,   -- from LAST athlete START (F-1)
   heat_start_mode race_heat_start_mode not null default 'AUTO',
   first_start_offset_ms int not null default 60000,
   bind_lead_ms int not null default 60000,
   announce_lead_ms int not null default 10000,
   checkin_deadline_before_heat_ms int not null default 900000,
+  planned_start_at timestamptz,             -- planned START EVENT wall time (deadlines before start)
   heats_lock_at timestamptz,               -- planned (48–72 h before)
   heats_locked_at timestamptz, heats_locked_by uuid references profiles(id),
   config jsonb not null default '{}',       -- voice language, display options…
@@ -363,6 +372,7 @@ create table race_events (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (start_interval_ms = work_ms + transition_ms),          -- D-1
+  check (heat_gap_ms >= start_interval_ms),                     -- ≥ 30 s changeover at heat boundary
   check (announce_lead_ms <= bind_lead_ms and bind_lead_ms <= first_start_offset_ms)
 );
 
@@ -682,14 +692,29 @@ create table race_rankings (                 -- versioned snapshots
 
 ---
 
-## 11. Open items for your sign-off
+## 11. Final decisions (sign-off round)
 
-| # | Item | Proposed default |
+| # | Decision | Applied in |
 |---|---|---|
-| O-1 | **Heat gap meaning.** Is it measured from the last athlete's start slot (so the gap sits on top of the 3:30 interval, as in §2.3), or from the last athlete's *finish*? | From the last start slot, which gives about 41:30 per full heat. Measuring from the finish gives about 69:00 per heat and the 6-heat event grows to about 6.5 h. |
-| O-2 | **DNF in rankings.** Do their completed stations count in station placements? | DNF: excluded from station and overall rankings (same as DNS), and their raw results are kept on record. |
-| O-3 | **Technique score and OCR after 3:00.** These can only be entered once the work ends. | Allowed only during the 30 s transition (`SCORING`); after that, Master review. **Performance actions get no extra time.** |
-| O-4 | **S06 penalty with 0 laps completed.** | Sequential: it cancels the last completed lap if one exists; otherwise it is recorded with nothing cancelled and no debt carried forward. |
-| O-5 | **Tie-break step 3 is redundant.** If S04 and S07 technique are both equal, their sum is equal too. | Implemented exactly as specified (so results match the rulebook). A missing technique score sorts last. |
-| O-6 | **Offline Masters hold events.** | Any offline-queued `HOLD_*` action sends that result to Master review (hold time needs server timestamps). |
-| O-7 | Timing defaults `F = 60 s`, `B = 60 s`, `A = 10 s`, check-in deadline 15 min before heat. | As listed, configurable per event. |
+| F-1 | Heat gap measured from the **last athlete's START**. Full heat: last start = heat start + 28:00, next heat = +10:00. Configurable, default 10:00 | §2.1, §2.3, §2.6, `race_events` |
+| F-2 | DNF excluded from station and overall rankings, same as DNS. Raw results and history kept | §6 |
+| F-3 | No REP/LAP accepted after 3:00. S04/S07 technique and S09 photo/OCR accepted through the 30 s transition. Later input → PENDING_MASTER_REVIEW | §4.2 |
+| F-4 | S06 penalty with 0 laps cancels nothing. Never negative | §7 |
+| F-5 | Tie-break exactly as the rulebook: S04 tech → S07 tech → S04+S07 → retain tie | §6 |
+| F-6 | Offline Masters wall-hold data → PENDING_MASTER_REVIEW, never auto-accepted | §4.3 |
+| F-7 | 60 s pre-race countdown; first athlete at +60 s; slot fixed at −60 s; voice at −10 s; check-in closes at heat start − 15:00 | §2.1, §3.1 |
+
+**Changes caused by F-1 (rev 1 → rev 2):**
+- Next-heat formula is now `anchor + (N − 1)·I + G` (was `+ N·I + G`).
+- A full heat now takes 38:00 from heat start to the next heat start (was 41:30).
+- The 50-athlete event ends at **3:56:00** (was 4:13:30).
+- Late-athlete overflow drops to **1 slot per heat** (was 2).
+- New `CHECK heat_gap_ms ≥ start_interval_ms`.
+- New column `race_events.planned_start_at`, needed because heat 1's check-in closes before START EVENT.
+
+No open items remain. On sign-off, Phase 3 starts with the migrations, in this order:
+1. Enums + configuration tables.
+2. People + heats.
+3. Race-day ledger + immutability triggers.
+4. RLS + RPCs.
+5. Seed data for THE NINTH's 9 stations × 3 categories.
