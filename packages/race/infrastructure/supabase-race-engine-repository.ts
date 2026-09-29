@@ -1,6 +1,6 @@
 import { err, ok } from "@9thround/shared-kernel";
 import type { Result } from "@9thround/shared-kernel";
-import type { TypedSupabaseClient } from "@9thround/supabase-client";
+import type { RaceSupabaseClient } from "./race-client";
 import type {
   RaceAdvanceJson,
   RaceControlStateJson,
@@ -12,7 +12,7 @@ import type {
   RaceResumeRow,
   RaceSkipRow,
   RaceStartEventRow,
-} from "@9thround/database-types";
+} from "./race-database";
 import type {
   ControlState,
   CorrectionResult,
@@ -119,7 +119,7 @@ export function toEngineTick(j: RaceAdvanceJson): EngineTick {
 }
 
 export class SupabaseRaceEngineRepository implements RaceEngineRepository {
-  constructor(private readonly client: TypedSupabaseClient) {}
+  constructor(private readonly client: RaceSupabaseClient) {}
 
   async startEvent(eventId: string): Promise<Result<StartEventResult>> {
     const { data, error } = await this.client.rpc("race_start_event", { p_event_id: eventId }).single();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TypedSupabaseClient } from "@9thround/supabase-client";
-import type { RaceControlStateJson } from "@9thround/database-types";
+import type { RaceSupabaseClient } from "./race-client";
+import type { RaceControlStateJson } from "./race-database";
 import { SupabaseRaceEngineRepository, toControlState, toEngineTick } from "./supabase-race-engine-repository";
 
 const STATE: RaceControlStateJson = {
@@ -52,7 +52,7 @@ describe("SupabaseRaceEngineRepository", () => {
         const p = Promise.resolve(response);
         return Object.assign(p, { single: () => Promise.resolve({ data: Array.isArray(response.data) ? (response.data as unknown[])[0] : response.data, error: response.error }) });
       },
-    } as unknown as TypedSupabaseClient;
+    } as unknown as RaceSupabaseClient;
     return { client, calls };
   }
   it("calls START EVENT with only the event id", async () => {

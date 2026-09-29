@@ -178,6 +178,64 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
+  apps/race:
+    dependencies:
+      '@9thround/race':
+        specifier: workspace:*
+        version: link:../../packages/race
+      '@9thround/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+      '@supabase/supabase-js':
+        specifier: 2.45.4
+        version: 2.45.4
+      jsqr:
+        specifier: ^1.4.0
+        version: 1.4.0
+      next:
+        specifier: ^14.2.0
+        version: 14.2.35(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
+      react:
+        specifier: 18.2.0
+        version: 18.2.0
+      react-dom:
+        specifier: 18.2.0
+        version: 18.2.0(react@18.2.0)
+      tailwindcss:
+        specifier: ^3.4.0
+        version: 3.4.19(yaml@2.9.0)
+      zustand:
+        specifier: ^4.5.0
+        version: 4.5.7(@types/react@18.3.31)(react@18.2.0)
+    devDependencies:
+      '@9thround/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.19.43
+      '@types/qrcode':
+        specifier: ^1.5.5
+        version: 1.5.6
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.2.0
+        version: 18.3.7(@types/react@18.3.31)
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.4(postcss@8.5.25)
+      postcss:
+        specifier: ^8.4.47
+        version: 8.5.25
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
   apps/site:
     dependencies:
       next:
@@ -241,9 +299,6 @@ importers:
       '@9thround/nutrition':
         specifier: workspace:*
         version: link:../../packages/nutrition
-      '@9thround/race':
-        specifier: workspace:*
-        version: link:../../packages/race
       '@9thround/reception':
         specifier: workspace:*
         version: link:../../packages/reception
@@ -484,15 +539,12 @@ importers:
 
   packages/race:
     dependencies:
-      '@9thround/database-types':
-        specifier: workspace:*
-        version: link:../database-types
       '@9thround/shared-kernel':
         specifier: workspace:*
         version: link:../shared-kernel
-      '@9thround/supabase-client':
-        specifier: workspace:*
-        version: link:../supabase-client
+      '@supabase/supabase-js':
+        specifier: 2.45.4
+        version: 2.45.4
     devDependencies:
       '@9thround/config':
         specifier: workspace:*

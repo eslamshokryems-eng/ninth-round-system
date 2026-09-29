@@ -1,6 +1,6 @@
 import { domainError, err, ok } from "@9thround/shared-kernel";
 import type { DomainError, Result } from "@9thround/shared-kernel";
-import type { TypedSupabaseClient } from "@9thround/supabase-client";
+import type { RaceSupabaseClient } from "./race-client";
 import type {
   RaceCheckInRow,
   RaceMyRegistrationRow,
@@ -8,7 +8,7 @@ import type {
   RaceQueueRow,
   RaceRegistrationConfirmationRow,
   RaceStaffRegistrationRow,
-} from "@9thround/database-types";
+} from "./race-database";
 import type { PushupStyle } from "../domain/eligibility";
 import { describeRaceError, parseRaceErrorCode } from "../domain/race-error";
 import type { RaceRegistrationRepository } from "../domain/race-registration-repository";
@@ -162,7 +162,7 @@ function registerArgs(command: RegisterAthleteCommand) {
 }
 
 export class SupabaseRaceRegistrationRepository implements RaceRegistrationRepository {
-  constructor(private readonly client: TypedSupabaseClient) {}
+  constructor(private readonly client: RaceSupabaseClient) {}
 
   async getPublicEvent(slug: string): Promise<Result<PublicRaceEvent | null>> {
     const { data, error } = await this.client.rpc("race_get_public_event", { p_slug: slug }).maybeSingle();

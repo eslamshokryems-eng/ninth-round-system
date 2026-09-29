@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TypedSupabaseClient } from "@9thround/supabase-client";
+import type { RaceSupabaseClient } from "./race-client";
 import { SupabaseRaceRegistrationRepository, toCheckInResult, toConfirmation, toQueueEntry, toMyRegistration, toRaceError, toStaffRow } from "./supabase-race-registration-repository";
 
 describe("toRaceError", () => {
@@ -50,7 +50,7 @@ describe("SupabaseRaceRegistrationRepository", () => {
     const calls: { fn: string; args: unknown }[] = [];
     const terminal = { single: () => Promise.resolve(response), maybeSingle: () => Promise.resolve(response), then: (r: (v: unknown) => unknown) => r(response) };
     const client = { rpc: (fn: string, args: unknown) => { calls.push({ fn, args }); return terminal; } };
-    return { client: client as unknown as TypedSupabaseClient, calls };
+    return { client: client as unknown as RaceSupabaseClient, calls };
   }
   it("calls race_register_athlete with the exact argument names and maps errors", async () => {
     const { client, calls } = clientReturning({ data: null, error: { code: "P0001", message: "RACE_WAIVER_REQUIRED: x" } });

@@ -1,0 +1,68 @@
+-- 1. Migration success — structure, isolation, lock-down.
+reset role;
+
+select race_test.eq((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%')::int,
+                    30, 'structure: 30 race_* tables (Phase 6 added race_check_in_corrections; the standalone project adds race_profiles and race_audit_log)');
+
+select race_test.ok(not exists (
+  select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%' and not c.relrowsecurity),
+  'structure: RLS enabled on every race_* table');
+
+select race_test.eq((select count(*) from pg_type where typname like 'race\_%' and typtype = 'e')::int,
+                    23, 'structure: 23 race_* enums (Phase 6 added race_correction_type; the standalone project adds race_gender)');
+
+select race_test.ok(not exists (
+  select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname like 'race\_%' and p.prosecdef
+    and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')),
+  'structure: every SECURITY DEFINER race function pins search_path');
+
+select race_test.ok(not exists (
+  select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%'
+    and (has_table_privilege('anon', c.oid, 'UPDATE') or has_table_privilege('anon', c.oid, 'DELETE')
+         or has_any_column_privilege('anon', c.oid, 'UPDATE'))),
+  'lock-down: anon has no UPDATE/DELETE privilege on any race table');
+
+select race_test.ok(not exists (
+  select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%'
+    and c.relname <> 'race_judge_applications' and has_any_column_privilege('anon', c.oid, 'INSERT')),
+  'lock-down: anon can INSERT only into race_judge_applications');
+
+select race_test.ok(not exists (
+  select 1 from unnest(array['race_athletes', 'race_payments', 'race_payment_events', 'race_clock', 'race_pauses',
+    'race_tie_draws', 'race_check_ins', 'race_start_slots', 'race_station_results', 'race_performance_events',
+    'race_action_reviews', 'race_ocr_records', 'race_result_corrections', 'race_rankings', 'race_event_counters']) t
+  where has_any_column_privilege('authenticated', t, 'INSERT') or has_any_column_privilege('authenticated', t, 'UPDATE')
+     or has_table_privilege('authenticated', t, 'DELETE')),
+  'lock-down: 15 ledger/state tables have NO client write privilege (RPC-only)');
+
+select race_test.ok(not has_any_column_privilege('authenticated', 'race_registrations', 'INSERT')
+                    and not has_column_privilege('authenticated', 'race_registrations', 'race_status', 'UPDATE')
+                    and not has_column_privilege('authenticated', 'race_registrations', 'race_number', 'UPDATE')
+                    and has_column_privilege('authenticated', 'race_registrations', 'heat_id', 'UPDATE'),
+  'lock-down: registrations — only heat_id/pushup_style are client-updatable (race_status/race_number are not)');
+
+select race_test.ok(not has_column_privilege('authenticated', 'race_events', 'status', 'UPDATE')
+                    and not has_column_privilege('authenticated', 'race_events', 'work_ms', 'UPDATE')
+                    and not has_column_privilege('authenticated', 'race_events', 'heats_locked_at', 'UPDATE'),
+  'lock-down: event status / work_ms / heats_locked_at are not client-updatable');
+
+select race_test.eq((select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid
+                     where c.relname like 'race\_%' and t.tgname like '%append_only')::int,
+                    7, 'structure: fully append-only triggers on 7 ledger tables (race_check_ins has the narrower guard instead; Phase 6 added race_check_in_corrections)');
+
+select race_test.ok(not has_any_column_privilege('authenticated', 'race_check_in_corrections', 'INSERT') and not has_any_column_privilege('authenticated', 'race_check_in_corrections', 'UPDATE')
+                    and not has_table_privilege('authenticated', 'race_check_in_corrections', 'DELETE'),
+  'lock-down: race_check_in_corrections has NO client write privilege (RPC-only)');
+
+select race_test.ok(exists (select 1 from pg_trigger where tgname = 'trg_race_check_ins_guard') and exists (select 1 from pg_trigger where tgname = 'trg_race_check_ins_no_truncate'),
+  'structure: race_check_ins keeps its delete/truncate protection plus the tie-draw guard');
+
+select race_test.ok(to_regprocedure('race_create_event(text,date,text,text,timestamptz)') is not null
+                    and to_regprocedure('race_now_ms(uuid)') is not null
+                    and to_regprocedure('race_plan_schedule(integer[],integer,integer,integer,integer,integer,integer,integer)') is not null,
+  'structure: foundation RPCs and timing functions present');

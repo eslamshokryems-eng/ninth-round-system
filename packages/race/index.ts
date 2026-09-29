@@ -1,4 +1,4 @@
-import type { TypedSupabaseClient } from "@9thround/supabase-client";
+import type { RaceSupabaseClient } from "./infrastructure/race-client";
 import { RegisterAthleteUseCase } from "./application/register-athlete";
 import { StaffRegisterAthleteUseCase } from "./application/staff-register-athlete";
 import { CheckInAthleteUseCase } from "./application/check-in-athlete";
@@ -27,6 +27,8 @@ import {
 import { SupabaseRaceRegistrationRepository } from "./infrastructure/supabase-race-registration-repository";
 import { SupabaseRaceEngineRepository } from "./infrastructure/supabase-race-engine-repository";
 
+export { createRaceSupabaseClient } from "./infrastructure/race-client";
+export type { RaceSupabaseClient, RaceClientParams } from "./infrastructure/race-client";
 export * from "./domain/eligibility";
 export * from "./domain/phone";
 export * from "./domain/race-number";
@@ -58,7 +60,7 @@ export { SupabaseRaceRegistrationRepository } from "./infrastructure/supabase-ra
  * THE NINTH race system's composition root (registration, payments, check-in, engine).
  * Later phases (judging, scoring, results) extend this module.
  */
-export function createRaceModule(client: TypedSupabaseClient) {
+export function createRaceModule(client: RaceSupabaseClient) {
   const registrations = new SupabaseRaceRegistrationRepository(client);
   const engine = new SupabaseRaceEngineRepository(client);
   return {

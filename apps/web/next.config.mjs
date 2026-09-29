@@ -11,7 +11,6 @@ const nextConfig = {
     "@9thround/ui",
     "@9thround/reception",
     "@9thround/hr",
-    "@9thround/race",
     "@9thround/audit",
     "@9thround/identity",
     "@9thround/supabase-client",
