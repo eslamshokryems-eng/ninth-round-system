@@ -4,6 +4,7 @@ import { createReceptionModule } from "@9thround/reception";
 import { createSalesModule } from "@9thround/sales";
 import { createHrModule } from "@9thround/hr";
 import { createAuditModule } from "@9thround/audit";
+import { createRaceModule } from "@9thround/race";
 import { env } from "./env";
 
 let client: TypedSupabaseClient | null = null;
@@ -78,4 +79,12 @@ let auditModule: ReturnType<typeof createAuditModule> | null = null;
 export function getAuditModule(): ReturnType<typeof createAuditModule> {
   auditModule ??= createAuditModule(getSupabaseClient());
   return auditModule;
+}
+
+let raceModule: ReturnType<typeof createRaceModule> | null = null;
+
+/** THE NINTH race system (apps/web/app/race). Public pages call it with the anonymous session; staff pages with their own. */
+export function getRaceModule(): ReturnType<typeof createRaceModule> {
+  raceModule ??= createRaceModule(getSupabaseClient());
+  return raceModule;
 }

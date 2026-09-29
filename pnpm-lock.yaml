@@ -241,6 +241,9 @@ importers:
       '@9thround/nutrition':
         specifier: workspace:*
         version: link:../../packages/nutrition
+      '@9thround/race':
+        specifier: workspace:*
+        version: link:../../packages/race
       '@9thround/reception':
         specifier: workspace:*
         version: link:../../packages/reception
@@ -478,6 +481,28 @@ importers:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
+
+  packages/race:
+    dependencies:
+      '@9thround/database-types':
+        specifier: workspace:*
+        version: link:../database-types
+      '@9thround/shared-kernel':
+        specifier: workspace:*
+        version: link:../shared-kernel
+      '@9thround/supabase-client':
+        specifier: workspace:*
+        version: link:../supabase-client
+    devDependencies:
+      '@9thround/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/reception:
     dependencies:

@@ -1,0 +1,48 @@
+{
+  "_comment": "Shared fixtures asserted against BOTH the TypeScript rules (vitest) and the SQL rules (supabase/tests/race/tests/11_parity.sql). If one side changes, this file forces the other to follow.",
+  "phone": [
+    { "input": "+20 100 123 4567", "expect": "01001234567" },
+    { "input": "0100 123 4567", "expect": "01001234567" },
+    { "input": "1001234567", "expect": "01001234567" },
+    { "input": "0020 100 123 4567", "expect": "01001234567" },
+    { "input": "(0100) 123-4567", "expect": "01001234567" },
+    { "input": "+201001234567", "expect": "01001234567" },
+    { "input": "201001234567", "expect": "01001234567" },
+    { "input": "01001234567", "expect": "01001234567" },
+    { "input": "20100123456", "expect": "20100123456" },
+    { "input": "+44 7911 123456", "expect": "447911123456" },
+    { "input": "٠١٠٠١٢٣٤٥٦٧", "expect": "01001234567" },
+    { "input": "۰۱۰۰۱۲۳۴۵۶۷", "expect": "01001234567" },
+    { "input": "+٢٠ ١٠٠ ١٢٣ ٤٥٦٧", "expect": "01001234567" },
+    { "input": "  ", "expect": "" },
+    { "input": "abc", "expect": "" },
+    { "input": "", "expect": "" },
+    { "input": null, "expect": "" }
+  ],
+  "eligibility": {
+    "eventDate": "2026-11-20",
+    "cases": [
+      { "name": "man ok", "category": "MEN", "gender": "male", "dateOfBirth": "1995-05-05", "pushupStyle": null, "expect": "ok" },
+      { "name": "man may choose knee", "category": "MEN", "gender": "male", "dateOfBirth": "1995-05-05", "pushupStyle": "KNEE", "expect": "ok" },
+      { "name": "man without dob", "category": "MEN", "gender": "male", "dateOfBirth": null, "pushupStyle": null, "expect": "ok" },
+      { "name": "woman in men", "category": "MEN", "gender": "female", "dateOfBirth": "1995-05-05", "pushupStyle": null, "expect": "RACE_CATEGORY_GENDER" },
+      { "name": "unspecified in men", "category": "MEN", "gender": "unspecified", "dateOfBirth": "1995-05-05", "pushupStyle": null, "expect": "RACE_CATEGORY_GENDER" },
+      { "name": "woman ok", "category": "WOMEN", "gender": "female", "dateOfBirth": "1998-03-03", "pushupStyle": null, "expect": "ok" },
+      { "name": "man in women", "category": "WOMEN", "gender": "male", "dateOfBirth": "1998-03-03", "pushupStyle": null, "expect": "RACE_CATEGORY_GENDER" },
+      { "name": "woman standard pushup", "category": "WOMEN", "gender": "female", "dateOfBirth": "1998-03-03", "pushupStyle": "STANDARD", "expect": "RACE_PUSHUP_STYLE_NOT_ALLOWED" },
+      { "name": "masters exactly 40 today", "category": "MASTERS", "gender": "male", "dateOfBirth": "1986-11-20", "pushupStyle": null, "expect": "ok" },
+      { "name": "masters turned 40 yesterday", "category": "MASTERS", "gender": "male", "dateOfBirth": "1986-11-19", "pushupStyle": null, "expect": "ok" },
+      { "name": "masters turns 40 tomorrow", "category": "MASTERS", "gender": "male", "dateOfBirth": "1986-11-21", "pushupStyle": null, "expect": "RACE_CATEGORY_AGE" },
+      { "name": "masters without dob", "category": "MASTERS", "gender": "male", "dateOfBirth": null, "pushupStyle": null, "expect": "RACE_DOB_REQUIRED" },
+      { "name": "masters unspecified gender", "category": "MASTERS", "gender": "unspecified", "dateOfBirth": "1970-01-01", "pushupStyle": null, "expect": "ok" },
+      { "name": "masters standard pushup", "category": "MASTERS", "gender": "female", "dateOfBirth": "1970-01-01", "pushupStyle": "STANDARD", "expect": "RACE_PUSHUP_STYLE_NOT_ALLOWED" },
+      { "name": "age error wins over pushup error", "category": "MASTERS", "gender": "female", "dateOfBirth": "1990-01-01", "pushupStyle": "STANDARD", "expect": "RACE_CATEGORY_AGE" },
+      { "name": "future dob", "category": "MEN", "gender": "male", "dateOfBirth": "2027-01-01", "pushupStyle": null, "expect": "RACE_INVALID_DOB" },
+      { "name": "dob on the event date", "category": "MEN", "gender": "male", "dateOfBirth": "2026-11-20", "pushupStyle": null, "expect": "RACE_INVALID_DOB" },
+      { "name": "dob error wins over gender error", "category": "MEN", "gender": "female", "dateOfBirth": "2027-01-01", "pushupStyle": null, "expect": "RACE_INVALID_DOB" },
+      { "name": "age 111 refused", "category": "MEN", "gender": "male", "dateOfBirth": "1915-11-20", "pushupStyle": null, "expect": "RACE_INVALID_DOB" },
+      { "name": "age 110 accepted", "category": "MEN", "gender": "male", "dateOfBirth": "1916-11-20", "pushupStyle": null, "expect": "ok" },
+      { "name": "leap-day birthday", "category": "MEN", "gender": "male", "dateOfBirth": "1996-02-29", "pushupStyle": null, "expect": "ok" }
+    ]
+  }
+}

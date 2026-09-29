@@ -283,6 +283,108 @@ export interface ReceptionDashboardStatsRow {
   monthly_revenue: number;
 }
 
+// --- THE NINTH race system (supabase/migrations/2026092800000x, 20260929000002) ---
+// Only the RPC surface the app calls is typed here; race tables are reached
+// exclusively through RPCs (clients hold no write grants on them).
+export type RaceCategoryCode = "MEN" | "WOMEN" | "MASTERS";
+export type RacePushupStyle = "STANDARD" | "KNEE";
+export type RaceRegistrationStatus = "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
+export type RaceAthleteStatus =
+  | "REGISTERED"
+  | "CHECKED_IN"
+  | "LATE_CHECK_IN"
+  | "STARTED"
+  | "FINISHED"
+  | "MISSED_START"
+  | "DNF"
+  | "WITHDRAWN";
+export type RacePaymentStatus = "PENDING" | "PAID" | "REFUNDED" | "CANCELLED";
+export type RaceManualPaymentMethod = "CASH" | "INSTAPAY" | "VODAFONE_CASH" | "CARD_POS" | "BANK_TRANSFER";
+
+export interface RaceRegisterAthleteArgs {
+  p_event_id: string;
+  p_full_name: string;
+  p_phone: string;
+  p_email: string | null;
+  p_gender: Gender | null;
+  p_date_of_birth: string | null;
+  p_category: RaceCategoryCode;
+  p_pushup_style?: RacePushupStyle | null;
+  p_waiver_accepted?: boolean;
+  p_emergency_contact?: { name: string; phone: string } | null;
+}
+
+export interface RaceRegistrationConfirmationRow {
+  registration_id: string;
+  race_number: string;
+  access_token: string;
+  status: RaceRegistrationStatus;
+  amount_due: number;
+  currency: string;
+}
+
+export interface RaceMyRegistrationRow {
+  registration_id: string;
+  race_number: string;
+  full_name: string;
+  category_code: RaceCategoryCode;
+  category_name: string;
+  status: RaceRegistrationStatus;
+  race_status: RaceAthleteStatus;
+  pushup_style: RacePushupStyle;
+  pushup_style_locked: boolean;
+  heat_number: number | null;
+  heat_start_at: string | null;
+  checkin_closes_at: string | null;
+  event_name: string;
+  event_slug: string;
+  event_date: string;
+  venue: string | null;
+  timezone: string;
+  instructions: string | null;
+  payment_status: RacePaymentStatus | null;
+  payment_amount: number | null;
+  currency: string;
+}
+
+export interface RacePublicEventRow {
+  event_id: string;
+  slug: string;
+  name: string;
+  event_date: string;
+  venue: string | null;
+  timezone: string;
+  status: string;
+  registration_open: boolean;
+  registration_fee: number;
+  currency: string;
+  instructions: string | null;
+  planned_start_at: string | null;
+  heats_locked: boolean;
+}
+
+export interface RaceStaffRegistrationRow {
+  registration_id: string;
+  race_number: string;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  gender: Gender | null;
+  category_code: RaceCategoryCode;
+  heat_id: string | null;
+  heat_number: number | null;
+  status: RaceRegistrationStatus;
+  race_status: RaceAthleteStatus;
+  pushup_style: RacePushupStyle;
+  payment_id: string | null;
+  payment_status: RacePaymentStatus | null;
+  payment_amount: number | null;
+  payment_method: RaceManualPaymentMethod | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
+
 // Shape (Tables/Views/Functions/Enums/CompositeTypes, and Relationships per
 // table) matches what `supabase gen types typescript` emits, so swapping
 // this file for the generated one later is a drop-in replacement.
@@ -533,6 +635,52 @@ export interface Database {
       };
       delete_receipt: {
         Args: { p_payment_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      race_register_athlete: {
+        Args: RaceRegisterAthleteArgs;
+        Returns: RaceRegistrationConfirmationRow[];
+      };
+      race_staff_register_athlete: {
+        Args: RaceRegisterAthleteArgs;
+        Returns: RaceRegistrationConfirmationRow[];
+      };
+      race_get_public_event: {
+        Args: { p_slug: string };
+        Returns: RacePublicEventRow[];
+      };
+      race_get_registration: {
+        Args: { p_token: string };
+        Returns: RaceMyRegistrationRow[];
+      };
+      race_update_pushup_style: {
+        Args: { p_token: string; p_style: RacePushupStyle };
+        Returns: RacePushupStyle;
+      };
+      race_list_registrations: {
+        Args: { p_event_id: string; p_query?: string | null; p_limit?: number };
+        Returns: RaceStaffRegistrationRow[];
+      };
+      race_confirm_payment: {
+        Args: {
+          p_registration_id: string;
+          p_method: RaceManualPaymentMethod;
+          p_amount?: number | null;
+          p_notes?: string | null;
+          p_idempotency_key?: string | null;
+        };
+        Returns: string;
+      };
+      race_waive_payment: {
+        Args: { p_registration_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      race_refund_payment: {
+        Args: { p_payment_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      race_cancel_registration: {
+        Args: { p_registration_id: string; p_reason: string };
         Returns: undefined;
       };
     };

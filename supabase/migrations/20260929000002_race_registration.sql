@@ -44,7 +44,9 @@ as $$
     when d ~ '^1[0-9]{9}$' then '0' || d
     else d
   end
-  from (select regexp_replace(coalesce(p, ''), '[^0-9]', '', 'g') as d) s
+  from (select regexp_replace(
+                 translate(coalesce(p, ''), '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '01234567890123456789'),
+                 '[^0-9]', '', 'g') as d) s  -- Arabic-Indic and Persian digits count as digits
 $$;
 
 alter table race_athletes
@@ -706,14 +708,15 @@ set search_path = ''
 as $$
 declare
   v_q text := trim(coalesce(p_query, ''));
-  v_digits text := regexp_replace(v_q, '[^0-9]', '', 'g');
+  v_ascii text := translate(v_q, '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '01234567890123456789');
+  v_digits text := regexp_replace(v_ascii, '[^0-9]', '', 'g');
   v_number text;
 begin
   if public.race_is_ops(p_event_id) is not true then
     raise exception 'RACE_FORBIDDEN' using errcode = 'insufficient_privilege';
   end if;
   -- "27", "n27", "N027" all mean N027.
-  if v_q ~* '^n?[0-9]{1,4}$' then
+  if v_ascii ~* '^n?[0-9]{1,4}$' then
     v_number := 'N' || lpad(v_digits, 3, '0');
   end if;
   return query
@@ -736,6 +739,29 @@ begin
 end;
 $$;
 grant execute on function race_list_registrations(uuid, text, int) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Public event page. Anonymous visitors cannot read tables, so the registration
+-- site gets exactly this projection (published events only; staff also see DRAFT).
+-- ---------------------------------------------------------------------------
+
+create or replace function race_get_public_event(p_slug text)
+returns table (
+  event_id uuid, slug text, name text, event_date date, venue text, timezone text,
+  status public.race_event_status, registration_open boolean,
+  registration_fee numeric, currency text, instructions text,
+  planned_start_at timestamptz, heats_locked boolean
+)
+language sql stable security definer
+set search_path = ''
+as $$
+  select e.id, e.slug, e.name, e.event_date, e.venue, e.timezone, e.status,
+         e.status = 'REGISTRATION_OPEN', e.registration_fee, e.registration_currency::text, e.instructions,
+         e.planned_start_at, e.heats_locked_at is not null
+  from public.race_events e
+  where e.slug = p_slug and public.race_event_visible(e.id) is true
+$$;
+grant execute on function race_get_public_event(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Defence in depth: Supabase grants EXECUTE on new public functions to anon by

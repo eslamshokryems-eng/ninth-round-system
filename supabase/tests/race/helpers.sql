@@ -113,3 +113,7 @@ create function race_test.put(p_key text, p_id uuid) returns uuid language sql s
   insert into race_test.fx values (p_key, p_id) returning id
 $$;
 grant execute on function race_test.put(text, uuid) to anon, authenticated, service_role;
+
+-- Shared TS/SQL parity fixture (packages/race/domain/parity-cases.json), loaded by run.sh.
+create table race_test.parity (doc jsonb not null);
+grant select on race_test.parity to public;

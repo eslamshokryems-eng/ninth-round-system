@@ -6,10 +6,12 @@ import QRCode from "qrcode";
 export interface QrCodeImageProps {
   value: string;
   size?: number;
+  /** Accessible description; defaults to the member wording this component was built for. */
+  alt?: string;
 }
 
 /** Renders a member's QR identity client-side — no server round trip, no QR image stored anywhere (see supabase/migrations/20260806000008's comment on members.qr_code). */
-export function QrCodeImage({ value, size = 180 }: QrCodeImageProps) {
+export function QrCodeImage({ value, size = 180, alt = "Member QR code" }: QrCodeImageProps) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,5 +31,5 @@ export function QrCodeImage({ value, size = 180 }: QrCodeImageProps) {
   }
 
   // Plain <img>, not next/image: a data: URI can't go through next/image's remote-optimization pipeline.
-  return <img src={dataUrl} alt="Member QR code" width={size} height={size} className="rounded-lg" />;
+  return <img src={dataUrl} alt={alt} width={size} height={size} className="rounded-lg" />;
 }

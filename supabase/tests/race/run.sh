@@ -28,11 +28,12 @@ if [ "$(id -u)" = "0" ]; then
   RUN_AS=(runuser -u postgres --)
 fi
 
-"${RUN_AS[@]}" initdb -D "$WORK/data" -U postgres --auth=trust >/dev/null
+"${RUN_AS[@]}" initdb -D "$WORK/data" -U postgres --auth=trust -E UTF8 --locale=C.UTF-8 >/dev/null
 "${RUN_AS[@]}" pg_ctl -D "$WORK/data" -o "-p $PORT -k $WORK -c timezone=UTC" -l "$WORK/log" start -w >/dev/null
 
 PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -q -X)
 "${PSQL[@]}" -d postgres -c "create database $DB" >/dev/null
+[ "$("${PSQL[@]}" -d "$DB" -Atc "show server_encoding")" = "UTF8" ] || { echo "harness must run on a UTF8 database (production Supabase is UTF8)"; exit 1; }
 
 apply() { "${PSQL[@]}" -d "$DB" -f "$1" >/dev/null; }
 snapshot() { # fingerprint of everything that is NOT race_* — for the regression diff
@@ -100,6 +101,7 @@ fi
 step "5. Test suites"
 total=0
 "${PSQL[@]}" -d "$DB" -f "$HERE/helpers.sql" >/dev/null
+"${PSQL[@]}" -d "$DB" -c "insert into race_test.parity values (\$json\$$(cat "$ROOT/packages/race/domain/parity-cases.json")\$json\$::jsonb)" >/dev/null
 node "$ROOT/docs/race/scripts/timing-validation.mjs" --csv > "$WORK/js_schedule.csv"
 "${PSQL[@]}" -d "$DB" -c "\\copy race_test.js_schedule from '$WORK/js_schedule.csv' with (format csv)" >/dev/null
 for t in "$HERE"/tests/*.sql; do

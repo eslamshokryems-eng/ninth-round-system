@@ -1,0 +1,204 @@
+/*
+ * THE NINTH — race theme. Scoped to .race-root: nothing here can touch the
+ * gym-management screens (the root layout and every other route group keep
+ * their own theme). Black · red · white, industrial, condensed display type.
+ * System condensed fonts only (no network font fetch at build time); swap in
+ * a licensed face by changing --race-display.
+ */
+.race-root {
+  --race-black: #050505;
+  --race-panel: #101010;
+  --race-panel-2: #171717;
+  --race-line: rgba(255, 255, 255, 0.14);
+  --race-red: #e10600;
+  --race-red-hot: #ff2b1f;
+  --race-white: #ffffff;
+  --race-muted: #9b9b9b;
+  --race-ok: #ffffff;
+  --race-display: "Barlow Condensed", "Oswald", "Bebas Neue", "Arial Narrow", "Roboto Condensed", Impact, sans-serif;
+  --race-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  background: var(--race-black);
+  color: var(--race-white);
+  font-family: var(--race-body);
+  -webkit-font-smoothing: antialiased;
+}
+.race-root *:focus-visible {
+  outline: 2px solid var(--race-red-hot);
+  outline-offset: 2px;
+}
+.race-display {
+  font-family: var(--race-display);
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+}
+.race-kicker {
+  font-family: var(--race-display);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  font-size: 0.8rem;
+  color: var(--race-red-hot);
+}
+.race-stripe {
+  height: 6px;
+  background: repeating-linear-gradient(115deg, var(--race-red) 0 18px, var(--race-black) 18px 26px);
+}
+.race-card {
+  background: var(--race-panel);
+  border: 1px solid var(--race-line);
+  border-left: 4px solid var(--race-red);
+  padding: 1.25rem;
+}
+.race-card--flat {
+  border-left-color: var(--race-line);
+}
+.race-label {
+  font-family: var(--race-display);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--race-muted);
+}
+.race-input {
+  width: 100%;
+  background: #0a0a0a;
+  border: 1px solid var(--race-line);
+  border-bottom: 2px solid #3a3a3a;
+  padding: 0.8rem 0.85rem;
+  min-height: 48px;
+  color: var(--race-white);
+  font-size: 1rem;
+  border-radius: 0;
+}
+.race-input::placeholder {
+  color: #5f5f5f;
+}
+.race-input:focus {
+  border-bottom-color: var(--race-red-hot);
+  outline: none;
+}
+.race-input[aria-invalid="true"] {
+  border-color: var(--race-red);
+}
+.race-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 52px;
+  padding: 0 1.75rem;
+  font-family: var(--race-display);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--race-white);
+  background: var(--race-red);
+  border: 0;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  transition: background 120ms;
+}
+.race-btn:hover:not(:disabled) {
+  background: var(--race-red-hot);
+}
+.race-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.race-btn--ghost {
+  background: transparent;
+  color: var(--race-white);
+  box-shadow: inset 0 0 0 2px var(--race-line);
+  clip-path: none;
+}
+.race-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+.race-btn--danger {
+  background: transparent;
+  color: var(--race-red-hot);
+  box-shadow: inset 0 0 0 2px var(--race-red);
+  clip-path: none;
+}
+.race-btn--sm {
+  min-height: 40px;
+  padding: 0 1rem;
+  font-size: 0.9rem;
+}
+.race-choice {
+  display: block;
+  cursor: pointer;
+  border: 1px solid var(--race-line);
+  padding: 0.85rem 1rem;
+  background: var(--race-panel-2);
+}
+.race-choice:has(input:checked) {
+  border-color: var(--race-red);
+  background: rgba(225, 6, 0, 0.12);
+}
+.race-choice:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.race-badge {
+  display: inline-block;
+  font-family: var(--race-display);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--race-line);
+}
+.race-badge--red {
+  background: var(--race-red);
+  border-color: var(--race-red);
+}
+.race-badge--white {
+  background: var(--race-white);
+  color: var(--race-black);
+  border-color: var(--race-white);
+}
+.race-notice {
+  border: 1px solid var(--race-red);
+  background: rgba(225, 6, 0, 0.1);
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+}
+.race-number-plate {
+  font-family: var(--race-display);
+  font-weight: 800;
+  line-height: 0.85;
+  letter-spacing: 0.02em;
+  font-size: clamp(6rem, 30vw, 11rem);
+  color: var(--race-white);
+}
+.race-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.race-table th {
+  text-align: left;
+  font-family: var(--race-display);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+  color: var(--race-muted);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid var(--race-red);
+  white-space: nowrap;
+}
+.race-table td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--race-line);
+  vertical-align: top;
+}
+.race-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}

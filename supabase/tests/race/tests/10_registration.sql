@@ -345,6 +345,21 @@ select race_test.login('rec');
 select race_test.throws($$select * from race_staff_register_athlete(race_test.id('ev_free'), 'After Lock Staff', '01000000021', null, 'male', '1995-01-01', 'MEN', null, true,
                           '{"name":"W","phone":"01011112222"}')$$, 'RACE_HEATS_LOCKED', 'lock: staff registration refused after heats are locked');
 
+-- Public event page ------------------------------------------------------------------------------------------------
+select race_test.anon();
+select race_test.ok((select event_id = race_test.id('ev_paid') and name = 'THE NINTH' and registration_open and registration_fee = 750 and currency = 'EGP'
+                            and instructions like 'Arrive 30 minutes%' and not heats_locked
+                     from race_get_public_event('reg-paid-2026')), 'public event: anon reads a published event by slug (fee, currency, instructions)');
+select race_test.ok((select status = 'HEATS_LOCKED' and not registration_open and heats_locked and planned_start_at = timestamptz '2026-11-20 07:00:00+00'
+                     from race_get_public_event('reg-free-2026')), 'public event: a locked event reports registration closed');
+select race_test.eq(race_test.count($$select 1 from race_get_public_event('the-ninth-alex-2026')$$), 0::bigint, 'public event: a DRAFT event is invisible to anon');
+select race_test.eq(race_test.count($$select 1 from race_get_public_event('no-such-event')$$), 0::bigint, 'public event: unknown slug → nothing');
+select race_test.login('bm_b');
+select race_test.eq(race_test.count($$select 1 from race_get_public_event('the-ninth-alex-2026')$$), 1::bigint, 'public event: the event''s own manager sees their DRAFT');
+select race_test.login('nobody');
+select race_test.eq(race_test.count($$select 1 from race_get_public_event('the-ninth-alex-2026')$$), 0::bigint, 'public event: a stranger does not see someone else''s DRAFT');
+reset role;
+
 -- Deactivated staff / RPC exposure ---------------------------------------------------------------------------------------------------
 reset role;
 select set_config('request.jwt.claim.sub', race_test.id('super')::text, false);
