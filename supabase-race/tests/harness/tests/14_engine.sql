@@ -246,8 +246,8 @@ select race_test.throws($$select race_mark_dnf(race_test.rid('ev_e3'), 'x')$$, '
 select race_mark_dnf(race_test.rid('ev_e2'), 'Athlete withdrew mid-race');
 reset role;
 select race_test.ok((select race_status = 'DNF' from race_registrations where id = race_test.rid('ev_e2'))
-                    and (select count(*) filter (where status = 'VOID_DNS') = 6 and count(*) filter (where status <> 'VOID_DNS') = 3 from race_station_results where registration_id = race_test.rid('ev_e2')),
-  'dnf: athlete 2 is DNF; the 6 stations not yet reached are voided, the 3 they reached keep their results');
+                    and (select count(*) filter (where status = 'NOT_REACHED') = 6 and count(*) filter (where status <> 'NOT_REACHED') = 3 from race_station_results where registration_id = race_test.rid('ev_e2')),
+  'dnf: athlete 2 is DNF; the 6 stations not yet reached are NOT_REACHED, the 3 they reached keep their results (nothing deleted)');
 select race_test.ok(exists (select 1 from race_audit_log where action = 'race.athlete.dnf' and metadata ->> 'reason' = 'Athlete withdrew mid-race'), 'audit: DNF logged');
 
 -- Finish: athlete 1 completes Station 09 at 0:32:00; the heat and the event finish with them ----------------------------------------------------
@@ -264,7 +264,7 @@ select race_test.ok((race_test.adv(race_test.id('ev_e')) ->> 'event_finished')::
 select race_test.ok((select status = 'FINISHED' from race_events where id = race_test.id('ev_e'))
                     and (select finished_at is not null from race_clock where event_id = race_test.id('ev_e'))
                     and (select status = 'FINISHED' from race_heats where id = race_test.id('e_h1')), 'finish: event, clock and heat are all FINISHED');
-select race_test.ok((select bool_and(status in ('LOCKED', 'VOID_DNS')) from race_station_results where event_id = race_test.id('ev_e')), 'finish: every station result is LOCKED (or void) — nothing is left open');
+select race_test.ok((select bool_and(status in ('LOCKED', 'VOID_DNS', 'NOT_REACHED')) from race_station_results where event_id = race_test.id('ev_e')), 'finish: every station result is LOCKED (or void / not reached) — nothing is left open');
 select race_test.login('master');
 select race_test.throws($$select * from race_pause(race_test.id('ev_e'))$$, 'RACE_EVENT_FINISHED', 'finish: a finished race cannot be paused');
 select race_test.throws($$select * from race_start_event(race_test.id('ev_e'))$$, 'RACE_ALREADY_STARTED', 'finish: and cannot be started again');

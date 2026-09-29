@@ -74,8 +74,8 @@ select race_test.eq((select count(*) from race_start_slots where registration_id
 select race_test.ok((select slot_index = 8 and status = 'STARTED' and not is_overflow from race_start_slots where registration_id = race_test.sn(14)), 'outcome: late #14 took heat 2''s last planned slot and raced');
 select race_test.ok((select status = 'SKIPPED' from race_start_slots where registration_id = race_test.sn(27)) and (select count(*) = 0 from race_station_results where registration_id = race_test.sn(27)), 'outcome: skipped #27 — empty slot, no results');
 select race_test.eq((select count(*) from race_station_results where event_id = race_test.id('ev_s') and status = 'LOCKED')::int, 46 * 9 + 3, 'outcome: 46 × 9 results + the 3 stations #30 reached are LOCKED');
-select race_test.eq((select count(*) from race_station_results where event_id = race_test.id('ev_s') and status = 'VOID_DNS')::int, 6, 'outcome: the 6 stations #30 never reached are void');
-select race_test.eq((select count(*) from race_station_results where event_id = race_test.id('ev_s') and status not in ('LOCKED', 'VOID_DNS'))::int, 0, 'outcome: nothing is left open');
+select race_test.eq((select count(*) from race_station_results where event_id = race_test.id('ev_s') and status = 'NOT_REACHED')::int, 6, 'outcome: the 6 stations #30 never reached are NOT_REACHED (rows kept, never deleted)');
+select race_test.eq((select count(*) from race_station_results where event_id = race_test.id('ev_s') and status not in ('LOCKED', 'VOID_DNS', 'NOT_REACHED'))::int, 0, 'outcome: nothing is left open');
 
 -- Timing accuracy -----------------------------------------------------------------------------------------------------------------------------------------
 select race_test.eq((select count(distinct (after -> 'registration_id')) from race_audit_log where action = 'race.athlete.start' and metadata ->> 'event_id' = race_test.id('ev_s')::text)::int, 47, 'timing: 47 start audit rows, one per athlete — nobody started twice');
@@ -86,8 +86,8 @@ select race_test.ok((select bool_and((after ->> 'planned_start_ms')::bigint = h.
                     where a.action = 'race.athlete.start' and a.metadata ->> 'event_id' = race_test.id('ev_s')::text), 'timing: planned start = heat anchor + slot × 3:30 for all 47 — no skip, DNS or late arrival moved anyone');
 select race_test.ok((select bool_and(sr.window_start_race_ms = h.anchor_race_ms + sl.slot_index::bigint * 210000 + (st.number - 1) * 210000 and sr.window_end_race_ms - sr.window_start_race_ms = 180000)
                      from race_station_results sr join race_start_slots sl on sl.id = sr.slot_id join race_heats h on h.id = sl.heat_id join race_stations st on st.id = sr.station_id
-                    where sr.event_id = race_test.id('ev_s') and sr.status <> 'VOID_DNS'), 'timing: every one of the 423 windows is exactly slot start + (station − 1) × 3:30, 3:00 long');
-select race_test.ok((select count(*) = 46 * 9 + 3 and count(distinct (station_id, window_start_race_ms)) = count(*) from race_station_results where event_id = race_test.id('ev_s') and status <> 'VOID_DNS'),
+                    where sr.event_id = race_test.id('ev_s') and sr.status not in ('VOID_DNS', 'NOT_REACHED')), 'timing: every one of the 423 windows is exactly slot start + (station − 1) × 3:30, 3:00 long');
+select race_test.ok((select count(*) = 46 * 9 + 3 and count(distinct (station_id, window_start_race_ms)) = count(*) from race_station_results where event_id = race_test.id('ev_s') and status not in ('VOID_DNS', 'NOT_REACHED')),
   'timing: no two athletes ever share a station window');
 select race_test.ok((select array_agg(right(r.race_number, 3) order by s.slot_index) = array['001', '002', '003', '004', '006', '007', '008', '009']
                      from race_start_slots s join race_registrations r on r.id = s.registration_id join race_heats h on h.id = s.heat_id where h.event_id = race_test.id('ev_s') and h.number = 1 and s.status = 'STARTED'),

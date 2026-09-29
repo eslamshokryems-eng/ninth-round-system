@@ -337,7 +337,7 @@ begin
     order by hh.number
   loop
     v_count := coalesce(h.planned_slot_count, h.roster);
-    continue when v_count = 0;  -- an empty heat holds no slots and takes no time
+    continue when v_count = 0 or h.status = 'CANCELLED';  -- an empty or cancelled heat holds no slots and takes no time
     if v_first then
       v_anchor := coalesce(h.anchor_race_ms, p_anchor_ms);
       if v_anchor <> p_anchor_ms then

@@ -232,6 +232,9 @@ begin
     raise exception 'RACE_NO_HEAT: this athlete has no heat yet' using errcode = 'check_violation';
   end if;
 
+  -- Bring the race up to date FIRST: an athlete who arrives after their heat closed must find it closed even if no
+  -- device was ticking, and their slot is decided at their arrival moment, not at some later tick.
+  perform public.race_advance_core(r.event_id);
   perform pg_advisory_xact_lock(public.race_heat_lock_key(r.heat_id));
   select * into r from public.race_registrations where id = p_registration_id for update;
   select * into e from public.race_events where id = r.event_id;
@@ -275,6 +278,7 @@ begin
     perform public.race_audit(case when v_kind = 'LATE' then 'race.checkin.late' else 'race.checkin' end, r.event_id,
       'race_check_ins', c.id, null, jsonb_build_object('race_number', r.race_number, 'heat', v_heat_number,
         'kind', v_kind, 'checked_in_at', c.checked_in_at), jsonb_build_object('registration_id', r.id));
+    perform public.race_advance_core(r.event_id);   -- bind / overflow decided at the arrival moment
   end if;
 
   select count(*)::int into v_pos from public.race_check_ins x
@@ -437,9 +441,14 @@ returns table (bound int, emptied int, overflow_created int, missed_start int)
 language plpgsql volatile security definer
 set search_path = ''
 as $$
+-- CATCH-UP semantics. This function brings slot assignment up to the current race time by REPLAYING every
+-- decision at the race moment it belongs to (a slot binds at start − 60 s, whenever anybody happens to call
+-- this). No device has to be online for the schedule to be right: every state-changing RPC catches up first,
+-- so the set of checked-in athletes cannot change between the last catch-up and this one.
 declare
   e public.race_events;
   v_now bigint;
+  v_m bigint;          -- the race moment being decided
   v_cap int;
   h record;
   s public.race_start_slots;
@@ -451,8 +460,10 @@ declare
   v_next_idx int;
   v_ov_cnt int;
   v_start bigint;
+  v_t bigint;
   v_last_bind bigint;
   v_next_anchor bigint;
+  v_progress boolean;
   m record;
 begin
   select * into e from public.race_events where id = p_event_id;
@@ -463,68 +474,65 @@ begin
   end if;
   v_cap := public.race_overflow_capacity(e.start_interval_ms, e.heat_gap_ms);
 
-  for h in select * from public.race_heats where event_id = p_event_id and anchor_race_ms is not null order by number loop
+  for h in select * from public.race_heats where event_id = p_event_id and anchor_race_ms is not null and status <> 'CANCELLED' order by number loop
     perform pg_advisory_xact_lock(public.race_heat_lock_key(h.id));
-
-    -- 1. planned / open slots that are due, in index order
-    loop
-      select * into s from public.race_start_slots
-       where heat_id = h.id and status = 'OPEN'
-         and (h.anchor_race_ms + slot_index::bigint * e.start_interval_ms - e.bind_lead_ms) <= v_now
-       order by slot_index limit 1 for update;
-      exit when not found;
-      select r.id into v_reg
-        from public.race_check_ins c join public.race_registrations r on r.id = c.registration_id
-       where c.heat_id = h.id and c.voided_by_correction_id is null
-         and r.status = 'CONFIRMED' and r.race_status in ('CHECKED_IN', 'LATE_CHECK_IN')
-         and not exists (select 1 from public.race_start_slots x where x.registration_id = r.id and x.status in ('BOUND', 'STARTED'))
-       order by c.checked_in_at, coalesce(c.tie_draw_position, 0), c.id limit 1;
-      if v_reg is null then
-        update public.race_start_slots set status = 'EMPTY' where id = s.id;
-        perform public.race_audit('race.slot.empty', p_event_id, 'race_start_slots', s.id, null,
-          jsonb_build_object('heat', h.number, 'slot_index', s.slot_index, 'reason', 'nobody checked in and unbound at bind time'), '{}'::jsonb);
-        v_empty := v_empty + 1;
-      else
-        update public.race_start_slots set status = 'BOUND', registration_id = v_reg, bound_at = clock_timestamp() where id = s.id;
-        perform public.race_audit('race.slot.bind', p_event_id, 'race_start_slots', s.id, null,
-          jsonb_build_object('heat', h.number, 'slot_index', s.slot_index, 'registration_id', v_reg), '{}'::jsonb);
-        v_bound := v_bound + 1;
-      end if;
-    end loop;
-
-    -- 2. late athletes: overflow slots, only when no planned slot is still waiting, only if
-    --    the slot still lies in the future AND ends at least one interval before the next heat
     select min(n.anchor_race_ms) into v_next_anchor from public.race_heats n
-     where n.event_id = p_event_id and n.number > h.number and n.anchor_race_ms is not null;
+     where n.event_id = p_event_id and n.number > h.number and n.anchor_race_ms is not null and n.status <> 'CANCELLED';
+    v_m := v_now;
+
     loop
-      exit when not exists (
-        select 1 from public.race_check_ins c join public.race_registrations r on r.id = c.registration_id
+      v_progress := false;
+
+      -- 1. planned / overflow slots that are due, in index order, each decided at its own bind moment
+      loop
+        select * into s from public.race_start_slots
+         where heat_id = h.id and status = 'OPEN' order by slot_index limit 1 for update;
+        exit when not found;
+        v_t := h.anchor_race_ms + s.slot_index::bigint * e.start_interval_ms - e.bind_lead_ms;
+        exit when v_t > v_now;
+        v_m := v_t;
+        v_progress := true;
+        select r.id into v_reg
+          from public.race_check_ins c join public.race_registrations r on r.id = c.registration_id
          where c.heat_id = h.id and c.voided_by_correction_id is null
            and r.status = 'CONFIRMED' and r.race_status in ('CHECKED_IN', 'LATE_CHECK_IN')
-           and not exists (select 1 from public.race_start_slots x where x.registration_id = r.id and x.status in ('BOUND', 'STARTED')));
-      exit when exists (select 1 from public.race_start_slots where heat_id = h.id and status = 'OPEN');
-      select coalesce(max(x.slot_index), -1) + 1, count(*) filter (where x.is_overflow)
-        into v_next_idx, v_ov_cnt from public.race_start_slots x where x.heat_id = h.id;
-      exit when v_ov_cnt >= v_cap;
-      v_start := h.anchor_race_ms + v_next_idx::bigint * e.start_interval_ms;
-      exit when v_start <= v_now;
-      exit when v_next_anchor is not null and v_start + e.start_interval_ms > v_next_anchor;
-      insert into public.race_start_slots (event_id, heat_id, slot_index, is_overflow)
-      values (p_event_id, h.id, v_next_idx, true) returning * into s;
-      perform public.race_audit('race.slot.overflow_created', p_event_id, 'race_start_slots', s.id, null,
-        jsonb_build_object('heat', h.number, 'slot_index', v_next_idx), '{}'::jsonb);
-      v_ov := v_ov + 1;
-      exit when (v_start - e.bind_lead_ms) > v_now;
-      select r.id into v_reg
-        from public.race_check_ins c join public.race_registrations r on r.id = c.registration_id
-       where c.heat_id = h.id and c.voided_by_correction_id is null
-         and r.status = 'CONFIRMED' and r.race_status in ('CHECKED_IN', 'LATE_CHECK_IN')
-         and not exists (select 1 from public.race_start_slots x where x.registration_id = r.id and x.status in ('BOUND', 'STARTED'))
-       order by c.checked_in_at, coalesce(c.tie_draw_position, 0), c.id limit 1;
-      update public.race_start_slots set status = 'BOUND', registration_id = v_reg, bound_at = clock_timestamp() where id = s.id;
-      perform public.race_audit('race.slot.bind', p_event_id, 'race_start_slots', s.id, null,
-        jsonb_build_object('heat', h.number, 'slot_index', v_next_idx, 'registration_id', v_reg, 'overflow', true), '{}'::jsonb);
-      v_bound := v_bound + 1;
+           and not exists (select 1 from public.race_start_slots x where x.registration_id = r.id and x.status in ('BOUND', 'STARTED'))
+         order by c.checked_in_at, coalesce(c.tie_draw_position, 0), c.id limit 1;
+        if v_reg is null then
+          update public.race_start_slots set status = 'EMPTY' where id = s.id;
+          perform public.race_audit('race.slot.empty', p_event_id, 'race_start_slots', s.id, null,
+            jsonb_build_object('heat', h.number, 'slot_index', s.slot_index, 'reason', 'nobody checked in and unbound at bind time', 'official_race_ms', v_t), '{}'::jsonb);
+          v_empty := v_empty + 1;
+        else
+          update public.race_start_slots set status = 'BOUND', registration_id = v_reg, bound_at = public.race_wall_at(p_event_id, v_t) where id = s.id;
+          perform public.race_audit('race.slot.bind', p_event_id, 'race_start_slots', s.id, null,
+            jsonb_build_object('heat', h.number, 'slot_index', s.slot_index, 'registration_id', v_reg, 'official_race_ms', v_t), '{}'::jsonb);
+          v_bound := v_bound + 1;
+        end if;
+      end loop;
+
+      -- 2. late athletes: an overflow slot, only when no planned slot is still waiting, only if the slot still lies
+      --    in the future AT THAT MOMENT and ends at least one interval before the next heat
+      if exists (
+           select 1 from public.race_check_ins c join public.race_registrations r on r.id = c.registration_id
+            where c.heat_id = h.id and c.voided_by_correction_id is null
+              and r.status = 'CONFIRMED' and r.race_status in ('CHECKED_IN', 'LATE_CHECK_IN')
+              and not exists (select 1 from public.race_start_slots x where x.registration_id = r.id and x.status in ('BOUND', 'STARTED')))
+         and not exists (select 1 from public.race_start_slots where heat_id = h.id and status = 'OPEN') then
+        select coalesce(max(x.slot_index), -1) + 1, count(*) filter (where x.is_overflow)
+          into v_next_idx, v_ov_cnt from public.race_start_slots x where x.heat_id = h.id;
+        v_start := h.anchor_race_ms + v_next_idx::bigint * e.start_interval_ms;
+        if v_ov_cnt < v_cap and v_start > v_m and not (v_next_anchor is not null and v_start + e.start_interval_ms > v_next_anchor) then
+          insert into public.race_start_slots (event_id, heat_id, slot_index, is_overflow)
+          values (p_event_id, h.id, v_next_idx, true) returning * into s;
+          perform public.race_audit('race.slot.overflow_created', p_event_id, 'race_start_slots', s.id, null,
+            jsonb_build_object('heat', h.number, 'slot_index', v_next_idx, 'official_race_ms', v_m), '{}'::jsonb);
+          v_ov := v_ov + 1;
+          v_progress := true;   -- the new slot is bound (or waits) in the next round, at its own bind moment
+        end if;
+      end if;
+
+      exit when not v_progress;
     end loop;
 
     -- 3. the heat can take nobody else after its last possible bind time
@@ -536,7 +544,7 @@ begin
         returning id, race_number
       loop
         perform public.race_audit('race.registration.missed_start', p_event_id, 'race_registrations', m.id, null,
-          jsonb_build_object('race_number', m.race_number, 'heat', h.number, 'reason', 'never checked in before the heat closed'), '{}'::jsonb);
+          jsonb_build_object('race_number', m.race_number, 'heat', h.number, 'reason', 'never checked in before the heat closed', 'official_race_ms', v_last_bind), '{}'::jsonb);
         v_miss := v_miss + 1;
       end loop;
     end if;
@@ -587,6 +595,7 @@ begin
     raise exception 'RACE_CORRECTION_DIFFERENT_HEAT: both athletes must be in the same heat' using errcode = 'check_violation';
   end if;
 
+  perform public.race_advance_core(o.event_id);   -- catch the race up before deciding anything
   perform pg_advisory_xact_lock(public.race_heat_lock_key(o.heat_id));
   select * into o from public.race_registrations where id = p_old_registration_id for update;
   select * into n from public.race_registrations where id = p_new_registration_id for update;
@@ -685,6 +694,7 @@ begin
     raise exception 'RACE_NO_HEAT' using errcode = 'check_violation';
   end if;
 
+  perform public.race_advance_core(r.event_id);   -- catch the race up before deciding anything
   perform pg_advisory_xact_lock(public.race_heat_lock_key(r.heat_id));
   select * into r from public.race_registrations where id = p_registration_id for update;
   if r.race_status <> 'MISSED_START' or r.status <> 'CONFIRMED' then
@@ -713,7 +723,7 @@ begin
   values (v_new_ci, r.event_id, r.id, r.heat_id, auth.uid(), 'LATE') returning * into v_ci;
   update public.race_registrations set race_status = 'LATE_CHECK_IN' where id = r.id;
 
-  perform public.race_bind_due_slots(r.event_id);
+  perform public.race_advance_core(r.event_id);
   select * into v_slot from public.race_start_slots where registration_id = r.id and status in ('BOUND', 'STARTED');
   select count(*)::int into v_pos from public.race_check_ins x
    where x.heat_id = r.heat_id and x.voided_by_correction_id is null
@@ -776,6 +786,7 @@ begin
     raise exception 'RACE_MOVE_NOT_LATER: an athlete can only move to a LATER heat' using errcode = 'check_violation';
   end if;
 
+  perform public.race_advance_core(r.event_id);   -- catch the race up before deciding anything
   -- both heat locks, lower heat number first (same order the binder uses → no deadlock)
   perform pg_advisory_xact_lock(public.race_heat_lock_key(cur.id));
   perform pg_advisory_xact_lock(public.race_heat_lock_key(tgt.id));
@@ -787,7 +798,7 @@ begin
   if exists (select 1 from public.race_start_slots x where x.registration_id = r.id and x.status in ('BOUND', 'STARTED')) then
     raise exception 'RACE_ATHLETE_HAS_SLOT: an athlete who already holds a start slot is never moved' using errcode = 'check_violation';
   end if;
-  if tgt.anchor_race_ms is null or tgt.status = 'FINISHED' then
+  if tgt.anchor_race_ms is null or tgt.status in ('FINISHED', 'CANCELLED') then
     raise exception 'RACE_NO_SLOT_AVAILABLE: that heat is not open for new athletes' using errcode = 'check_violation';
   end if;
   v_free := public.race_heat_free_capacity(tgt.id, r.id);
@@ -807,7 +818,7 @@ begin
   values (v_new_ci, r.event_id, r.id, tgt.id, auth.uid(), 'LATE') returning * into v_ci;
   update public.race_registrations set race_status = 'LATE_CHECK_IN' where id = r.id;
 
-  perform public.race_bind_due_slots(r.event_id);
+  perform public.race_advance_core(r.event_id);
   select * into v_slot from public.race_start_slots where registration_id = r.id and status in ('BOUND', 'STARTED');
   select count(*)::int into v_pos from public.race_check_ins x
    where x.heat_id = tgt.id and x.voided_by_correction_id is null

@@ -25,7 +25,7 @@ create type race_event_status as enum (
   'LIVE', 'FINISHED', 'RESULTS_OFFICIAL', 'ARCHIVED'
 );
 create type race_heat_start_mode as enum ('AUTO', 'MANUAL');
-create type race_heat_status as enum ('DRAFT', 'LOCKED', 'AWAITING_START', 'RUNNING', 'FINISHED');
+create type race_heat_status as enum ('DRAFT', 'LOCKED', 'AWAITING_START', 'RUNNING', 'FINISHED', 'CANCELLED');
 create type race_category_code as enum ('MEN', 'WOMEN', 'MASTERS');
 create type race_scoring_type as enum ('REPS', 'HOLD_MS', 'LAPS', 'CONVERTED_REPS', 'DISTANCE_M');
 create type race_reg_status as enum ('PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED');
@@ -40,7 +40,7 @@ create type race_pushup_style as enum ('STANDARD', 'KNEE');
 create type race_checkin_kind as enum ('ON_TIME', 'LATE');
 create type race_slot_status as enum ('OPEN', 'BOUND', 'STARTED', 'SKIPPED', 'EMPTY');
 create type race_result_status as enum (
-  'SCHEDULED', 'ACTIVE', 'SCORING', 'REVIEW_PENDING', 'LOCKED', 'CORRECTED', 'VOID_DNS'
+  'SCHEDULED', 'ACTIVE', 'SCORING', 'REVIEW_PENDING', 'LOCKED', 'CORRECTED', 'VOID_DNS', 'NOT_REACHED'
 );
 create type race_action_type as enum (
   'REP', 'NO_REP', 'LAP', 'PENALTY', 'HOLD_START', 'HOLD_BREAK', 'HOLD_RESUME',

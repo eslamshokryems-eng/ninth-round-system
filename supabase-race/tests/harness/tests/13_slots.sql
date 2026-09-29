@@ -98,7 +98,9 @@ select race_test.eq(race_test.bind(race_test.id('ev_sl')), 'bound=0 emptied=1 ov
 select race_test.login('rec');
 select race_test.ok((select kind = 'LATE' from race_check_in(race_test.rid('ev_sl9'))), 'overflow: athlete 9 arrives after every planned slot is gone');
 reset role;
-select race_test.eq(race_test.bind(race_test.id('ev_sl')), 'bound=0 emptied=0 overflow=1 missed=0', 'overflow: one extra slot is opened inside the heat gap');
+-- The check-in itself catches the race up (no device has to tick), so the overflow slot already exists the moment athlete 9 is checked in.
+select race_test.eq((select count(*) from race_start_slots where heat_id = race_test.id('sl_h1') and is_overflow)::int, 1, 'overflow: one extra slot was opened inside the heat gap — at the moment of the check-in');
+select race_test.eq(race_test.bind(race_test.id('ev_sl')), 'bound=0 emptied=0 overflow=0 missed=0', 'overflow: a later binder pass has nothing left to do (state was already settled)');
 select race_test.ok((select is_overflow and slot_index = 9 and status = 'OPEN' from race_start_slots where heat_id = race_test.id('sl_h1') and slot_index = 9), 'overflow: slot index 9, flagged overflow, waiting for its bind time');
 select race_test.login('rec');
 select race_test.ok((select projected_slot_index = 9 and projected_start_ms = 60000 + 9 * 210000 and not no_slot_available
@@ -112,9 +114,9 @@ select race_test.at(race_test.id('ev_sl'), 1900);
 select race_test.eq(race_test.bind(race_test.id('ev_sl')), 'bound=1 emptied=0 overflow=0 missed=1', 'bind 31:40 — overflow slot binds athlete 9; the heat can take nobody else, so athlete 6 is MISSED_START');
 select race_test.ok((select race_status = 'MISSED_START' from race_registrations where id = race_test.rid('ev_sl6')), 'DNS: athlete 6 (never checked in) → MISSED_START');
 select race_test.ok(exists (select 1 from race_audit_log where action = 'race.registration.missed_start' and target_id = race_test.rid('ev_sl6')), 'audit: the missed start is logged');
-select race_test.ok((select array_agg(coalesce(status::text, 'x') || ':' || coalesce(rn, '-') order by slot_index) = array['BOUND:1', 'BOUND:2', 'BOUND:3', 'BOUND:4', 'BOUND:5', 'BOUND:7', 'EMPTY:-', 'BOUND:8', 'EMPTY:-', 'BOUND:9']
+select race_test.ok((select array_agg(case when status in ('BOUND', 'STARTED') then 'BOUND' else coalesce(status::text, 'x') end || ':' || coalesce(rn, '-') order by slot_index) = array['BOUND:1', 'BOUND:2', 'BOUND:3', 'BOUND:4', 'BOUND:5', 'BOUND:7', 'EMPTY:-', 'BOUND:8', 'EMPTY:-', 'BOUND:9']
                      from (select s.slot_index, s.status, right(r.race_number, 1) rn from race_start_slots s left join race_registrations r on r.id = s.registration_id where s.heat_id = race_test.id('sl_h1')) q
-                     where true), 'result: heat 1 slots = athletes 1,2,3,4,5,7,(empty),8,(empty),9 — nobody was ever moved');
+                     where true), 'result: heat 1 slots = athletes 1,2,3,4,5,7,(empty),8,(empty),9 — nobody was ever moved (BOUND and already-STARTED both mean "holds the slot": catch-up starts due athletes)');
 select race_test.login('rec');
 select race_test.throws($$select * from race_check_in(race_test.rid('ev_sl6'))$$, 'RACE_CHECKIN_NOT_ELIGIBLE', 'DNS: a missed-start athlete cannot check in afterwards');
 reset role;
@@ -128,7 +130,8 @@ select race_test.eq(race_test.bind(race_test.id('ev_sl')), 'bound=0 emptied=3 ov
 select race_test.login('rec');
 select race_test.ok((select kind = 'LATE' from race_check_in(race_test.rid('ev_sl10'))) and (select kind = 'LATE' from race_check_in(race_test.rid('ev_sl11'))), 'heat 2: two athletes arrive late');
 reset role;
-select race_test.eq(race_test.bind(race_test.id('ev_sl')), 'bound=0 emptied=0 overflow=1 missed=0', 'heat 2: only ONE overflow slot exists (floor(10:00 / 3:30) − 1)');
+select race_test.eq((select count(*) from race_start_slots where heat_id = race_test.id('sl_h2') and is_overflow)::int, 1, 'heat 2: only ONE overflow slot exists (floor(10:00 / 3:30) − 1), opened by the first late check-in');
+select race_test.eq(race_test.bind(race_test.id('ev_sl')), 'bound=0 emptied=0 overflow=0 missed=0', 'heat 2: the second late athlete did not create another one');
 select race_test.login('rec');
 select race_test.ok((select no_slot_available and projected_slot_index is null from race_queue(race_test.id('ev_sl'), 2) where queue_position = 2),
   'heat 2: the second late athlete is flagged NO SLOT AVAILABLE (an Event Manager must move them) — nobody else is disturbed');
