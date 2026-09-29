@@ -132,7 +132,7 @@ as $$
 #variable_conflict use_column
 declare
   clk public.race_clock;
-  v_ts timestamptz := date_trunc('milliseconds', clock_timestamp());
+  v_ts timestamptz;
   v_race_ms bigint;
 begin
   if public.race_is_control(p_event_id) is not true then
@@ -152,7 +152,9 @@ begin
     raise exception 'RACE_ALREADY_PAUSED' using errcode = 'check_violation';
   end if;
 
-  v_ts := greatest(v_ts, date_trunc('milliseconds', clk.started_at));
+  -- stamped only NOW, after the clock row is locked: a caller that waited for the lock must not carry a timestamp from before
+  -- the pause/resume that ran while it waited, or pauses would overlap
+  v_ts := greatest(date_trunc('milliseconds', clock_timestamp()), date_trunc('milliseconds', clk.started_at));
   v_race_ms := public.race_ms_from_clock(clk.started_at, null, clk.paused_total_ms, v_ts);
   insert into public.race_pauses (event_id, paused_at, paused_race_ms, paused_by, reason)
   values (p_event_id, v_ts, greatest(v_race_ms, 0), auth.uid(), coalesce(nullif(trim(p_reason), ''), 'Emergency pause'));
