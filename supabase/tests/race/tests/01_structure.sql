@@ -53,7 +53,10 @@ select race_test.ok(not has_column_privilege('authenticated', 'race_events', 'st
 
 select race_test.eq((select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid
                      where c.relname like 'race\_%' and t.tgname like '%append_only')::int,
-                    7, 'structure: append-only triggers on 7 ledger tables');
+                    6, 'structure: fully append-only triggers on 6 ledger tables (race_check_ins has the narrower tie-draw guard instead)');
+
+select race_test.ok(exists (select 1 from pg_trigger where tgname = 'trg_race_check_ins_guard') and exists (select 1 from pg_trigger where tgname = 'trg_race_check_ins_no_truncate'),
+  'structure: race_check_ins keeps its delete/truncate protection plus the tie-draw guard');
 
 select race_test.ok(to_regprocedure('race_create_event(uuid,text,date,text,text,timestamptz)') is not null
                     and to_regprocedure('race_now_ms(uuid)') is not null

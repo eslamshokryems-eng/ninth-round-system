@@ -4,6 +4,8 @@ import { CancelRegistrationUseCase } from "./cancel-registration";
 import { ConfirmPaymentUseCase } from "./confirm-payment";
 import { GetMyRegistrationUseCase } from "./get-my-registration";
 import { GetPublicEventUseCase } from "./get-public-event";
+import { CheckInAthleteUseCase } from "./check-in-athlete";
+import { GetQueueUseCase } from "./get-queue";
 import { ListRegistrationsUseCase } from "./list-registrations";
 import { RefundPaymentUseCase } from "./refund-payment";
 import { RegisterAthleteUseCase } from "./register-athlete";
@@ -150,5 +152,29 @@ describe("GetPublicEventUseCase", () => {
     const result = await new GetPublicEventUseCase(repo).execute("  The-Ninth-2026 ");
     expect(result.isErr && result.error.code).toBe("RACE_NOT_FOUND");
     expect(repo.calls[0]).toEqual({ method: "getPublicEvent", args: ["the-ninth-2026"] });
+  });
+});
+
+describe("CheckInAthleteUseCase", () => {
+  it("sends ONLY the registration id — no position, time or order can be supplied", async () => {
+    const repo = new FakeRaceRegistrationRepository();
+    const result = await new CheckInAthleteUseCase(repo).execute("reg-9");
+    expect(result.isOk && result.value.queuePosition).toBe(1);
+    expect(repo.calls).toEqual([{ method: "checkIn", args: ["reg-9"] }]);
+  });
+  it("refuses an empty selection without a round trip", async () => {
+    const repo = new FakeRaceRegistrationRepository();
+    const result = await new CheckInAthleteUseCase(repo).execute("  ");
+    expect(result.isErr && result.error.code).toBe("RACE_NOT_FOUND");
+    expect(repo.calls).toHaveLength(0);
+  });
+});
+
+describe("GetQueueUseCase", () => {
+  it("passes the heat filter through, or null for every heat", async () => {
+    const repo = new FakeRaceRegistrationRepository();
+    await new GetQueueUseCase(repo).execute({ eventId: "e" });
+    await new GetQueueUseCase(repo).execute({ eventId: "e", heatNumber: 2 });
+    expect(repo.calls.map((c) => c.args)).toEqual([["e", null], ["e", 2]]);
   });
 });

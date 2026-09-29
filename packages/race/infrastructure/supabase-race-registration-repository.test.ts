@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
-import { SupabaseRaceRegistrationRepository, toConfirmation, toMyRegistration, toRaceError, toStaffRow } from "./supabase-race-registration-repository";
+import { SupabaseRaceRegistrationRepository, toCheckInResult, toConfirmation, toQueueEntry, toMyRegistration, toRaceError, toStaffRow } from "./supabase-race-registration-repository";
 
 describe("toRaceError", () => {
   it("uses the database's RACE_* code and friendly wording", () => {
@@ -73,5 +73,34 @@ describe("SupabaseRaceRegistrationRepository", () => {
     const result = await new SupabaseRaceRegistrationRepository(client).confirmPayment({ registrationId: "r", method: "CASH", amount: null, notes: null, idempotencyKey: "k" });
     expect(result.isOk && result.value).toBe("pay-1");
     expect(calls[0]).toEqual({ fn: "race_confirm_payment", args: { p_registration_id: "r", p_method: "CASH", p_amount: null, p_notes: null, p_idempotency_key: "k" } });
+  });
+});
+
+describe("check-in mapping", () => {
+  it("maps a check-in result", () => {
+    expect(toCheckInResult({ check_in_id: "c", checked_in_at: "2026-11-20T06:00:00Z", kind: "LATE", queue_position: 4, heat_number: 2, already_checked_in: true }))
+      .toEqual({ checkInId: "c", checkedInAt: "2026-11-20T06:00:00Z", kind: "LATE", queuePosition: 4, heatNumber: 2, alreadyCheckedIn: true });
+  });
+  it("maps a queue row; a missing overflow flag means false and bigint-as-string becomes a number", () => {
+    const entry = toQueueEntry({
+      heat_number: 1, queue_position: 2, registration_id: "r", race_number: "N002", full_name: "B", category_code: "WOMEN", race_status: "CHECKED_IN",
+      checked_in_at: "2026-11-20T06:00:00Z", kind: "ON_TIME", slot_index: null, slot_status: null, is_overflow: null, projected_slot_index: 1,
+      projected_start_ms: "270000" as unknown as number, projected_start_at: null, no_slot_available: false,
+    });
+    expect(entry.isOverflow).toBe(false);
+    expect(entry.projectedStartMs).toBe(270000);
+    expect(entry.slotIndex).toBeNull();
+  });
+  it("calls race_check_in with exactly one argument and maps the row", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    const response = { data: { check_in_id: "c", checked_in_at: "t", kind: "ON_TIME", queue_position: 1, heat_number: 1, already_checked_in: false }, error: null };
+    const client = { rpc: (fn: string, args: unknown) => { calls.push({ fn, args }); return { single: () => Promise.resolve(response) }; } };
+    const result = await new SupabaseRaceRegistrationRepository(client as never).checkIn("reg-1");
+    expect(result.isOk && result.value.queuePosition).toBe(1);
+    expect(calls).toEqual([{ fn: "race_check_in", args: { p_registration_id: "reg-1" } }]);
+  });
+  it("maps check-in refusals to friendly codes", () => {
+    expect(toRaceError({ code: "P0001", message: "RACE_NOT_CONFIRMED: payment must be confirmed before check-in" }).message).toMatch(/payment desk/);
+    expect(toRaceError({ code: "P0001", message: "RACE_CHECKIN_NOT_OPEN: check-in opens when heats are locked" }).code).toBe("RACE_CHECKIN_NOT_OPEN");
   });
 });

@@ -128,3 +128,40 @@ export interface PublicRaceEvent {
   plannedStartAt: string | null;
   heatsLocked: boolean;
 }
+
+export type CheckInKind = "ON_TIME" | "LATE";
+export type SlotStatus = "OPEN" | "BOUND" | "STARTED" | "SKIPPED" | "EMPTY";
+
+export interface CheckInResult {
+  checkInId: string;
+  checkedInAt: string;
+  kind: CheckInKind;
+  /** 1-based position in the athlete's heat, decided by the server from the check-in order. */
+  queuePosition: number;
+  heatNumber: number;
+  /** True when this athlete had already been checked in (double click, second desk): nothing changed. */
+  alreadyCheckedIn: boolean;
+}
+
+/** One checked-in athlete in start order. Slot times are never stored: they are heat anchor + slot × interval. */
+export interface QueueEntry {
+  heatNumber: number;
+  queuePosition: number;
+  registrationId: string;
+  raceNumber: string;
+  fullName: string;
+  categoryCode: RaceCategoryCode;
+  raceStatus: RaceStatus;
+  checkedInAt: string;
+  kind: CheckInKind;
+  /** The athlete's bound slot, once the binder has assigned one. */
+  slotIndex: number | null;
+  slotStatus: SlotStatus | null;
+  isOverflow: boolean;
+  /** Where the athlete will start if nothing changes (the next free slot for those not bound yet). */
+  projectedSlotIndex: number | null;
+  projectedStartMs: number | null;
+  projectedStartAt: string | null;
+  /** Late athlete for whom no slot fits inside the heat gap: an Event Manager must move them. */
+  noSlotAvailable: boolean;
+}

@@ -1,9 +1,11 @@
 import type { Result } from "@9thround/shared-kernel";
 import type { PushupStyle } from "./eligibility";
 import type {
+  CheckInResult,
   ConfirmPaymentInput,
   MyRegistration,
   PublicRaceEvent,
+  QueueEntry,
   RegisterAthleteCommand,
   RegistrationConfirmation,
   StaffRegistrationRow,
@@ -21,4 +23,6 @@ export interface RaceRegistrationRepository {
   waivePayment(registrationId: string, reason: string): Promise<Result<true>>;
   refundPayment(paymentId: string, reason: string): Promise<Result<true>>;
   cancelRegistration(registrationId: string, reason: string): Promise<Result<true>>;
+  checkIn(registrationId: string): Promise<Result<CheckInResult>>;
+  queue(eventId: string, heatNumber: number | null): Promise<Result<QueueEntry[]>>;
 }

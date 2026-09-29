@@ -2,8 +2,10 @@ import { domainError, err, ok } from "@9thround/shared-kernel";
 import type { DomainError, Result } from "@9thround/shared-kernel";
 import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import type {
+  RaceCheckInRow,
   RaceMyRegistrationRow,
   RacePublicEventRow,
+  RaceQueueRow,
   RaceRegistrationConfirmationRow,
   RaceStaffRegistrationRow,
 } from "@9thround/database-types";
@@ -11,9 +13,11 @@ import type { PushupStyle } from "../domain/eligibility";
 import { describeRaceError, parseRaceErrorCode } from "../domain/race-error";
 import type { RaceRegistrationRepository } from "../domain/race-registration-repository";
 import type {
+  CheckInResult,
   ConfirmPaymentInput,
   MyRegistration,
   PublicRaceEvent,
+  QueueEntry,
   RegisterAthleteCommand,
   RegistrationConfirmation,
   StaffRegistrationRow,
@@ -84,6 +88,38 @@ export function toPublicEvent(row: RacePublicEventRow): PublicRaceEvent {
     instructions: row.instructions,
     plannedStartAt: row.planned_start_at,
     heatsLocked: row.heats_locked,
+  };
+}
+
+export function toCheckInResult(row: RaceCheckInRow): CheckInResult {
+  return {
+    checkInId: row.check_in_id,
+    checkedInAt: row.checked_in_at,
+    kind: row.kind,
+    queuePosition: row.queue_position,
+    heatNumber: row.heat_number,
+    alreadyCheckedIn: row.already_checked_in,
+  };
+}
+
+export function toQueueEntry(row: RaceQueueRow): QueueEntry {
+  return {
+    heatNumber: row.heat_number,
+    queuePosition: row.queue_position,
+    registrationId: row.registration_id,
+    raceNumber: row.race_number,
+    fullName: row.full_name,
+    categoryCode: row.category_code,
+    raceStatus: row.race_status,
+    checkedInAt: row.checked_in_at,
+    kind: row.kind,
+    slotIndex: row.slot_index,
+    slotStatus: row.slot_status,
+    isOverflow: row.is_overflow ?? false,
+    projectedSlotIndex: row.projected_slot_index,
+    projectedStartMs: row.projected_start_ms === null ? null : Number(row.projected_start_ms),
+    projectedStartAt: row.projected_start_at,
+    noSlotAvailable: row.no_slot_available,
   };
 }
 
@@ -196,5 +232,17 @@ export class SupabaseRaceRegistrationRepository implements RaceRegistrationRepos
       p_reason: reason,
     });
     return error ? err(toRaceError(error)) : ok(true);
+  }
+
+  async checkIn(registrationId: string): Promise<Result<CheckInResult>> {
+    const { data, error } = await this.client.rpc("race_check_in", { p_registration_id: registrationId }).single();
+    if (error) return err(toRaceError(error));
+    return ok(toCheckInResult(data as RaceCheckInRow));
+  }
+
+  async queue(eventId: string, heatNumber: number | null): Promise<Result<QueueEntry[]>> {
+    const { data, error } = await this.client.rpc("race_queue", { p_event_id: eventId, p_heat_number: heatNumber });
+    if (error) return err(toRaceError(error));
+    return ok((data as RaceQueueRow[]).map(toQueueEntry));
   }
 }

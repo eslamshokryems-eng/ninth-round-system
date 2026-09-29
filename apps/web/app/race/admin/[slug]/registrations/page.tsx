@@ -22,6 +22,7 @@ import {
   RaceSelect,
   RaceSpinner,
   RaceTextArea,
+  StaffNav,
   formatMoney,
 } from "../../../../../src/components/race/race-ui";
 
@@ -108,7 +109,7 @@ export default function RegistrationsAdminPage() {
   const currency = event?.currency ?? "EGP";
 
   return (
-    <Shell wide>
+    <Shell wide slug={slug}>
       <div className="mt-2 flex flex-col gap-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -213,10 +214,10 @@ export default function RegistrationsAdminPage() {
   );
 }
 
-function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+function Shell({ children, wide = false, slug }: { children: React.ReactNode; wide?: boolean; slug?: string }) {
   return (
     <>
-      <RaceHeader wide={wide} />
+      <RaceHeader wide={wide} right={slug ? <StaffNav slug={slug} current="registrations" /> : undefined} />
       <RacePage wide={wide}>{children}</RacePage>
     </>
   );

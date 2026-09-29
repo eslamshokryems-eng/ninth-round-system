@@ -28,6 +28,11 @@ const MESSAGES: Record<string, string> = {
   RACE_PAYMENT_REQUIRED: "The registration must be paid or waived first.",
   RACE_HEAT_FULL: "That heat is full (9 athletes).",
   RACE_NUMBERS_EXHAUSTED: "No race numbers left for this event.",
+  RACE_CHECKIN_NOT_OPEN: "Check-in opens when heats are locked.",
+  RACE_NO_HEAT: "This athlete has no heat yet — ask the Event Manager to assign one.",
+  RACE_NOT_CONFIRMED: "Payment is not confirmed — send the athlete to the payment desk first.",
+  RACE_CHECKIN_NOT_ELIGIBLE: "This athlete cannot be checked in (missed start, withdrawn or already racing).",
+  RACE_TIE_GROUP_CHANGED: "A tie group changed unexpectedly — tell the Event Manager.",
 };
 
 export function describeRaceError(code: string, serverMessage?: string): string {

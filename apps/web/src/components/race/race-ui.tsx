@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 /** THE NINTH wordmark + 9th Round byline. Used as the top bar on every /race page. */
 export function RaceHeader({ right, wide = false }: { right?: ReactNode; wide?: boolean }) {
@@ -71,10 +71,10 @@ function FieldShell({ label, hint, error, children, htmlFor }: FieldShellProps) 
   );
 }
 
-export function RaceInput({ label, hint, error, id, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string | null; id: string }) {
+export function RaceInput({ label, hint, error, id, inputRef, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string | null; id: string; inputRef?: Ref<HTMLInputElement> }) {
   return (
     <FieldShell label={label} hint={hint} error={error} htmlFor={id}>
-      <input id={id} className="race-input" aria-invalid={error ? true : undefined} {...rest} />
+      <input ref={inputRef} id={id} className="race-input" aria-invalid={error ? true : undefined} {...rest} />
     </FieldShell>
   );
 }
@@ -132,4 +132,39 @@ export function formatEventTime(iso: string, timeZone: string): string {
 export function formatEventDate(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(y!, m! - 1, d!)));
+}
+
+/** Wall-clock time of day (HH:MM:SS) in the event's timezone — what desks and screens show for a slot. */
+export function formatClock(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone }).format(new Date(iso));
+}
+
+/** Race time (milliseconds since START EVENT) as H:MM:SS. */
+export function formatRaceTime(ms: number): string {
+  const total = Math.round(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+/** Links between the staff screens (Registrations · Check-in). */
+export function StaffNav({ slug, current }: { slug: string; current: "registrations" | "reception" }) {
+  const item = (href: string, label: string, active: boolean) => (
+    <a
+      key={href}
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className="race-label"
+      style={{ padding: "0.5rem 0.25rem", borderBottom: active ? "2px solid var(--race-red-hot)" : "2px solid transparent", color: active ? "var(--race-white)" : undefined }}
+    >
+      {label}
+    </a>
+  );
+  return (
+    <nav className="flex gap-5" aria-label="Staff screens">
+      {item(`/race/reception/${slug}`, "Check-in", current === "reception")}
+      {item(`/race/admin/${slug}/registrations`, "Registrations", current === "registrations")}
+    </nav>
+  );
 }

@@ -26,6 +26,22 @@ fs.mkdirSync(shots, { recursive: true });
 const EVENT = { event_id: "11111111-1111-1111-1111-111111111111", slug: "the-ninth-2026", name: "THE NINTH", event_date: "2026-11-20", venue: "9th Round Arena, Cairo",
   timezone: "Africa/Cairo", status: "REGISTRATION_OPEN", registration_open: true, registration_fee: 750, currency: "EGP",
   instructions: "Arrive 30 minutes before your heat.\nBring water and a towel.", planned_start_at: "2026-11-20T07:00:00+00:00", heats_locked: false };
+const LOCKED_ID = "33333333-3333-3333-3333-333333333333";
+const LOCKED = { ...EVENT, event_id: LOCKED_ID, slug: "locked-2026", status: "HEATS_LOCKED", registration_open: false, heats_locked: true };
+const mkRow = (id, no, name, phone, over) => ({ registration_id: id, race_number: no, full_name: name, phone, email: null, gender: "male", category_code: "MEN", heat_id: "h2", heat_number: 2, status: "CONFIRMED",
+  race_status: "REGISTERED", pushup_style: "STANDARD", payment_id: null, payment_status: null, payment_amount: null, payment_method: null, paid_at: null, created_at: "2026-09-29T10:00:00Z", ...over });
+const RROWS = [
+  mkRow("r27", "N027", "Omar Fathy", "01001112233", {}),
+  mkRow("r28", "N028", "Nada Sami", "01001112244", { status: "PENDING_PAYMENT", payment_status: "PENDING", payment_amount: 750, payment_id: "pp" }),
+  mkRow("r29", "N029", "No Heat Guy", "01001112255", { heat_id: null, heat_number: null }),
+  mkRow("r30", "N030", "Already In", "01001112266", { race_status: "CHECKED_IN", heat_number: 1 }),
+  mkRow("late1", "N031", "Late Larry", "01001112277", {}),
+];
+const QUEUE = [
+  { heat_number: 1, queue_position: 1, registration_id: "q1", race_number: "N001", full_name: "First Athlete", category_code: "MEN", race_status: "CHECKED_IN", checked_in_at: "2026-11-20T05:00:00Z", kind: "ON_TIME", slot_index: 0, slot_status: "BOUND", is_overflow: false, projected_slot_index: 0, projected_start_ms: 60000, projected_start_at: "2026-11-20T07:01:00+00:00", no_slot_available: false },
+  { heat_number: 1, queue_position: 2, registration_id: "q2", race_number: "N009", full_name: "Late Athlete", category_code: "MEN", race_status: "LATE_CHECK_IN", checked_in_at: "2026-11-20T06:59:00Z", kind: "LATE", slot_index: null, slot_status: null, is_overflow: null, projected_slot_index: 9, projected_start_ms: 1950000, projected_start_at: "2026-11-20T07:32:30+00:00", no_slot_available: false },
+  { heat_number: 2, queue_position: 1, registration_id: "q3", race_number: "N020", full_name: "Stranded Athlete", category_code: "WOMEN", race_status: "LATE_CHECK_IN", checked_in_at: "2026-11-20T07:59:00Z", kind: "LATE", slot_index: null, slot_status: null, is_overflow: null, projected_slot_index: null, projected_start_ms: null, projected_start_at: null, no_slot_available: true },
+];
 const ME = { registration_id: "r1", race_number: "N007", full_name: "Ahmed Mohamed", category_code: "MEN", category_name: "Men", status: "PENDING_PAYMENT",
   race_status: "REGISTERED", pushup_style: "STANDARD", pushup_style_locked: false, heat_number: 1, heat_start_at: "2026-11-20T07:01:00+00:00",
   checkin_closes_at: "2026-11-20T06:46:00+00:00", event_name: "THE NINTH", event_slug: "the-ninth-2026", event_date: "2026-11-20", venue: "9th Round Arena, Cairo",
@@ -52,7 +68,7 @@ async function installMock(context) {
       const body = req.postData() ? JSON.parse(req.postData()) : {};
       calls.push({ fn, body });
       switch (fn) {
-        case "race_get_public_event": return body.p_slug === "the-ninth-2026" ? json(200, EVENT) : json(406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned", details: "The result contains 0 rows", hint: null });
+        case "race_get_public_event": return body.p_slug === "locked-2026" ? json(200, LOCKED) : body.p_slug === "the-ninth-2026" ? json(200, EVENT) : json(406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned", details: "The result contains 0 rows", hint: null });
         case "race_register_athlete":
         case "race_staff_register_athlete":
           if (registerMode === "dup") return json(400, { code: "P0001", message: "RACE_ALREADY_REGISTERED: this athlete is already registered for the event", details: null, hint: null });
@@ -61,9 +77,20 @@ async function installMock(context) {
         case "race_update_pushup_style": return json(200, body.p_style);
         case "race_list_registrations": {
           const q = (body.p_query || "").toLowerCase();
+          if (body.p_event_id === LOCKED_ID) {
+            const num = /^n?(\d{1,4})$/.exec(q);
+            const wanted = num ? "n" + num[1].padStart(3, "0") : null;
+            return json(200, q === "" ? RROWS : RROWS.filter((r) => (wanted ? r.race_number.toLowerCase() === wanted : r.full_name.toLowerCase().includes(q))));
+          }
           const list = q === "" ? ROWS : ROWS.filter((r) => r.full_name.toLowerCase().includes(q) || r.race_number.toLowerCase() === q.toLowerCase());
           return json(200, list);
         }
+        case "race_check_in": {
+          await new Promise((r) => setTimeout(r, 350));
+          if (body.p_registration_id === "r28") return json(400, { code: "P0001", message: "RACE_NOT_CONFIRMED: payment must be confirmed before check-in", details: null, hint: null });
+          return json(200, { check_in_id: "c1", checked_in_at: "2026-11-20T06:00:00Z", kind: body.p_registration_id === "late1" ? "LATE" : "ON_TIME", queue_position: 4, heat_number: 2, already_checked_in: body.p_registration_id === "r30" });
+        }
+        case "race_queue": return json(200, QUEUE);
         case "race_confirm_payment": await new Promise((r) => setTimeout(r, confirmDelay)); return json(200, "22222222-2222-2222-2222-222222222222");
         default: return json(200, null);
       }
@@ -292,6 +319,92 @@ const main = async () => {
     assert.equal(callsOf("race_register_athlete").length, 2, "public path untouched by staff registration"); // earlier: dup + success
     assert.match(await s2.locator("input[aria-label=\"Athlete's private link\"]").inputValue(), /\/race\/e\/the-ninth-2026\/me#t=/);
     await s2.screenshot({ path: `${shots}/07-admin-registered.png` });
+  });
+
+  // ---------- reception check-in ----------
+  const recCtx = await browser.newContext({ viewport: { width: 1360, height: 900 } });
+  await installMock(recCtx);
+  const rec = await recCtx.newPage();
+  await seedSession(rec);
+  rec.on("pageerror", (e) => errors.push(`pageerror(reception): ${e.message}`));
+
+  await step("reception asks a signed-out visitor to sign in (safe next link)", async () => {
+    const anon = await desk.newPage();
+    await anon.goto(`${BASE}/race/reception/locked-2026`); await anon.waitForSelector("text=Sign in required");
+    assert.equal(await anon.locator("a", { hasText: "Sign in" }).getAttribute("href"), "/race/login?next=/race/reception/locked-2026");
+    await anon.close();
+  });
+
+  await step("reception: the start queue shows order, LATE badges, slot times in event time, and 'no slot' athletes", async () => {
+    await rec.goto(`${BASE}/race/reception/locked-2026`); await rec.waitForSelector("text=First Athlete");
+    const text = await rec.locator("main").innerText();
+    assert.match(text, /3 checked in/i); assert.match(text, /Late Athlete/); assert.match(text, /LATE/); assert.match(text, /No slot — Event Manager/i);
+    assert.match(text, /09:01:00/, "07:01 UTC = 09:01 Cairo");
+    assert.match(text, /≈ slot 10/, "the late athlete's projected slot (index 9) is shown as slot 10, not yet bound");
+    assert.match(text, /SLOT 01/i, "a bound athlete shows a firm slot");
+    await rec.getByRole("button", { name: "Heat 02" }).click();
+    assert.equal(await rec.locator("tbody tr").count(), 1, "heat filter");
+    await rec.getByRole("button", { name: "All" }).click();
+    await rec.screenshot({ path: `${shots}/09-reception-queue.png`, fullPage: true });
+  });
+
+  await step("reception: typing a race number selects the athlete; a double-click checks in ONCE with only the registration id", async () => {
+    await rec.locator("#race-checkin-search").fill("27");
+    await rec.waitForSelector("text=Omar Fathy");
+    await rec.screenshot({ path: `${shots}/10-reception-athlete.png` });
+    const before = callsOf("race_check_in").length;
+    await rec.getByRole("button", { name: "Check in", exact: true }).dblclick();
+    await rec.waitForSelector("text=Checked in");
+    const sent = callsOf("race_check_in").slice(before);
+    assert.equal(sent.length, 1, `expected 1 request, sent ${sent.length}`);
+    assert.deepEqual(sent[0].body, { p_registration_id: "r27" }, "only the athlete is sent — never a position, time or order");
+    const banner = await rec.locator("[role=status]").innerText();
+    assert.match(banner, /N027/); assert.match(banner, /Omar Fathy/i); assert.match(banner, /Heat 02/i); assert.match(banner, /position 4/i);
+    assert.equal(await rec.locator("#race-checkin-search").inputValue(), "", "search cleared for the next athlete");
+    assert.ok(await rec.evaluate(() => document.activeElement && document.activeElement.id === "race-checkin-search"), "focus returns to the search box");
+    await rec.screenshot({ path: `${shots}/11-reception-checked-in.png` });
+  });
+
+  await step("reception: a late check-in is announced as LATE with 'next available start slot'", async () => {
+    await rec.locator("#race-checkin-search").fill("31");
+    await rec.waitForSelector("text=Late Larry");
+    await rec.getByRole("button", { name: "Check in", exact: true }).click();
+    await rec.waitForSelector("text=Late check-in");
+    assert.match(await rec.locator("[role=status]").innerText(), /next available start slot/i);
+  });
+
+  await step("reception: unpaid athlete is blocked with a clear reason and the button is disabled (no request)", async () => {
+    const before = callsOf("race_check_in").length;
+    await rec.locator("#race-checkin-search").fill("28");
+    await rec.waitForSelector("text=Nada Sami");
+    assert.match(await rec.locator("main").innerText(), /Payment not confirmed/i);
+    assert.equal(await rec.getByRole("button", { name: "Check in", exact: true }).isDisabled(), true);
+    assert.equal(callsOf("race_check_in").length, before);
+  });
+
+  await step("reception: no heat → blocked; already checked in → 'Show check-in' reports the original", async () => {
+    await rec.locator("#race-checkin-search").fill("29");
+    await rec.waitForSelector("text=No Heat Guy");
+    assert.match(await rec.locator("main").innerText(), /No heat assigned/i);
+    assert.equal(await rec.getByRole("button", { name: "Check in", exact: true }).isDisabled(), true);
+    await rec.locator("#race-checkin-search").fill("30");
+    await rec.waitForSelector("text=Already In");
+    await rec.getByRole("button", { name: "Show check-in" }).click();
+    await rec.waitForSelector("text=Already checked in");
+  });
+
+  await step("reception: several matches show a pick list; choosing one opens their card", async () => {
+    await rec.locator("#race-checkin-search").fill("a");
+    await rec.waitForSelector("ul[aria-label=Matches]");
+    assert.ok((await rec.locator("ul[aria-label=Matches] li").count()) >= 2);
+    await rec.locator("ul[aria-label=Matches] button", { hasText: "Nada Sami" }).click();
+    await rec.waitForSelector("text=Payment not confirmed");
+  });
+
+  await step("reception: before heats are locked check-in is closed, with a notice", async () => {
+    const p = await recCtx.newPage();
+    await p.goto(`${BASE}/race/reception/the-ninth-2026`); await p.waitForSelector("text=Check-in opens when the Event Manager locks the heats");
+    await p.close();
   });
 
   // ---------- isolation from the gym app ----------

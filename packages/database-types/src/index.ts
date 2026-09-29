@@ -347,6 +347,34 @@ export interface RaceMyRegistrationRow {
   currency: string;
 }
 
+export interface RaceCheckInRow {
+  check_in_id: string;
+  checked_in_at: string;
+  kind: "ON_TIME" | "LATE";
+  queue_position: number;
+  heat_number: number;
+  already_checked_in: boolean;
+}
+
+export interface RaceQueueRow {
+  heat_number: number;
+  queue_position: number;
+  registration_id: string;
+  race_number: string;
+  full_name: string;
+  category_code: RaceCategoryCode;
+  race_status: RaceAthleteStatus;
+  checked_in_at: string;
+  kind: "ON_TIME" | "LATE";
+  slot_index: number | null;
+  slot_status: "OPEN" | "BOUND" | "STARTED" | "SKIPPED" | "EMPTY" | null;
+  is_overflow: boolean | null;
+  projected_slot_index: number | null;
+  projected_start_ms: number | null;
+  projected_start_at: string | null;
+  no_slot_available: boolean;
+}
+
 export interface RacePublicEventRow {
   event_id: string;
   slug: string;
@@ -644,6 +672,14 @@ export interface Database {
       race_staff_register_athlete: {
         Args: RaceRegisterAthleteArgs;
         Returns: RaceRegistrationConfirmationRow[];
+      };
+      race_check_in: {
+        Args: { p_registration_id: string };
+        Returns: RaceCheckInRow[];
+      };
+      race_queue: {
+        Args: { p_event_id: string; p_heat_number?: number | null };
+        Returns: RaceQueueRow[];
       };
       race_get_public_event: {
         Args: { p_slug: string };

@@ -3,9 +3,11 @@ import type { Result } from "@9thround/shared-kernel";
 import type { PushupStyle } from "../domain/eligibility";
 import type { RaceRegistrationRepository } from "../domain/race-registration-repository";
 import type {
+  CheckInResult,
   ConfirmPaymentInput,
   MyRegistration,
   PublicRaceEvent,
+  QueueEntry,
   RegisterAthleteCommand,
   RegistrationConfirmation,
   StaffRegistrationRow,
@@ -58,5 +60,12 @@ export class FakeRaceRegistrationRepository implements RaceRegistrationRepositor
   }
   cancelRegistration(registrationId: string, reason: string) {
     return Promise.resolve(this.record("cancelRegistration", [registrationId, reason], ok(true as const) as Result<true>));
+  }
+  checkIn(registrationId: string) {
+    const result: CheckInResult = { checkInId: "c1", checkedInAt: "2026-11-20T06:00:00Z", kind: "ON_TIME", queuePosition: 1, heatNumber: 1, alreadyCheckedIn: false };
+    return Promise.resolve(this.record("checkIn", [registrationId], ok(result) as Result<CheckInResult>));
+  }
+  queue(eventId: string, heatNumber: number | null) {
+    return Promise.resolve(this.record("queue", [eventId, heatNumber], ok([]) as Result<QueueEntry[]>));
   }
 }
