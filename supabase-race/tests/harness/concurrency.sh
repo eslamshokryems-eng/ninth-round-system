@@ -312,3 +312,62 @@ activeall=$(q "select count(*) from (select registration_id from race_check_ins 
 total=$(q "select count(*) from race_check_ins where event_id='$EVC2'")
 [ "$succ" = "1" ] && [ "$rows" = "1" ] && [ "$active5" = "1" ] && [ "$activeall" = "0" ] && [ "$total" = "3" ] || fail "concurrency: corrections — successes=$succ ledger=$rows active-for-#5=$active5 athletes-with-2-active=$activeall check-in-rows=$total"
 pass "concurrency: 8 desks correct check-ins onto the SAME athlete at once → exactly 1 correction; nobody ends up with two active check-ins; the original rows all survive (3 check-in rows)"
+
+# ============================ Final checkpoint: a full house and a blackout ============================
+setup_big_event() { # 6 heats (9,9,9,9,9,5), 50 athletes, heats locked, nobody checked in -> echoes the event id
+  local slug=$1 ev
+  ev=$(q "select set_config('request.jwt.claim.sub','$FOUNDER',false)::text is not null; select race_create_event('$slug',date '2027-03-01','THE NINTH','Africa/Cairo', timestamptz '2027-03-01 07:00:00+00')" | tail -1)
+  q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_set_event_status('$ev','REGISTRATION_OPEN')" >/dev/null
+  q "set role anon; select count(*) from (select race_register_athlete('$ev','Big '||i,'0199'||lpad(i::text,7,'0'),null,'male','1990-01-01','MEN',null,true,'{\"name\":\"C\",\"phone\":\"01011112222\"}'::jsonb) from generate_series(1,50) i) x" >/dev/null
+  q "insert into race_heats (event_id, number) select '$ev', n from generate_series(1,6) n" >/dev/null
+  q "update race_registrations r set heat_id = (select id from race_heats h where h.event_id = r.event_id and h.number = case when substr(r.race_number,2)::int <= 45 then (substr(r.race_number,2)::int - 1) / 9 + 1 else 6 end) where r.event_id = '$ev'" >/dev/null
+  q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_lock_heats('$ev')" >/dev/null
+  echo "$ev"
+}
+
+# --- 9. 50 reception desks check in at the same instant, across 6 heats ----------------------------------------------------------------------
+EVB50=$(setup_big_event concurrency-50)
+[ "$(q "select count(*) from race_registrations where event_id='$EVB50'")" = "50" ] || fail "concurrency: the 50-athlete event was not created"
+rm -f "$WORK"/c/b50*
+barrier_hold 4
+for i in $(seq 1 50); do checkin "b50_$i" "$(regid "$EVB50" "$i")" & done
+wait; sleep 2
+okc=$(cat "$WORK"/c/b50_*.out | grep -cE '^[0-9]+\|false\|' || true)
+rows=$(q "select count(*) from race_check_ins where event_id='$EVB50'")
+dup=$(q "select count(*) from (select registration_id from race_check_ins where event_id='$EVB50' group by 1 having count(*) > 1) x")
+dist=$(q "select count(distinct checked_in_at) from race_check_ins where event_id='$EVB50'")
+badpos=$(q "select count(*) from (select heat_id, count(*) n, count(distinct checked_in_at) d from race_check_ins where event_id='$EVB50' group by 1) x where n <> d")
+[ "$okc" = "50" ] && [ "$rows" = "50" ] && [ "$dup" = "0" ] && [ "$dist" = "50" ] && [ "$badpos" = "0" ] || fail "concurrency: 50 simultaneous check-ins — ok=$okc rows=$rows duplicates=$dup distinct-times=$dist heats-with-ties=$badpos"
+pass "concurrency: 50 simultaneous check-ins across 6 heats → 50 check-ins, no duplicate, 50 distinct server timestamps (nobody tied, nobody lost)"
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVB50')" >/dev/null
+[ "$(q "select count(*) from race_start_slots where event_id='$EVB50'")" = "50" ] || fail "concurrency: the schedule for 50 athletes has the wrong number of slots"
+pass "concurrency: START EVENT on the full house froze 50 slots in 6 heats"
+
+# --- 10. Everybody was disconnected for 40 minutes; twelve devices reconnect in the same instant -----------------------------------------------
+rewind "$EVB50" 2400000
+rm -f "$WORK"/c/rc*
+barrier_hold 3
+for n in $(seq 1 12); do call "rc$n" "select (race_control_state('$EVB50') -> 'clock' ->> 'race_ms')::bigint > 2399000" & done
+wait; sleep 1
+errs=$(cat "$WORK"/c/rc*.err | grep -c . || true)
+starts=$(q "select count(*) from race_audit_log where action='race.athlete.start' and metadata->>'event_id'='$EVB50'")
+perreg=$(q "select count(*) from (select registration_id from race_station_results where event_id='$EVB50' group by 1 having count(*) <> 9) x")
+stuck=$(q "select count(*) from race_station_results where event_id='$EVB50' and ((status='ACTIVE' and window_end_race_ms <= race_now_ms('$EVB50')) or (status='SCHEDULED' and window_start_race_ms <= race_now_ms('$EVB50')) or (status='SCORING' and window_end_race_ms + 30000 <= race_now_ms('$EVB50')))")
+dupslot=$(q "select count(*) from (select registration_id from race_start_slots where event_id='$EVB50' and status in ('BOUND','STARTED') group by 1 having count(*) > 1) x")
+[ "$errs" = "0" ] && [ "$perreg" = "0" ] && [ "$stuck" = "0" ] && [ "$dupslot" = "0" ] && [ "$starts" -ge 1 ] || fail "concurrency: 12 simultaneous reconnects after a blackout — errors=$errs start-audits=$starts athletes-without-9-results=$perreg stale-statuses=$stuck double-slots=$dupslot"
+distinct_starts=$(q "select count(*) from (select target_id from race_audit_log where action='race.athlete.start' and metadata->>'event_id'='$EVB50' group by 1 having count(*) > 1) x")
+[ "$distinct_starts" = "0" ] || fail "concurrency: an athlete was started twice by simultaneous reconnects"
+pass "concurrency: 40 minutes of blackout, 12 devices reconnect in the same instant → one settled state: $starts athletes started exactly once each, every station status matches race time, 0 errors, 0 double slots"
+
+# --- 11. Closing a heat, simultaneously -----------------------------------------------------------------------------------------------------------
+EVC6=$(setup_big_event concurrency-close)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVC6')" >/dev/null
+rm -f "$WORK"/c/ch*
+barrier_hold 3
+for n in $(seq 1 8); do call "ch$n" "select athletes_dns from race_close_heat_without_start('$EVC6', 6, 'will not run $n')" & done
+wait; sleep 1
+succ=$(cat "$WORK"/c/ch?.out | grep -E '^[0-9]+$' | wc -l || true)
+cancelled=$(q "select count(*) from race_heats where event_id='$EVC6' and number=6 and status='CANCELLED'")
+audits=$(q "select count(*) from race_audit_log where action='race.heat.cancel' and metadata->>'event_id'='$EVC6'")
+[ "$succ" = "1" ] && [ "$cancelled" = "1" ] && [ "$audits" = "1" ] || fail "concurrency: 8 simultaneous 'close heat' — successes=$succ cancelled=$cancelled audits=$audits"
+pass "concurrency: 8 simultaneous CLOSE HEAT WITHOUT START → exactly 1 closes it, 1 audit row, the others are refused"
