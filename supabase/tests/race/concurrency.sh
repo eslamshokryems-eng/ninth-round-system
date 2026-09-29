@@ -161,7 +161,8 @@ q "select * from race_bind_due_slots('$EVB')" >/dev/null
 arrived=$(q "select count(*) from race_check_ins where event_id='$EVB'")
 inv=$(q "select count(*) from race_start_slots s1 join race_start_slots s2 on s1.heat_id = s2.heat_id and s1.slot_index < s2.slot_index
           join race_check_ins c1 on c1.registration_id = s1.registration_id join race_check_ins c2 on c2.registration_id = s2.registration_id
-         where (c1.checked_in_at, coalesce(c1.tie_draw_position, 0)) > (c2.checked_in_at, coalesce(c2.tie_draw_position, 0))")
+         where s1.event_id='$EVB' and c1.voided_by_correction_id is null and c2.voided_by_correction_id is null
+           and (c1.checked_in_at, coalesce(c1.tie_draw_position, 0)) > (c2.checked_in_at, coalesce(c2.tie_draw_position, 0))")
 bound=$(q "select count(*) from race_start_slots where event_id='$EVB' and registration_id is not null")
 empty=$(q "select count(*) from race_start_slots where event_id='$EVB' and status='EMPTY'")
 twice=$(q "select count(*) from (select registration_id from race_start_slots where event_id='$EVB' and registration_id is not null group by 1 having count(*) > 1) x")

@@ -3,7 +3,7 @@ reset role;
 
 select race_test.eq((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
                      where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%')::int,
-                    27, 'structure: 27 race_* tables created');
+                    28, 'structure: 28 race_* tables created (Phase 6 added race_check_in_corrections)');
 
 select race_test.ok(not exists (
   select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -11,7 +11,7 @@ select race_test.ok(not exists (
   'structure: RLS enabled on every race_* table');
 
 select race_test.eq((select count(*) from pg_type where typname like 'race\_%' and typtype = 'e')::int,
-                    21, 'structure: 21 race_* enums');
+                    22, 'structure: 22 race_* enums (Phase 6 added race_correction_type)');
 
 select race_test.ok(not exists (
   select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -53,7 +53,11 @@ select race_test.ok(not has_column_privilege('authenticated', 'race_events', 'st
 
 select race_test.eq((select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid
                      where c.relname like 'race\_%' and t.tgname like '%append_only')::int,
-                    6, 'structure: fully append-only triggers on 6 ledger tables (race_check_ins has the narrower tie-draw guard instead)');
+                    7, 'structure: fully append-only triggers on 7 ledger tables (race_check_ins has the narrower guard instead; Phase 6 added race_check_in_corrections)');
+
+select race_test.ok(not has_any_column_privilege('authenticated', 'race_check_in_corrections', 'INSERT') and not has_any_column_privilege('authenticated', 'race_check_in_corrections', 'UPDATE')
+                    and not has_table_privilege('authenticated', 'race_check_in_corrections', 'DELETE'),
+  'lock-down: race_check_in_corrections has NO client write privilege (RPC-only)');
 
 select race_test.ok(exists (select 1 from pg_trigger where tgname = 'trg_race_check_ins_guard') and exists (select 1 from pg_trigger where tgname = 'trg_race_check_ins_no_truncate'),
   'structure: race_check_ins keeps its delete/truncate protection plus the tie-draw guard');

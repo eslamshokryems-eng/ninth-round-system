@@ -101,6 +101,7 @@ fi
 step "5. Test suites"
 total=0
 "${PSQL[@]}" -d "$DB" -f "$HERE/helpers.sql" >/dev/null
+"${PSQL[@]}" -d "$DB" -f "$HERE/simulator.sql" >/dev/null
 "${PSQL[@]}" -d "$DB" -c "insert into race_test.parity values (\$json\$$(cat "$ROOT/packages/race/domain/parity-cases.json")\$json\$::jsonb)" >/dev/null
 node "$ROOT/docs/race/scripts/timing-validation.mjs" --csv > "$WORK/js_schedule.csv"
 "${PSQL[@]}" -d "$DB" -c "\\copy race_test.js_schedule from '$WORK/js_schedule.csv' with (format csv)" >/dev/null
