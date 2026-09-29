@@ -1,3 +1,5 @@
+> **Superseded in part:** the race system now runs in its own Supabase project with its own accounts, audit log, storage and app, and the engine no longer depends on any device ticking. See `07-final-architecture-checkpoint.md`. Paths and gym coupling described below are historical.
+
 # Phase 6 — Race engine, master clock, pause, skip, corrections — report
 
 Status: **built and verified in the test harness. NOT connected to any live database or production flow.**

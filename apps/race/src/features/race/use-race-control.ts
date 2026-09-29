@@ -21,8 +21,9 @@ export interface RaceControl {
 }
 
 /**
- * Drives Master Control: every second it ticks the engine (any staff device may — the server de-duplicates) and reads the
- * dashboard snapshot. Between snapshots the race clock is extrapolated locally from the measured clock offset, so the display
+ * Drives Master Control: every second it re-reads the dashboard snapshot. That is a UI refresh, NOT what keeps the race going — the
+ * authoritative race state is derived on the server from the START EVENT time, the pauses and the configured durations, so a device
+ * that reconnects after any outage simply asks and gets the correct state. Between snapshots the race clock is extrapolated locally from the measured clock offset, so the display
  * is smooth without ever being the authority.
  */
 export function useRaceControl(eventId: string | null): RaceControl {
@@ -40,7 +41,7 @@ export function useRaceControl(eventId: string | null): RaceControl {
     inFlight.current = true;
     const module = getRaceModule();
     try {
-      await module.advanceRace.execute(eventId);
+      // No "tick" is sent: the dashboard read itself settles the race on the server (official times are arithmetic). This poll only refreshes the picture.
       const sentAt = performance.now();
       const r = await module.getControlState.execute(eventId);
       const receivedAt = performance.now();

@@ -399,7 +399,8 @@ const main = async () => {
     await rec.screenshot({ path: `${shots}/10-reception-athlete.png` });
     const before = callsOf("race_check_in").length;
     await rec.getByRole("button", { name: "Check in", exact: true }).dblclick();
-    await rec.waitForSelector("text=Checked in");
+    // wait for the RESULT banner itself — the queue heading also says "checked in", so a bare text match would return before the request finished
+    await rec.locator("[role=status]").filter({ hasText: /Checked in/i }).first().waitFor();
     const sent = callsOf("race_check_in").slice(before);
     assert.equal(sent.length, 1, `expected 1 request, sent ${sent.length}`);
     assert.deepEqual(sent[0].body, { p_registration_id: "r27" }, "only the athlete is sent — never a position, time or order");
@@ -414,7 +415,7 @@ const main = async () => {
     await rec.locator("#race-checkin-search").fill("31");
     await rec.waitForSelector("text=Late Larry");
     await rec.getByRole("button", { name: "Check in", exact: true }).click();
-    await rec.waitForSelector("text=Late check-in");
+    await rec.locator("[role=status]").filter({ hasText: /Late check-in/i }).first().waitFor();
     assert.match(await rec.locator("[role=status]").innerText(), /next available start slot/i);
   });
 
@@ -494,12 +495,11 @@ const main = async () => {
     await ctlPage.screenshot({ path: `${shots}/13-control-prerace.png`, fullPage: true });
   });
 
-  await step("control: the engine is ticked about once a second (advance before the snapshot)", async () => {
-    const before = callsOf("race_advance").length;
+  await step("control: the dashboard refreshes about once a second — and sends NO engine tick (the race does not depend on devices)", async () => {
+    const before = callsOf("race_control_state").length;
     await ctlPage.waitForTimeout(2500);
-    assert.ok(callsOf("race_advance").length - before >= 2, "advance is called every second");
-    const order = calls.filter((c) => c.fn === "race_advance" || c.fn === "race_control_state").slice(-6).map((c) => c.fn);
-    assert.equal(order[0], "race_advance");
+    assert.ok(callsOf("race_control_state").length - before >= 2, "the picture refreshes every second");
+    assert.equal(callsOf("race_advance").length, 0, "the Master Control screen never drives the race");
   });
 
   await step("control: EMERGENCY PAUSE freezes the clock on screen; RESUME continues it", async () => {

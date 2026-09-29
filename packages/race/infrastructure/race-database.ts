@@ -1,5 +1,5 @@
 /**
- * Database types for THE NINTH's OWN Supabase project (supabase-race/migrations).
+ * Database types for THE NINTH's OWN Supabase project (supabase-race/supabase/migrations).
  * Deliberately independent of the gym system's generated types: the race app never imports the gym schema. Only the RPC surface the app calls is typed — race tables are reached
  * exclusively through RPCs (clients hold no write grants on them).
  */

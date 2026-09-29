@@ -6,8 +6,8 @@ Storage, API keys, environment variables and audit log. No foreign key, function
 
 ```
 supabase-race/
-  config.toml          local CLI config (ports differ from the gym project)
-  migrations/          ordered, standalone (apply to the NEW project only)
+  verify/              read-only post-deployment verification (also run by the test harness)
+  supabase/            Supabase CLI project: config.toml + migrations/ (ordered, standalone; apply to the NEW project only)
   bootstrap/           one-time SQL run by the database owner (no secrets in git)
   tests/harness/       throw-away-Postgres test harness (run.sh) — migrations, RLS, engine, simulation, concurrency, restore
 ```

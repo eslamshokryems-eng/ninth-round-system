@@ -2,12 +2,15 @@
 # THE NINTH — Phase 3 migration test harness.
 #
 # Spins up a throwaway Postgres cluster, applies supabase-shim.sql, every
-# migration in supabase-race/migrations (in filename order — the same order the
+# migration in supabase-race/supabase/migrations (in filename order — the same order the
 # Supabase CLI uses) to a database with NO gym-management objects, then every tests/*.sql file. Any failed assertion
 # raises, which fails the run. Nothing touches a real Supabase project.
 #
 # Usage: supabase-race/tests/harness/run.sh           (needs Postgres 15+ binaries on PATH or in /usr/lib/postgresql/*/bin)
 set -euo pipefail
+set -E
+# never die silently: say where and on which command
+trap 'echo "FAIL  harness stopped unexpectedly at $(basename "${BASH_SOURCE[0]}"):${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
@@ -44,13 +47,16 @@ apply "$HERE/supabase-shim.sql"
 
 step "2. THE NINTH migrations (its own project — nothing else is applied)"
 race=0
-for f in "$ROOT"/supabase-race/migrations/*.sql; do
+for f in "$ROOT"/supabase-race/supabase/migrations/*.sql; do
   apply "$f"; race=$((race+1)); echo "  ok  $(basename "$f")"
 done
 echo "applied $race migrations to a database that contains NO gym-management objects"
 
 step "3. Independence: nothing from any other system exists here, nothing references one"
-"${PSQL[@]}" -d "$DB" -f "$HERE/isolation.sql" 2>&1 | sed -n 's/^NOTICE:  //p'
+"${PSQL[@]}" -d "$DB" -f "$HERE/isolation.sql" 2>&1 | sed -n 's/^.*NOTICE:  //p'
+
+step "3b. The post-deployment verification script (the same one run against staging/production) passes on this database"
+"${PSQL[@]}" -d "$DB" -f "$ROOT/supabase-race/verify/verify_deployment.sql" 2>&1 | sed -n 's/^.*NOTICE:  //p'
 
 step "5. Test suites"
 total=0
