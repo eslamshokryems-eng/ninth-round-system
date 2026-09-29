@@ -72,7 +72,7 @@ for n in $(seq 1 12); do pay "n$n" "NULL" & done
 wait
 sleep 1
 succ=$(cat "$WORK"/c/n*.out | grep -E '^[0-9a-f-]{36}$' | grep -vc "$FOUNDER" || true)
-already=$(grep -l 'RACE_ALREADY_PAID' "$WORK"/c/n*.err | wc -l)
+already=$(grep -l 'RACE_ALREADY_PAID' "$WORK"/c/n*.err | wc -l || true)
 rows=$(q "select count(*) from race_payments where registration_id='$REG'")
 paid=$(q "select count(*) from race_payments where registration_id='$REG' and status='PAID'")
 [ "$succ" = "1" ] && [ "$already" = "11" ] && [ "$rows" = "1" ] && [ "$paid" = "1" ] || fail "concurrency: keyless confirm — successes=$succ already_paid=$already rows=$rows paid=$paid"
@@ -191,7 +191,7 @@ barrier_hold 3
 for n in $(seq 1 12); do call "st$n" "select started_at from race_start_event('$EVS')" & done
 wait; sleep 1
 succ=$(cat "$WORK"/c/st?.out "$WORK"/c/st??.out 2>/dev/null | grep -cE '^[0-9]{4}-' || true)
-refused=$(grep -l 'RACE_ALREADY_STARTED' "$WORK"/c/st*.err 2>/dev/null | wc -l)
+refused=$(grep -l 'RACE_ALREADY_STARTED' "$WORK"/c/st*.err 2>/dev/null | wc -l || true)
 audits=$(q "select count(*) from admin_audit_log where action='race.event.start' and metadata->>'event_id'='$EVS'")
 ver=$(q "select version from race_clock where event_id='$EVS'")
 [ "$succ" = "1" ] && [ "$refused" = "11" ] && [ "$audits" = "1" ] || fail "concurrency: START EVENT — successes=$succ refused=$refused audits=$audits version=$ver"
@@ -241,7 +241,7 @@ barrier_hold 3
 for n in $(seq 1 10); do call "pa$n" "select paused_race_ms from race_pause('$EVP2','storm')" & done
 wait; sleep 1
 succ=$(cat "$WORK"/c/pa*.out | grep -cE '^[0-9]+$' || true)
-already=$(grep -l 'RACE_ALREADY_PAUSED' "$WORK"/c/pa*.err | wc -l)
+already=$(grep -l 'RACE_ALREADY_PAUSED' "$WORK"/c/pa*.err | wc -l || true)
 rows=$(q "select count(*) from race_pauses where event_id='$EVP2'")
 [ "$succ" = "1" ] && [ "$already" = "9" ] && [ "$rows" = "1" ] || fail "concurrency: 10 simultaneous pauses — successes=$succ already-paused=$already rows=$rows"
 pass "concurrency: 10 simultaneous EMERGENCY PAUSE presses → 1 pause row, 9 told RACE_ALREADY_PAUSED"
@@ -250,7 +250,7 @@ barrier_hold 3
 for n in $(seq 1 10); do call "re$n" "select paused_ms from race_resume('$EVP2')" & done
 wait; sleep 1
 succ=$(cat "$WORK"/c/re*.out | grep -cE '^[0-9]+$' || true)
-notp=$(grep -l 'RACE_NOT_PAUSED' "$WORK"/c/re*.err | wc -l)
+notp=$(grep -l 'RACE_NOT_PAUSED' "$WORK"/c/re*.err | wc -l || true)
 [ "$succ" = "1" ] && [ "$notp" = "9" ] || fail "concurrency: 10 simultaneous resumes — successes=$succ not-paused=$notp"
 pass "concurrency: 10 simultaneous RESUME presses → exactly 1 resumes, 9 told RACE_NOT_PAUSED"
 # a storm of interleaved pauses and resumes from 8 desks
