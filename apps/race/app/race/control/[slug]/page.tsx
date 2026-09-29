@@ -55,6 +55,9 @@ function Dashboard({ slug, event }: { slug: string; event: PublicRaceEvent }) {
   const [confirmStart, setConfirmStart] = useState(false);
   const [busy, setBusy] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
+  const [pauseNote, setPauseNote] = useState("");
+  const [closingHeat, setClosingHeat] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
   const announced = useRef(new Set<string>());
 
   async function run<T>(label: string, action: () => Promise<{ isErr: boolean; error?: { message: string }; value?: T }>, success?: (v: T) => string) {
@@ -148,11 +151,14 @@ function Dashboard({ slug, event }: { slug: string; event: PublicRaceEvent }) {
                 <RaceButton
                   variant="danger"
                   isLoading={busy}
-                  onClick={() => void run("Pause", () => getRaceModule().pauseRace.execute({ eventId: event.eventId, reason: "Emergency pause" }), () => "Race PAUSED. Every clock is frozen.")}
+                  onClick={() => void run("Pause", () => getRaceModule().pauseRace.execute({ eventId: event.eventId, reason: pauseNote }), () => "Race PAUSED. Every clock is frozen.").then(() => setPauseNote(""))}
                   style={{ minHeight: 72, fontSize: "1.4rem" }}
                 >
                   EMERGENCY PAUSE
                 </RaceButton>
+              ) : null}
+              {clock.started && !clock.finished && !clock.paused ? (
+                <RaceInput id="pause-note" label="Note (optional)" placeholder="e.g. medical" value={pauseNote} onChange={(e) => setPauseNote(e.target.value)} autoComplete="off" />
               ) : null}
               {clock.paused ? (
                 <RaceButton isLoading={busy} onClick={() => void run("Resume", () => getRaceModule().resumeRace.execute(event.eventId), (v) => `Race resumed after ${formatCountdown(v.pausedMs)} of pause.`)} style={{ minHeight: 72, fontSize: "1.4rem" }}>
@@ -184,11 +190,30 @@ function Dashboard({ slug, event }: { slug: string; event: PublicRaceEvent }) {
         </section>
 
         {nextManual ? (
-          <div className="race-card race-card--flat flex flex-wrap items-center justify-between gap-3">
-            <p>Heat {pad2(nextManual.number)} starts on your command ({nextManual.roster} athletes).</p>
-            <RaceButton isLoading={busy} onClick={() => void run("Start heat", () => getRaceModule().startNextHeat.execute({ eventId: event.eventId, heatNumber: nextManual.number }), (v) => `Heat ${pad2(v.heatNumber)} anchored.`)}>
-              START HEAT {pad2(nextManual.number)}
-            </RaceButton>
+          <div className="race-card race-card--flat flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p>Heat {pad2(nextManual.number)} starts on your command ({nextManual.roster} athletes).</p>
+              <div className="flex gap-2">
+                <RaceButton isLoading={busy} onClick={() => void run("Start heat", () => getRaceModule().startNextHeat.execute({ eventId: event.eventId, heatNumber: nextManual.number }), (v) => `Heat ${pad2(v.heatNumber)} anchored.`)}>
+                  START HEAT {pad2(nextManual.number)}
+                </RaceButton>
+                <RaceButton variant="ghost" onClick={() => { setClosingHeat((v) => !v); setCloseReason(""); }}>CLOSE HEAT WITHOUT START</RaceButton>
+              </div>
+            </div>
+            {closingHeat ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm" style={{ color: "var(--race-muted)" }}>The heat will never run. Its athletes become DNS (an Event Manager can still move them to a later heat). Nobody who already started is touched.</p>
+                <RaceInput id="close-heat-reason" label="Reason (required)" value={closeReason} onChange={(e) => setCloseReason(e.target.value)} autoComplete="off" />
+                <RaceButton
+                  variant="danger"
+                  isLoading={busy}
+                  disabled={closeReason.trim() === ""}
+                  onClick={() => void run("Close heat", () => getRaceModule().closeHeatWithoutStart.execute({ eventId: event.eventId, heatNumber: nextManual.number, reason: closeReason }), (v) => `Heat ${pad2(v.heatNumber)} closed — ${v.athletesDns} athletes are DNS.${v.nextHeatAnchored !== null ? ` Heat ${pad2(v.nextHeatAnchored)} is now scheduled.` : ""}`).then((ok) => { if (ok) { setClosingHeat(false); setCloseReason(""); } })}
+                >
+                  Confirm — close heat {pad2(nextManual.number)}
+                </RaceButton>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

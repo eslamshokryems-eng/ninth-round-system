@@ -1,8 +1,9 @@
-import { err, ok } from "@9thround/shared-kernel";
-import type { Result } from "@9thround/shared-kernel";
+import { err, ok } from "../kernel";
+import type { Result } from "../kernel";
 import type { RaceSupabaseClient } from "./race-client";
 import type {
   RaceAdvanceJson,
+  RaceCloseHeatRow,
   RaceControlStateJson,
   RaceCorrectionRow,
   RaceDnsOverrideRow,
@@ -14,6 +15,7 @@ import type {
   RaceStartEventRow,
 } from "./race-database";
 import type {
+  CloseHeatResult,
   ControlState,
   CorrectionResult,
   DnsOverrideResult,
@@ -171,6 +173,15 @@ export class SupabaseRaceEngineRepository implements RaceEngineRepository {
     if (error) return err(toRaceError(error));
     const row = data as RaceNextHeatRow;
     return ok({ heatNumber: row.heat_number, anchorMs: row.anchor_race_ms });
+  }
+
+  async closeHeatWithoutStart(eventId: string, heatNumber: number, reason: string): Promise<Result<CloseHeatResult>> {
+    const { data, error } = await this.client
+      .rpc("race_close_heat_without_start", { p_event_id: eventId, p_heat_number: heatNumber, p_reason: reason })
+      .single();
+    if (error) return err(toRaceError(error));
+    const row = data as RaceCloseHeatRow;
+    return ok({ heatNumber: row.heat_number, athletesDns: row.athletes_dns, slotsEmptied: row.slots_emptied, nextHeatAnchored: row.next_heat_anchored });
   }
 
   async correctCheckIn(oldRegistrationId: string, newRegistrationId: string, reason: string): Promise<Result<CorrectionResult>> {

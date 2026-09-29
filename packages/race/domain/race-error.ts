@@ -47,6 +47,7 @@ const MESSAGES: Record<string, string> = {
   RACE_PREVIOUS_HEAT_NOT_STARTED: "Start the previous heat first.",
   RACE_HEAT_ALREADY_STARTED: "That heat has already started.",
   RACE_HEAT_NOT_MANUAL: "That heat starts automatically — it does not need a manual start.",
+  RACE_HEAT_NOT_CANCELLABLE: "That heat cannot be closed — it has already started or is finished.",
   RACE_HEAT_EMPTY: "That heat has no athletes.",
   RACE_CORRECTION_SAME_ATHLETE: "Choose a different athlete.",
   RACE_CORRECTION_DIFFERENT_HEAT: "Both athletes must be in the same heat.",

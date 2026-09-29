@@ -163,3 +163,12 @@ export interface MoveResult {
   queuePosition: number;
   slotIndex: number | null;
 }
+
+export interface CloseHeatResult {
+  heatNumber: number;
+  /** Athletes of the closed heat who became DNS. */
+  athletesDns: number;
+  slotsEmptied: number;
+  /** Number of the AUTO heat that was waiting behind it and has now been scheduled (null if none). */
+  nextHeatAnchored: number | null;
+}

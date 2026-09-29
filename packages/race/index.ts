@@ -13,6 +13,7 @@ import { RefundPaymentUseCase } from "./application/refund-payment";
 import { CancelRegistrationUseCase } from "./application/cancel-registration";
 import {
   AdvanceRaceUseCase,
+  CloseHeatWithoutStartUseCase,
   CorrectCheckInUseCase,
   GetControlStateUseCase,
   MarkDnfUseCase,
@@ -27,6 +28,7 @@ import {
 import { SupabaseRaceRegistrationRepository } from "./infrastructure/supabase-race-registration-repository";
 import { SupabaseRaceEngineRepository } from "./infrastructure/supabase-race-engine-repository";
 
+export type { Result, DomainError, UseCase } from "./kernel";
 export { createRaceSupabaseClient } from "./infrastructure/race-client";
 export type { RaceSupabaseClient, RaceClientParams } from "./infrastructure/race-client";
 export * from "./domain/eligibility";
@@ -72,6 +74,7 @@ export function createRaceModule(client: RaceSupabaseClient) {
     skipAthlete: new SkipAthleteUseCase(engine),
     markDnf: new MarkDnfUseCase(engine),
     startNextHeat: new StartNextHeatUseCase(engine),
+    closeHeatWithoutStart: new CloseHeatWithoutStartUseCase(engine),
     correctCheckIn: new CorrectCheckInUseCase(engine),
     overrideDns: new OverrideDnsUseCase(engine),
     moveToLaterHeat: new MoveToLaterHeatUseCase(engine),

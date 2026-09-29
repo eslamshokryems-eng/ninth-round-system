@@ -582,7 +582,7 @@ create trigger trg_race_judge_applications_guard before insert or update on race
   for each row execute function race_guard_judge_application();
 
 -- ===========================================================================
--- D. Audit → existing race_audit_log (append-only, via log_audit_event()).
+-- D. Audit → race_audit_log (append-only, via race_log_audit_event()).
 -- Every entry carries metadata.event_id so event managers can read their
 -- own event's trail (policy in section E).
 -- ===========================================================================

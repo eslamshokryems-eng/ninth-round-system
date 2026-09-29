@@ -1,4 +1,4 @@
-import type { Result, UseCase } from "@9thround/shared-kernel";
+import type { Result, UseCase } from "../kernel";
 import type { RaceRegistrationRepository } from "../domain/race-registration-repository";
 import type { RegisterAthleteInput, RegistrationConfirmation } from "../domain/registration";
 import { validateRegistration } from "../domain/registration-validation";

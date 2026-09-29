@@ -1,0 +1,33 @@
+# THE NINTH — its OWN Supabase project. Nothing here is shared with the gym-management project (supabase/config.toml).
+project_id = "the-ninth"
+
+[api]
+enabled = true
+port = 55321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 55322
+major_version = 15
+
+[studio]
+enabled = true
+port = 55323
+
+[storage]
+enabled = true
+file_size_limit = "20MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3100"
+additional_redirect_urls = ["http://localhost:3100/race/login"]
+jwt_expiry = 3600
+# Race accounts are created by a Super Admin (staff and judges). Athletes register through a public RPC and never need an account.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true

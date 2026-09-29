@@ -4,11 +4,11 @@
  * Drives the BUILT web app in Chromium with Supabase mocked at the network
  * layer (no backend needed): registration form rules, exact RPC arguments,
  * token handling, staff console, double-click protection, phone-width
- * overflow, and theme isolation from the gym app.
+ * overflow, and independence from the gym system.
  *
- *   pnpm --filter @9thround/web build          # with NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
- *   pnpm --filter @9thround/web exec next start -p 3100
- *   node apps/web/scripts/race-e2e.mjs         # needs `playwright` resolvable (e.g. NODE_PATH=$(npm root -g))
+ *   pnpm --filter @9thround/race-web build     # with NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon
+ *   pnpm --filter @9thround/race-web start     # port 3100
+ *   node apps/race/scripts/race-e2e.mjs        # needs `playwright` resolvable (e.g. NODE_PATH=$(npm root -g))
  *
  * Env: RACE_E2E_BASE (default http://localhost:3100), CHROMIUM_PATH (optional), RACE_E2E_SHOTS (screenshot dir).
  */
@@ -53,6 +53,7 @@ const ROWS = [
 ];
 
 const calls = []; // every RPC the browser makes: {fn, body}
+const seenUrls = []; // every URL any page requested
 let registerMode = "ok"; // "ok" | "dup"
 let confirmDelay = 400;
 
@@ -79,6 +80,7 @@ const controlState = () => {
 };
 
 async function installMock(context) {
+  context.on("request", (r) => seenUrls.push(r.url()));
   await context.route(`${SB}/**`, async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -128,6 +130,7 @@ async function installMock(context) {
         case "race_resume":
           ctl.baseAt = Date.now(); ctl.paused = false; ctl.version++;
           return json(200, { resumed_at: new Date().toISOString(), paused_ms: 90000, race_ms: ctl.baseMs });
+        case "race_close_heat_without_start": return json(200, { heat_number: body.p_heat_number, athletes_dns: 9, slots_emptied: 0, next_heat_anchored: null });
         case "race_skip_athlete": return json(200, { heat_number: 1, slot_index: 1, race_number: "N002" });
         case "race_override_dns": return json(200, { outcome: "NO_SLOT_AVAILABLE", queue_position: null, heat_number: 1, slot_index: null });
         case "race_move_athlete_later_heat": return json(200, { heat_number: body.p_target_heat_number, queue_position: 4, slot_index: null });
@@ -503,7 +506,7 @@ const main = async () => {
     await ctlPage.getByRole("button", { name: "EMERGENCY PAUSE" }).click();
     await ctlPage.waitForSelector("text=RESUME RACE");
     assert.equal(callsOf("race_pause").length, 1);
-    assert.deepEqual(callsOf("race_pause")[0].body, { p_event_id: LOCKED_ID, p_reason: "Emergency pause" });
+    assert.deepEqual(callsOf("race_pause")[0].body, { p_event_id: LOCKED_ID, p_reason: null });
     assert.match(await ctlPage.locator("main").innerText(), /PAUSED/);
     const a = await clockText(); await ctlPage.waitForTimeout(1500); const b = await clockText();
     assert.equal(a, b, "a paused clock does not move");
@@ -565,6 +568,25 @@ const main = async () => {
     assert.deepEqual(callsOf("race_correct_check_in")[0].body, { p_old_registration_id: "q1", p_new_registration_id: "late1", p_reason: "Wrong wristband scanned" });
   });
 
+  await step("control: a manual heat that will never run can be closed — reason required, audited server-side, no start time is typed", async () => {
+    await ctlPage.getByRole("button", { name: "CLOSE HEAT WITHOUT START" }).click();
+    const confirm = ctlPage.getByRole("button", { name: /Confirm — close heat 03/ });
+    assert.equal(await confirm.isDisabled(), true);
+    await ctlPage.locator("#close-heat-reason").fill("Only two athletes showed up");
+    await confirm.click();
+    await ctlPage.waitForSelector("text=9 athletes are DNS");
+    assert.deepEqual(callsOf("race_close_heat_without_start")[0].body, { p_event_id: LOCKED_ID, p_heat_number: 3, p_reason: "Only two athletes showed up" });
+  });
+
+  await step("control: EMERGENCY PAUSE takes an optional note and never requires one", async () => {
+    await ctlPage.locator("#pause-note").fill("medical");
+    await ctlPage.getByRole("button", { name: "EMERGENCY PAUSE" }).click();
+    await ctlPage.waitForSelector("text=RESUME RACE");
+    assert.deepEqual(callsOf("race_pause").at(-1).body, { p_event_id: LOCKED_ID, p_reason: "medical" });
+    await ctlPage.getByRole("button", { name: "RESUME RACE" }).click();
+    await ctlPage.waitForSelector("text=EMERGENCY PAUSE");
+  });
+
   await step("control: the dashboard fits a landscape tablet and a phone without sideways scrolling", async () => {
     await ctlPage.setViewportSize({ width: 1024, height: 768 });
     assert.ok(await ctlPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "1024px wide");
@@ -585,15 +607,16 @@ const main = async () => {
     ctl.forbidden = false;
   });
 
-  // ---------- isolation from the gym app ----------
-  await step("theme isolation: /login (gym app) has no race theme and keeps its own", async () => {
+  // ---------- independence from the gym system ----------
+  await step("independence: THE NINTH has no gym screens, talks only to its own Supabase project, and calls only race_* functions", async () => {
     const p3 = await desk.newPage();
-    await p3.goto(`${BASE}/login`); await p3.waitForSelector("text=Staff sign in");
-    assert.equal(await p3.locator(".race-root").count(), 0);
-    const btn = await p3.evaluate(() => getComputedStyle(document.querySelector("button[type=submit]")).backgroundColor);
-    assert.equal(btn, "rgb(201, 162, 39)", "the gym login's gold button is unchanged");
-    await p3.screenshot({ path: `${shots}/08-gym-login-unchanged.png` });
+    const res = await p3.goto(`${BASE}/login`);
+    assert.equal(res.status(), 404, "the gym login does not exist in THE NINTH's app");
     await p3.close();
+    const hosts = new Set(); for (const u of seenUrls) hosts.add(new URL(u).host);
+    assert.deepEqual([...hosts].filter((h) => !/^localhost(:\d+)?$/.test(h) && h !== "example.supabase.co"), [], "no request left for any other host");
+    assert.ok(calls.length > 50, "the run exercised the API");
+    assert.deepEqual([...new Set(calls.map((c) => c.fn))].filter((fn) => !fn.startsWith("race_")), [], "every RPC name is race_*");
   });
 
   await step("no uncaught page errors on any race page", async () => { assert.deepEqual(errors, []); });

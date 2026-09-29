@@ -1,7 +1,6 @@
 /**
  * Database types for THE NINTH's OWN Supabase project (supabase-race/migrations).
- * Deliberately independent of @9thround/database-types (the gym project): the race app never
- * imports the gym schema. Only the RPC surface the app calls is typed — race tables are reached
+ * Deliberately independent of the gym system's generated types: the race app never imports the gym schema. Only the RPC surface the app calls is typed — race tables are reached
  * exclusively through RPCs (clients hold no write grants on them).
  */
 
@@ -88,6 +87,7 @@ export interface RaceDnsOverrideRow {
   heat_number: number;
   slot_index: number | null;
 }
+export interface RaceCloseHeatRow { heat_number: number; athletes_dns: number; slots_emptied: number; next_heat_anchored: number | null }
 export interface RaceMoveRow { heat_number: number; queue_position: number; slot_index: number | null }
 
 /** JSON returned by race_control_state (Master Control dashboard). */
@@ -254,6 +254,10 @@ export interface RaceDatabase {
       race_check_in: {
         Args: { p_registration_id: string };
         Returns: RaceCheckInRow[];
+      };
+      race_close_heat_without_start: {
+        Args: { p_event_id: string; p_heat_number: number; p_reason: string };
+        Returns: RaceCloseHeatRow[];
       };
       race_start_event: {
         Args: { p_event_id: string };

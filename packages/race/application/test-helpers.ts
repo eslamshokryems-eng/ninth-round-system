@@ -1,5 +1,5 @@
-import { ok } from "@9thround/shared-kernel";
-import type { Result } from "@9thround/shared-kernel";
+import { ok } from "../kernel";
+import type { Result } from "../kernel";
 import type { PushupStyle } from "../domain/eligibility";
 import type { RaceRegistrationRepository } from "../domain/race-registration-repository";
 import type {

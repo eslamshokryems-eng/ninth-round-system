@@ -67,7 +67,7 @@ begin
   begin
     execute p_sql;
   exception when others then
-    if p_expect is null or sqlerrm ilike '%' || p_expect || '%' then
+    if p_expect is null or exists (select 1 from unnest(string_to_array(p_expect, '|')) x where sqlerrm ilike '%' || x || '%') then
       raise notice 'PASS  % [refused: %]', p_label, left(sqlerrm, 80);
       return;
     end if;

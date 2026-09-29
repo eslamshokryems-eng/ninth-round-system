@@ -1,4 +1,4 @@
-import type { Result } from "@9thround/shared-kernel";
+import type { Result } from "../kernel";
 import type { PushupStyle } from "./eligibility";
 import type {
   CheckInResult,

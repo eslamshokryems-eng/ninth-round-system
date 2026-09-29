@@ -183,9 +183,6 @@ importers:
       '@9thround/race':
         specifier: workspace:*
         version: link:../../packages/race
-      '@9thround/shared-kernel':
-        specifier: workspace:*
-        version: link:../../packages/shared-kernel
       '@supabase/supabase-js':
         specifier: 2.45.4
         version: 2.45.4
@@ -539,9 +536,6 @@ importers:
 
   packages/race:
     dependencies:
-      '@9thround/shared-kernel':
-        specifier: workspace:*
-        version: link:../shared-kernel
       '@supabase/supabase-js':
         specifier: 2.45.4
         version: 2.45.4

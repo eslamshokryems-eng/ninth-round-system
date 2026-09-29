@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { domainError, err, ok } from "@9thround/shared-kernel";
+import { domainError, err, ok } from "../kernel";
 import { CancelRegistrationUseCase } from "./cancel-registration";
 import { ConfirmPaymentUseCase } from "./confirm-payment";
 import { GetMyRegistrationUseCase } from "./get-my-registration";

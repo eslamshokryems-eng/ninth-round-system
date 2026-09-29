@@ -1,5 +1,5 @@
-import { domainError, err, ok } from "@9thround/shared-kernel";
-import type { Result } from "@9thround/shared-kernel";
+import { domainError, err, ok } from "../kernel";
+import type { Result } from "../kernel";
 import { checkEligibility } from "./eligibility";
 import { isPlausiblePhone } from "./phone";
 import type { RegisterAthleteInput } from "./registration";

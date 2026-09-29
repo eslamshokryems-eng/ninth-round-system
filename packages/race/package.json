@@ -5,7 +5,6 @@
   "sideEffects": false,
   "main": "./index.ts",
   "dependencies": {
-    "@9thround/shared-kernel": "workspace:*",
     "@supabase/supabase-js": "2.45.4"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
-import { domainError, err } from "@9thround/shared-kernel";
-import type { Result, UseCase } from "@9thround/shared-kernel";
+import { domainError, err } from "../kernel";
+import type { Result, UseCase } from "../kernel";
 import type {
+  CloseHeatResult,
   ControlState,
   CorrectionResult,
   DnsOverrideResult,
@@ -34,7 +35,7 @@ export interface PauseInput {
   eventId: string;
   reason?: string;
 }
-/** EMERGENCY PAUSE. The reason is optional in the heat of the moment (the server records "Emergency pause"). */
+/** EMERGENCY PAUSE. Never asks for a justification: `reason` is just an OPTIONAL NOTE, stored as-is (or not at all). */
 export class PauseRaceUseCase implements UseCase<PauseInput, PauseResult> {
   constructor(private readonly engine: RaceEngineRepository) {}
   async execute(input: PauseInput): Promise<Result<PauseResult>> {
@@ -154,5 +155,22 @@ export class MoveToLaterHeatUseCase implements UseCase<MoveToLaterHeatInput, Mov
     if (!Number.isInteger(input.targetHeatNumber) || input.targetHeatNumber < 1) return err(domainError("RACE_NOT_FOUND", "Choose a heat first."));
     if (input.reason.trim() === "") return REASON_REQUIRED();
     return this.engine.moveToLaterHeat(input.registrationId, input.targetHeatNumber, input.reason.trim());
+  }
+}
+
+export interface CloseHeatInput {
+  eventId: string;
+  heatNumber: number;
+  reason: string;
+}
+/** A heat that will never run must not block the event. Event Manager or Master Control; reason required; audited. */
+export class CloseHeatWithoutStartUseCase implements UseCase<CloseHeatInput, CloseHeatResult> {
+  constructor(private readonly engine: RaceEngineRepository) {}
+  async execute(input: CloseHeatInput): Promise<Result<CloseHeatResult>> {
+    const bad = need(input.eventId, "an event");
+    if (bad) return bad;
+    if (!Number.isInteger(input.heatNumber) || input.heatNumber < 1) return err(domainError("RACE_NOT_FOUND", "Choose a heat first."));
+    if (input.reason.trim() === "") return REASON_REQUIRED();
+    return this.engine.closeHeatWithoutStart(input.eventId, input.heatNumber, input.reason.trim());
   }
 }

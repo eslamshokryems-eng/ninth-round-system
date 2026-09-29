@@ -1,5 +1,5 @@
-import { domainError, err } from "@9thround/shared-kernel";
-import type { Result, UseCase } from "@9thround/shared-kernel";
+import { domainError, err } from "../kernel";
+import type { Result, UseCase } from "../kernel";
 import type { RaceRegistrationRepository } from "../domain/race-registration-repository";
 import type { CheckInResult } from "../domain/registration";
 

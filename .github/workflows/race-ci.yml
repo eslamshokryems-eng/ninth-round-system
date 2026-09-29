@@ -1,0 +1,47 @@
+name: THE NINTH CI
+
+# THE NINTH is its own system with its own Supabase project. This workflow needs NO secrets and never touches any hosted
+# database: the database job runs against a throw-away local Postgres.
+on:
+  pull_request:
+    paths: ["supabase-race/**", "apps/race/**", "packages/race/**", ".github/workflows/race-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["supabase-race/**", "apps/race/**", "packages/race/**"]
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version-file: ".nvmrc" }
+      - name: Isolation from the gym system (repository level)
+        run: supabase-race/tests/check-isolation.sh
+      - name: Migrations, RLS, storage, engine, 50-athlete simulation, blackout equivalence, concurrency, restore
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql postgresql-contrib
+          supabase-race/tests/harness/run.sh
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: ".nvmrc", cache: "pnpm" }
+      - run: pnpm install --frozen-lockfile
+      - name: Lint, typecheck, unit tests
+        run: |
+          pnpm --filter @9thround/race lint
+          pnpm --filter @9thround/race typecheck
+          pnpm --filter @9thround/race test
+          pnpm --filter @9thround/race-web lint
+          pnpm --filter @9thround/race-web typecheck
+      - name: Build THE NINTH's app (placeholder public values — no real project needed)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: anon-placeholder
+        run: pnpm --filter @9thround/race-web build

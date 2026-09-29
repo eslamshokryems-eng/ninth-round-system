@@ -1,5 +1,5 @@
-import { domainError, err, ok } from "@9thround/shared-kernel";
-import type { DomainError, Result } from "@9thround/shared-kernel";
+import { domainError, err, ok } from "../kernel";
+import type { DomainError, Result } from "../kernel";
 import type { RaceSupabaseClient } from "./race-client";
 import type {
   RaceCheckInRow,

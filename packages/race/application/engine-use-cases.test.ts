@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ok } from "@9thround/shared-kernel";
-import type { Result } from "@9thround/shared-kernel";
+import { ok } from "../kernel";
+import type { Result } from "../kernel";
 import type { RaceEngineRepository } from "../domain/race-engine-repository";
 import {
   AdvanceRaceUseCase,
+  CloseHeatWithoutStartUseCase,
   CorrectCheckInUseCase,
   MarkDnfUseCase,
   MoveToLaterHeatUseCase,
@@ -31,6 +32,7 @@ function fake() {
     skipAthlete: (s, r) => rec("skipAthlete", [s, r], { heatNumber: 1, slotIndex: 0, raceNumber: "N001" }),
     markDnf: (a, r) => rec("markDnf", [a, r], true as const),
     startNextHeat: (e, h) => rec("startNextHeat", [e, h], { heatNumber: h, anchorMs: 1 }),
+    closeHeatWithoutStart: (e, h, r) => rec("closeHeatWithoutStart", [e, h, r], { heatNumber: h, athletesDns: 9, slotsEmptied: 0, nextHeatAnchored: null }),
     correctCheckIn: (o, n, r) => rec("correctCheckIn", [o, n, r], { correctionId: "c", newCheckInId: "n", queuePosition: 1, heatNumber: 1, slotRebound: false }),
     overrideDns: (a, r) => rec("overrideDns", [a, r], { outcome: "QUEUED" as const, queuePosition: 1, heatNumber: 1, slotIndex: null }),
     moveToLaterHeat: (a, h, r) => rec("moveToLaterHeat", [a, h, r], { heatNumber: h, queuePosition: 1, slotIndex: null }),
@@ -56,6 +58,7 @@ describe("engine use cases — inputs that never reach the database", () => {
       new OverrideDnsUseCase(repo).execute({ registrationId: "r", reason: " \n" }),
       new MoveToLaterHeatUseCase(repo).execute({ registrationId: "r", targetHeatNumber: 3, reason: "" }),
       new CorrectCheckInUseCase(repo).execute({ wrongRegistrationId: "a", rightRegistrationId: "b", reason: "" }),
+      new CloseHeatWithoutStartUseCase(repo).execute({ eventId: "e", heatNumber: 5, reason: "  " }),
     ]);
     for (const r of results) {
       expect(r.isErr && r.error.code).toBe("RACE_REASON_REQUIRED");
@@ -92,6 +95,12 @@ describe("engine use cases — what does reach the database", () => {
       { method: "moveToLaterHeat", args: ["reg-1", 2, "late"] },
       { method: "correctCheckIn", args: ["a", "b", "wristband"] },
     ]);
+  });
+
+  it("closing a heat sends the event, heat number and trimmed reason", async () => {
+    const { repo, calls } = fake();
+    await new CloseHeatWithoutStartUseCase(repo).execute({ eventId: "e", heatNumber: 5, reason: " will not start " });
+    expect(calls).toEqual([{ method: "closeHeatWithoutStart", args: ["e", 5, "will not start"] }]);
   });
 
   it("EMERGENCY PAUSE works with no reason at all (panic button) and passes null", async () => {

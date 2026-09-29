@@ -7,11 +7,14 @@
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/link-react.mjs",
+    "prebuild": "node scripts/link-react.mjs",
+    "predev": "node scripts/link-react.mjs",
+    "prestart": "node scripts/link-react.mjs"
   },
   "dependencies": {
     "@9thround/race": "workspace:*",
-    "@9thround/shared-kernel": "workspace:*",
     "@supabase/supabase-js": "2.45.4",
     "next": "^14.2.0",
     "react": "18.2.0",

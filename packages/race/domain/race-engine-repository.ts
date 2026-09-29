@@ -1,5 +1,6 @@
-import type { Result } from "@9thround/shared-kernel";
+import type { Result } from "../kernel";
 import type {
+  CloseHeatResult,
   ControlState,
   CorrectionResult,
   DnsOverrideResult,
@@ -22,6 +23,7 @@ export interface RaceEngineRepository {
   skipAthlete(slotId: string, reason: string): Promise<Result<SkipResult>>;
   markDnf(registrationId: string, reason: string): Promise<Result<true>>;
   startNextHeat(eventId: string, heatNumber: number): Promise<Result<NextHeatResult>>;
+  closeHeatWithoutStart(eventId: string, heatNumber: number, reason: string): Promise<Result<CloseHeatResult>>;
   correctCheckIn(oldRegistrationId: string, newRegistrationId: string, reason: string): Promise<Result<CorrectionResult>>;
   overrideDns(registrationId: string, reason: string): Promise<Result<DnsOverrideResult>>;
   moveToLaterHeat(registrationId: string, targetHeatNumber: number, reason: string): Promise<Result<MoveResult>>;
