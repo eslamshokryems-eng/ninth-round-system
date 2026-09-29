@@ -56,6 +56,28 @@ const calls = []; // every RPC the browser makes: {fn, body}
 let registerMode = "ok"; // "ok" | "dup"
 let confirmDelay = 400;
 
+
+// ---- Master Control mock: a tiny stateful race clock -------------------------------------------------------------------
+const ctl = { started: false, paused: false, baseMs: 0, baseAt: 0, version: 1, forbidden: false };
+const ctlRaceMs = () => (!ctl.started ? null : ctl.paused ? ctl.baseMs : ctl.baseMs + (Date.now() - ctl.baseAt));
+const controlState = () => {
+  const t = ctlRaceMs();
+  const startsIn = t === null ? null : 60000 - t;
+  return {
+    server_time: new Date().toISOString(),
+    event: { id: LOCKED_ID, name: "THE NINTH", status: ctl.started ? "LIVE" : "HEATS_LOCKED", timezone: "Africa/Cairo", first_start_offset_ms: 60000, start_interval_ms: 210000, work_ms: 180000, transition_ms: 30000, announce_lead_ms: 10000 },
+    clock: { started: ctl.started, paused: ctl.paused, finished: false, race_ms: t, version: ctl.version, started_at: ctl.started ? new Date(ctl.baseAt).toISOString() : null, paused_at: null, pre_race: t !== null && t < 60000 },
+    next_athlete: ctl.started && startsIn > 0 ? { registration_id: "q1", race_number: "N001", full_name: "First Athlete", category_code: "MEN", heat: 1, slot_index: 0, start_ms: 60000, starts_in_ms: startsIn, announce_in_ms: startsIn - 10000 } : null,
+    skippable: [{ slot_id: "slot-n002", registration_id: "q9", race_number: "N002", full_name: "Second Athlete", category_code: "MEN", heat: 1, slot_index: 1, is_overflow: false, status: "BOUND", start_ms: 270000, starts_in_ms: 270000 - (t ?? 0) }],
+    stations: Array.from({ length: 9 }, (_, i) => i === 0
+      ? { number: 1, name: "Station 01", state: "WORK", athlete: { race_number: "N003", full_name: "Third Athlete", category_code: "MEN" }, window_start_ms: 0, window_end_ms: 180000, scoring_end_ms: 210000, remaining_ms: 100000, score: null }
+      : { number: i + 1, name: "Station 0" + (i + 1), state: "IDLE", athlete: null, window_start_ms: null, window_end_ms: null, scoring_end_ms: null, remaining_ms: null, score: null }),
+    heats: [1, 2, 3].map((n) => ({ number: n, status: n === 3 ? "AWAITING_START" : "LOCKED", anchor_ms: n === 3 ? null : n === 1 ? 60000 : 2340000, planned_slots: 9, start_mode: n === 3 ? "MANUAL" : "AUTO", roster: 9, started: 0, bound: 0, empty: 0, skipped: 0, open: 9 })),
+    counts: { registered: 27, checked_in: 20, racing: 0, finished: 0, dns: 1, dnf: 0 },
+    attention: { dns: [{ registration_id: "d4", race_number: "N004", full_name: "Missed Mo", heat: 1, was_skipped: true }], no_slot: [{ registration_id: "q3", race_number: "N020", full_name: "Stranded Athlete", heat: 1 }] },
+  };
+};
+
 async function installMock(context) {
   await context.route(`${SB}/**`, async (route) => {
     const req = route.request();
@@ -90,6 +112,26 @@ async function installMock(context) {
           if (body.p_registration_id === "r28") return json(400, { code: "P0001", message: "RACE_NOT_CONFIRMED: payment must be confirmed before check-in", details: null, hint: null });
           return json(200, { check_in_id: "c1", checked_in_at: "2026-11-20T06:00:00Z", kind: body.p_registration_id === "late1" ? "LATE" : "ON_TIME", queue_position: 4, heat_number: 2, already_checked_in: body.p_registration_id === "r30" });
         }
+        case "race_control_state":
+          if (ctl.forbidden) return json(403, { code: "42501", message: "RACE_FORBIDDEN", details: null, hint: null });
+          return json(200, controlState());
+        case "race_advance": return json(200, { advanced: ctl.started, race_ms: ctlRaceMs(), athletes_started: 0 });
+        case "race_start_event":
+          await new Promise((r) => setTimeout(r, 300));
+          if (ctl.started) return json(400, { code: "23514", message: "RACE_ALREADY_STARTED: START EVENT can only be pressed once", details: null, hint: null });
+          ctl.started = true; ctl.baseMs = 0; ctl.baseAt = Date.now(); ctl.version++;
+          return json(200, { started_at: new Date(ctl.baseAt).toISOString(), first_start_ms: 60000, heats_anchored: 1 });
+        case "race_pause":
+          if (ctl.paused) return json(400, { code: "23514", message: "RACE_ALREADY_PAUSED", details: null, hint: null });
+          ctl.baseMs = ctlRaceMs(); ctl.paused = true; ctl.version++;
+          return json(200, { paused_at: new Date().toISOString(), paused_race_ms: ctl.baseMs });
+        case "race_resume":
+          ctl.baseAt = Date.now(); ctl.paused = false; ctl.version++;
+          return json(200, { resumed_at: new Date().toISOString(), paused_ms: 90000, race_ms: ctl.baseMs });
+        case "race_skip_athlete": return json(200, { heat_number: 1, slot_index: 1, race_number: "N002" });
+        case "race_override_dns": return json(200, { outcome: "NO_SLOT_AVAILABLE", queue_position: null, heat_number: 1, slot_index: null });
+        case "race_move_athlete_later_heat": return json(200, { heat_number: body.p_target_heat_number, queue_position: 4, slot_index: null });
+        case "race_correct_check_in": return json(200, { correction_id: "corr-1", new_check_in_id: "ci-9", queue_position: 1, heat_number: 1, slot_rebound: true });
         case "race_queue": return json(200, QUEUE);
         case "race_confirm_payment": await new Promise((r) => setTimeout(r, confirmDelay)); return json(200, "22222222-2222-2222-2222-222222222222");
         default: return json(200, null);
@@ -405,6 +447,142 @@ const main = async () => {
     const p = await recCtx.newPage();
     await p.goto(`${BASE}/race/reception/the-ninth-2026`); await p.waitForSelector("text=Check-in opens when the Event Manager locks the heats");
     await p.close();
+  });
+
+
+  // ---------- Master Control ----------
+  const ctlPage = await recCtx.newPage();
+  await seedSession(ctlPage);
+  ctlPage.on("pageerror", (e) => errors.push(`pageerror(control): ${e.message}`));
+  const clockText = () => ctlPage.locator("[data-testid=race-clock]").innerText();
+
+  await step("control: a signed-out visitor is asked to sign in", async () => {
+    const anon = await desk.newPage();
+    await anon.goto(`${BASE}/race/control/locked-2026`); await anon.waitForSelector("text=Sign in required");
+    assert.equal(await anon.locator("a", { hasText: "Sign in" }).getAttribute("href"), "/race/login?next=/race/control/locked-2026");
+    await anon.close();
+  });
+
+  await step("control: before the start — START EVENT needs a second, explicit confirmation", async () => {
+    await ctlPage.goto(`${BASE}/race/control/locked-2026`); await ctlPage.waitForSelector("text=START EVENT");
+    assert.equal(await clockText(), "0:00");
+    assert.equal(callsOf("race_start_event").length, 0);
+    await ctlPage.getByRole("button", { name: "START EVENT", exact: true }).click();
+    await ctlPage.waitForSelector("text=Confirm — START EVENT");
+    assert.equal(callsOf("race_start_event").length, 0, "one tap must not start the race");
+    await ctlPage.screenshot({ path: `${shots}/12-control-before.png`, fullPage: true });
+  });
+
+  await step("control: a double-click on confirm starts the race ONCE, with only the event id", async () => {
+    await ctlPage.getByRole("button", { name: "Confirm — START EVENT" }).dblclick();
+    await ctlPage.waitForSelector("text=Race started");
+    assert.equal(callsOf("race_start_event").length, 1);
+    assert.deepEqual(callsOf("race_start_event")[0].body, { p_event_id: LOCKED_ID });
+  });
+
+  await step("control: PRE-RACE countdown to the first athlete, then the race clock runs from 0:00", async () => {
+    await ctlPage.waitForSelector("[data-testid=pre-race]");
+    assert.match(await ctlPage.locator("[data-testid=pre-race]").innerText(), /first athlete in (0:5\d|1:00)/i);
+    assert.match(await ctlPage.locator("main").innerText(), /PRE-RACE/);
+    const a = await clockText(); await ctlPage.waitForTimeout(1300); const b = await clockText();
+    assert.notEqual(a, b, "the clock ticks");
+    assert.match(await ctlPage.locator("[data-testid=next-countdown]").innerText(), /0:5\d|1:00/);
+    assert.match(await ctlPage.locator("main").innerText(), /N001/);
+    await ctlPage.screenshot({ path: `${shots}/13-control-prerace.png`, fullPage: true });
+  });
+
+  await step("control: the engine is ticked about once a second (advance before the snapshot)", async () => {
+    const before = callsOf("race_advance").length;
+    await ctlPage.waitForTimeout(2500);
+    assert.ok(callsOf("race_advance").length - before >= 2, "advance is called every second");
+    const order = calls.filter((c) => c.fn === "race_advance" || c.fn === "race_control_state").slice(-6).map((c) => c.fn);
+    assert.equal(order[0], "race_advance");
+  });
+
+  await step("control: EMERGENCY PAUSE freezes the clock on screen; RESUME continues it", async () => {
+    await ctlPage.getByRole("button", { name: "EMERGENCY PAUSE" }).click();
+    await ctlPage.waitForSelector("text=RESUME RACE");
+    assert.equal(callsOf("race_pause").length, 1);
+    assert.deepEqual(callsOf("race_pause")[0].body, { p_event_id: LOCKED_ID, p_reason: "Emergency pause" });
+    assert.match(await ctlPage.locator("main").innerText(), /PAUSED/);
+    const a = await clockText(); await ctlPage.waitForTimeout(1500); const b = await clockText();
+    assert.equal(a, b, "a paused clock does not move");
+    await ctlPage.screenshot({ path: `${shots}/14-control-paused.png`, fullPage: true });
+    await ctlPage.getByRole("button", { name: "RESUME RACE" }).click();
+    await ctlPage.waitForSelector("text=EMERGENCY PAUSE");
+    assert.equal(callsOf("race_resume").length, 1);
+    const c = await clockText(); await ctlPage.waitForTimeout(1300); const d = await clockText();
+    assert.notEqual(c, d, "the clock runs again after resume");
+  });
+
+  await step("control: nine station cards; Station 01 shows the athlete and a live countdown", async () => {
+    assert.equal(await ctlPage.locator("[data-testid^=station-]").count(), 9);
+    const t = await ctlPage.locator("[data-testid=station-1]").innerText();
+    assert.match(t, /N003/); assert.match(t, /WORK/);
+  });
+
+  await step("control: SKIP needs a reason, then sends only the slot id and the reason", async () => {
+    await ctlPage.getByRole("button", { name: "SKIP", exact: true }).click();
+    const confirm = ctlPage.getByRole("button", { name: /Confirm skip N002/ });
+    assert.equal(await confirm.isDisabled(), true);
+    await ctlPage.locator("#skip-reason-slot-n002").fill("Not at the start line");
+    assert.equal(await confirm.isDisabled(), false);
+    await confirm.click();
+    await ctlPage.waitForSelector("text=slot 02 stays empty");
+    assert.deepEqual(callsOf("race_skip_athlete")[0].body, { p_slot_id: "slot-n002", p_reason: "Not at the start line" });
+  });
+
+  await step("control: DNS override reports NO SLOT AVAILABLE plainly and nobody is displaced", async () => {
+    await ctlPage.getByRole("button", { name: "Override DNS" }).click();
+    const confirm = ctlPage.getByRole("button", { name: "Confirm", exact: true });
+    assert.equal(await confirm.isDisabled(), true);
+    await ctlPage.locator("[id^=ex-reason-dns]").fill("Arrived 20 minutes late");
+    await confirm.click();
+    await ctlPage.waitForSelector("text=nobody was displaced");
+    assert.deepEqual(callsOf("race_override_dns")[0].body, { p_registration_id: "d4", p_reason: "Arrived 20 minutes late" });
+  });
+
+  await step("control: a late athlete with no slot can be moved — only to a LATER heat, with a reason", async () => {
+    await ctlPage.getByRole("button", { name: "Move to later heat" }).click();
+    const options = await ctlPage.locator("select option").allInnerTexts();
+    assert.ok(options.includes("Heat 02") && !options.includes("Heat 01") && !options.includes("Heat 03"), `only later heats that already have a schedule are offered: ${options}`);
+    await ctlPage.locator("select").last().selectOption("2");
+    await ctlPage.locator("[id^=ex-reason-move]").fill("Arrived after heat 1 closed");
+    await ctlPage.getByRole("button", { name: "Confirm", exact: true }).click();
+    await ctlPage.waitForSelector("text=moved to heat 02");
+    assert.deepEqual(callsOf("race_move_athlete_later_heat")[0].body, { p_registration_id: "q3", p_target_heat_number: 2, p_reason: "Arrived after heat 1 closed" });
+  });
+
+  await step("control: correcting a wrong check-in sends both athletes and the reason; the screen says the original is kept", async () => {
+    await ctlPage.locator("section[aria-label='Correct check-in'] button", { hasText: "Open" }).click();
+    assert.match(await ctlPage.locator("section[aria-label='Correct check-in']").innerText(), /original check-in is kept/i);
+    await ctlPage.locator("section[aria-label='Correct check-in'] select").selectOption("q1");
+    await ctlPage.locator("#correct-right-search").fill("31");
+    await ctlPage.waitForSelector("text=Late Larry");
+    await ctlPage.locator("#correct-reason").fill("Wrong wristband scanned");
+    await ctlPage.getByRole("button", { name: "Apply correction" }).click();
+    await ctlPage.waitForSelector("text=start slot handed over");
+    assert.deepEqual(callsOf("race_correct_check_in")[0].body, { p_old_registration_id: "q1", p_new_registration_id: "late1", p_reason: "Wrong wristband scanned" });
+  });
+
+  await step("control: the dashboard fits a landscape tablet and a phone without sideways scrolling", async () => {
+    await ctlPage.setViewportSize({ width: 1024, height: 768 });
+    assert.ok(await ctlPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "1024px wide");
+    await ctlPage.screenshot({ path: `${shots}/15-control-tablet.png`, fullPage: true });
+    await ctlPage.setViewportSize({ width: 390, height: 844 });
+    const wide = await ctlPage.evaluate(() => [...document.querySelectorAll("body *")].filter((el) => !el.closest(".overflow-x-auto") && el.getBoundingClientRect().right > window.innerWidth + 1).slice(0, 4).map((el) => `${el.tagName}.${el.className}`.slice(0, 60)));
+    assert.deepEqual(wide, [], "elements wider than the phone screen");
+    assert.ok(await ctlPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "390px wide");
+  });
+
+  await step("control: a user without control rights sees the refusal, not a broken screen", async () => {
+    ctl.forbidden = true;
+    const p = await recCtx.newPage();
+    await p.goto(`${BASE}/race/control/locked-2026`);
+    await p.waitForSelector("text=not allowed");
+    assert.equal(await p.getByRole("button", { name: "START EVENT" }).count(), 0, "no control buttons without a snapshot");
+    await p.close();
+    ctl.forbidden = false;
   });
 
   // ---------- isolation from the gym app ----------

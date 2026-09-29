@@ -593,6 +593,7 @@ declare
   v_heats jsonb;
   v_counts jsonb;
   v_attention jsonb;
+  v_queue jsonb;
 begin
   if public.race_is_control(p_event_id) is not true then
     raise exception 'RACE_FORBIDDEN' using errcode = 'insufficient_privilege';
@@ -658,6 +659,23 @@ begin
       'dnf', count(*) filter (where g.race_status = 'DNF'))
     into v_counts from public.race_registrations g where g.event_id = p_event_id;
 
+  -- who can still be skipped right now: bound (waiting) or inside their Station 01 window
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'slot_id', s.id, 'registration_id', r.id, 'race_number', r.race_number, 'full_name', a.full_name, 'category_code', c.code,
+      'heat', h.number, 'slot_index', s.slot_index, 'is_overflow', s.is_overflow, 'status', s.status,
+      'start_ms', h.anchor_race_ms + s.slot_index::bigint * e.start_interval_ms,
+      'starts_in_ms', h.anchor_race_ms + s.slot_index::bigint * e.start_interval_ms - v_now)
+      order by h.anchor_race_ms + s.slot_index::bigint * e.start_interval_ms, s.id), '[]'::jsonb)
+    into v_queue
+    from public.race_start_slots s
+    join public.race_heats h on h.id = s.heat_id
+    join public.race_registrations r on r.id = s.registration_id
+    join public.race_athletes a on a.id = r.athlete_id
+    join public.race_categories c on c.id = r.category_id
+   where s.event_id = p_event_id and s.status in ('BOUND', 'STARTED') and v_now is not null
+     and v_now < h.anchor_race_ms + s.slot_index::bigint * e.start_interval_ms + e.work_ms
+     and clk.finished_at is null;
+
   -- athletes that need a human: DNS (Event Manager may override) and unslotted late athletes (may be moved)
   select jsonb_build_object(
       'dns', (select coalesce(jsonb_agg(jsonb_build_object('registration_id', g.id, 'race_number', g.race_number, 'full_name', a.full_name,
@@ -678,7 +696,7 @@ begin
     'clock', jsonb_build_object('started', clk.started_at is not null, 'paused', clk.paused_at is not null, 'finished', clk.finished_at is not null,
                                 'race_ms', v_now, 'version', clk.version, 'started_at', clk.started_at, 'paused_at', clk.paused_at,
                                 'pre_race', v_now is not null and v_now < e.first_start_offset_ms and clk.finished_at is null),
-    'next_athlete', v_next, 'stations', v_stations, 'heats', v_heats, 'counts', v_counts, 'attention', v_attention);
+    'next_athlete', v_next, 'skippable', v_queue, 'stations', v_stations, 'heats', v_heats, 'counts', v_counts, 'attention', v_attention);
 end;
 $$;
 

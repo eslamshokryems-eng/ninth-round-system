@@ -356,6 +356,110 @@ export interface RaceCheckInRow {
   already_checked_in: boolean;
 }
 
+export interface RaceStartEventRow { started_at: string; first_start_ms: number; heats_anchored: number }
+export interface RacePauseRow { paused_at: string; paused_race_ms: number }
+export interface RaceResumeRow { resumed_at: string; paused_ms: number; race_ms: number }
+export interface RaceSkipRow { heat_number: number; slot_index: number; race_number: string }
+export interface RaceNextHeatRow { heat_number: number; anchor_race_ms: number }
+export interface RaceCorrectionRow { correction_id: string; new_check_in_id: string; queue_position: number; heat_number: number; slot_rebound: boolean }
+export interface RaceDnsOverrideRow {
+  outcome: "ASSIGNED" | "QUEUED" | "NO_SLOT_AVAILABLE";
+  queue_position: number | null;
+  heat_number: number;
+  slot_index: number | null;
+}
+export interface RaceMoveRow { heat_number: number; queue_position: number; slot_index: number | null }
+
+/** JSON returned by race_control_state (Master Control dashboard). */
+export interface RaceControlStateJson {
+  server_time: string;
+  event: {
+    id: string;
+    name: string;
+    status: string;
+    timezone: string;
+    first_start_offset_ms: number;
+    start_interval_ms: number;
+    work_ms: number;
+    transition_ms: number;
+    announce_lead_ms: number;
+  };
+  clock: {
+    started: boolean;
+    paused: boolean;
+    finished: boolean;
+    race_ms: number | null;
+    version: number;
+    started_at: string | null;
+    paused_at: string | null;
+    pre_race: boolean;
+  };
+  next_athlete: {
+    registration_id: string;
+    race_number: string;
+    full_name: string;
+    category_code: string;
+    heat: number;
+    slot_index: number;
+    start_ms: number;
+    starts_in_ms: number;
+    announce_in_ms: number;
+  } | null;
+  skippable: {
+    slot_id: string;
+    registration_id: string;
+    race_number: string;
+    full_name: string;
+    category_code: string;
+    heat: number;
+    slot_index: number;
+    is_overflow: boolean;
+    status: "BOUND" | "STARTED";
+    start_ms: number;
+    starts_in_ms: number;
+  }[];
+  stations: {
+    number: number;
+    name: string;
+    state: "IDLE" | "WORK" | "TRANSITION";
+    athlete: { race_number: string; full_name: string; category_code: string } | null;
+    window_start_ms: number | null;
+    window_end_ms: number | null;
+    scoring_end_ms: number | null;
+    remaining_ms: number | null;
+    score: null;
+  }[];
+  heats: {
+    number: number;
+    status: string;
+    anchor_ms: number | null;
+    planned_slots: number | null;
+    start_mode: "AUTO" | "MANUAL";
+    roster: number;
+    started: number;
+    bound: number;
+    empty: number;
+    skipped: number;
+    open: number;
+  }[];
+  counts: { registered: number; checked_in: number; racing: number; finished: number; dns: number; dnf: number };
+  attention: {
+    dns: { registration_id: string; race_number: string; full_name: string; heat: number | null; was_skipped: boolean }[];
+    no_slot: { registration_id: string; race_number: string; full_name: string; heat: number }[];
+  };
+}
+
+/** JSON returned by race_advance / the engine tick. */
+export interface RaceAdvanceJson {
+  advanced?: boolean;
+  busy?: boolean;
+  race_ms?: number;
+  paused?: boolean;
+  athletes_started?: number;
+  athletes_finished?: number;
+  event_finished?: boolean;
+}
+
 export interface RaceQueueRow {
   heat_number: number;
   queue_position: number;
@@ -676,6 +780,50 @@ export interface Database {
       race_check_in: {
         Args: { p_registration_id: string };
         Returns: RaceCheckInRow[];
+      };
+      race_start_event: {
+        Args: { p_event_id: string };
+        Returns: RaceStartEventRow[];
+      };
+      race_pause: {
+        Args: { p_event_id: string; p_reason?: string | null };
+        Returns: RacePauseRow[];
+      };
+      race_resume: {
+        Args: { p_event_id: string };
+        Returns: RaceResumeRow[];
+      };
+      race_advance: {
+        Args: { p_event_id: string };
+        Returns: RaceAdvanceJson;
+      };
+      race_control_state: {
+        Args: { p_event_id: string };
+        Returns: RaceControlStateJson;
+      };
+      race_skip_athlete: {
+        Args: { p_slot_id: string; p_reason: string };
+        Returns: RaceSkipRow[];
+      };
+      race_mark_dnf: {
+        Args: { p_registration_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      race_start_next_heat: {
+        Args: { p_event_id: string; p_heat_number: number };
+        Returns: RaceNextHeatRow[];
+      };
+      race_correct_check_in: {
+        Args: { p_old_registration_id: string; p_new_registration_id: string; p_reason: string };
+        Returns: RaceCorrectionRow[];
+      };
+      race_override_dns: {
+        Args: { p_registration_id: string; p_reason: string };
+        Returns: RaceDnsOverrideRow[];
+      };
+      race_move_athlete_later_heat: {
+        Args: { p_registration_id: string; p_target_heat_number: number; p_reason: string };
+        Returns: RaceMoveRow[];
       };
       race_queue: {
         Args: { p_event_id: string; p_heat_number?: number | null };

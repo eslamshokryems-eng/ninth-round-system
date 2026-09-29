@@ -7,7 +7,7 @@ export function RaceHeader({ right, wide = false }: { right?: ReactNode; wide?: 
   return (
     <header>
       <div className="race-stripe" />
-      <div className={`mx-auto flex ${wide ? "max-w-6xl" : "max-w-2xl"} items-center justify-between gap-4 px-4 py-4`}>
+      <div className={`mx-auto flex ${wide ? "max-w-6xl" : "max-w-2xl"} flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4`}>
         <a href="/race" className="flex items-baseline gap-3" aria-label="THE NINTH — home">
           <span className="race-display text-3xl sm:text-4xl">
             THE <span style={{ color: "var(--race-red-hot)" }}>NINTH</span>
@@ -149,7 +149,7 @@ export function formatRaceTime(ms: number): string {
 }
 
 /** Links between the staff screens (Registrations · Check-in). */
-export function StaffNav({ slug, current }: { slug: string; current: "registrations" | "reception" }) {
+export function StaffNav({ slug, current }: { slug: string; current: "registrations" | "reception" | "control" }) {
   const item = (href: string, label: string, active: boolean) => (
     <a
       key={href}
@@ -162,7 +162,8 @@ export function StaffNav({ slug, current }: { slug: string; current: "registrati
     </a>
   );
   return (
-    <nav className="flex gap-5" aria-label="Staff screens">
+    <nav className="flex flex-wrap justify-end gap-x-5 gap-y-1" aria-label="Staff screens">
+      {item(`/race/control/${slug}`, "Control", current === "control")}
       {item(`/race/reception/${slug}`, "Check-in", current === "reception")}
       {item(`/race/admin/${slug}/registrations`, "Registrations", current === "registrations")}
     </nav>

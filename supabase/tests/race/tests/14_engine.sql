@@ -122,8 +122,9 @@ select race_test.ok((select s -> 'stations' -> 0 ->> 'state' = 'WORK' and s -> '
                             and (s -> 'stations' -> 0 ->> 'remaining_ms')::bigint between 178000 and 180000
                             and s -> 'stations' -> 1 ->> 'state' = 'WORK' and s -> 'stations' -> 1 -> 'athlete' ->> 'race_number' = 'N001'
                             and s -> 'stations' -> 2 ->> 'state' = 'IDLE'
+                            and jsonb_array_length(s -> 'skippable') = 1 and s -> 'skippable' -> 0 ->> 'race_number' = 'N002' and s -> 'skippable' -> 0 ->> 'status' = 'STARTED'
                      from (select race_control_state(race_test.id('ev_e')) s) q),
-  'dashboard: at 4:31 Station 01 = N002 (WORK, ~2:59 left), Station 02 = N001 (WORK), Station 03 idle');
+  'dashboard: at 4:31 Station 01 = N002 (WORK, ~2:59 left), Station 02 = N001 (WORK), Station 03 idle; only N002 is still skippable (N001 is past its Station 01 window)');
 reset role;
 
 -- Judges and screens may tick the engine; strangers may not ----------------------------------------------------------------------------
