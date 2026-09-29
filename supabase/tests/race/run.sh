@@ -53,6 +53,24 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
   if [ "$(basename "$f")" = "20260809000001_bootstrap_super_admin.sql" ]; then
     "${PSQL[@]}" -d "$DB" -c "insert into auth.users (id, email, raw_user_meta_data) values ('aea7db27-3aaa-4701-aed2-f1b49127bdda', 'founder@test.local', '{\"full_name\":\"Founder\"}')" >/dev/null
   fi
+  if [ "$(basename "$f")" = "20260929000001_fix_admin_rpc_null_guards.sql" ]; then
+    snapshot "$WORK/pre_fix.sql"
+    apply "$f"; existing=$((existing+1))
+    snapshot "$WORK/post_fix.sql"
+    changed=$( { diff "$WORK/pre_fix.sql" "$WORK/post_fix.sql" || true; } | grep -E '^[<>]' | sed -E 's/^[<>] //; s/ md5=.*//' | sort -u)
+    expected=$(printf '%s\n' \
+      'fn public.clear_user_permission_override(p_profile_id uuid, p_permission_key text)' \
+      'fn public.delete_receipt(p_payment_id uuid, p_reason text)' \
+      'fn public.prepare_staff_deletion(p_profile_id uuid)' \
+      'fn public.set_role_permission(p_role user_role, p_permission_key text, p_granted boolean)' \
+      'fn public.set_user_permission_override(p_profile_id uuid, p_permission_key text, p_granted boolean)' | sort -u)
+    if [ "$changed" = "$expected" ]; then
+      echo "PASS  security fix 20260929000001 changes exactly 5 functions (guard line + EXECUTE grants) and nothing else"
+    else
+      echo "FAIL  security fix touched unexpected objects:"; diff <(echo "$expected") <(echo "$changed"); exit 1
+    fi
+    continue
+  fi
   apply "$f"; existing=$((existing+1))
 done
 echo "applied $existing existing migrations"
@@ -87,9 +105,9 @@ node "$ROOT/docs/race/scripts/timing-validation.mjs" --csv > "$WORK/js_schedule.
 for t in "$HERE"/tests/*.sql; do
   echo "-- $(basename "$t")"
   if ! "${PSQL[@]}" -d "$DB" -f "$t" > "$WORK/out" 2>&1; then
-    grep -oE 'PASS  .*' "$WORK/out"; grep -E 'ERROR|FAIL' "$WORK/out"; exit 1
+    { grep -oE 'PASS  .*' "$WORK/out" || true; }; grep -E 'ERROR|FAIL' "$WORK/out" || true; exit 1
   fi
-  grep -oE 'PASS  .*' "$WORK/out"
+  grep -oE 'PASS  .*' "$WORK/out" || true
   total=$((total + $(grep -c 'NOTICE:  PASS' "$WORK/out" || true)))
 done
 

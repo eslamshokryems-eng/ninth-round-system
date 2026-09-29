@@ -44,13 +44,18 @@ Reproduce: `supabase/tests/race/run.sh` (see [supabase/tests/race/README.md](../
 1. **NULL-guard bypass.** The existing helpers `is_super_admin()` / `has_permission()` return NULL (not false) for anonymous or deactivated callers. `IF NOT (NULL …)` skips the guard. The first test run caught `race_create_event` succeeding for an anonymous caller. Fixed at the root: strict wrappers `race_is_super_admin()` / `race_has_permission()`, and every RPC guard written `IS NOT TRUE`. Covered by 7 regression tests (anon + deactivated manager).
 2. **CI lint.** `docs/race/timing-validation.mjs` (pushed in the previous round) failed the repo ESLint gate. Moved to `docs/race/scripts/`, per the repo's existing `**/scripts/**/*.mjs` convention. `pnpm lint` is clean.
 
-### ⚠️ Pre-existing gym-system vulnerability (NOT fixed — out of scope, needs approval)
+### ✅ Pre-existing gym-system vulnerability — FIXED (approved; migration `20260929000001_fix_admin_rpc_null_guards.sql`)
+*Resolution:* the five guards are now `is not true` (one line each, function bodies otherwise identical) and `anon`/`public` lose EXECUTE on them. The harness proves the migration changes exactly those 5 functions, and 21 regression tests (`09_gym_null_guard.sql`) cover anon, deactivated super admin, plain staff and the still-working active super admin. Negative control: with the migration removed, the suite fails on the anonymous `set_role_permission` call. A full sweep found no other guard of this shape in the gym migrations.
+
+*Original finding (kept for the record):*
 The same NULL-guard pattern exists in four existing SECURITY DEFINER functions:
 `set_role_permission`, `set_user_permission_override`, `clear_user_permission_override` (20260815000002) and `prepare_staff_deletion` (20260821000002).
 
 Verified on the local harness (rolled back): **as `anon`, `set_role_permission('reception', 'audit_logs.view', true)` succeeds.** Anyone with the public anon key, or any deactivated staff account, can rewrite the permission matrix. `delete_receipt` has the same pattern but is SECURITY INVOKER, so RLS still blocks it.
 
-Fix: one line per function (`if public.is_super_admin() is not true then`) in a new migration, with tests. Not applied, because Phase 3 rules forbid modifying existing gym functionality.
+Fix: one line per function (`if public.is_super_admin() is not true then`) in a new migration, with tests. Held back during Phase 3 because that phase forbade modifying existing gym functionality; applied after approval.
+
+**Deployment note:** this migration is on the production path. Because the flaw was exploitable with the public anon key, check `role_permissions` / `user_permission_overrides` in production for unexpected rows once it is applied.
 
 ## Implementation notes vs the approved schema
 - **Seed as templates.** `race_category_templates` / `race_station_templates` / `race_station_rule_templates` hold the rulebook. `race_create_event()` copies them into each event and refuses unless the copy is exactly 3 / 9 / 27.
