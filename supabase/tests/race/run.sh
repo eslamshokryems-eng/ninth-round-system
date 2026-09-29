@@ -113,6 +113,9 @@ done
 
 echo "== $total assertions passed"
 
+step "5b. Concurrency (parallel sessions)"
+source "$HERE/concurrency.sh"
+
 step "6. Rollback safety"
 "${PSQL[@]}" -d "$DB" -f "$ROOT/supabase/rollback/20260928_race_phase3_down.sql" 2>&1 | sed -n 's/^NOTICE:  //p'
 snapshot "$WORK/rolled_back.sql"

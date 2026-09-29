@@ -17,11 +17,11 @@ select race_test.throws($$insert into race_performance_events (event_id, station
                           values (race_test.id('event_a'), race_test.id('s1'), race_test.id('res_s1'), 'REP', gen_random_uuid(), 'ONLINE', 1, race_test.id('judge1'), 'ACCEPTED')$$,
   'permission denied', 'anon: cannot write judge actions');
 select race_test.throws($$select race_create_event(race_test.id('branch_a'), 'hack', current_date)$$,
-  'RACE_FORBIDDEN', 'anon: cannot create an event through the RPC');
+  'permission denied', 'anon: cannot create an event through the RPC');
 select race_test.throws($$select race_set_event_status(race_test.id('event_a'), 'REGISTRATION_CLOSED')$$,
-  'RACE_FORBIDDEN', 'anon: cannot change event status (NULL-safe guard)');
-select race_test.throws($$select race_lock_heats(race_test.id('event_a'))$$, 'RACE_FORBIDDEN', 'anon: cannot lock heats');
-select race_test.throws($$select race_move_athlete_heat(race_test.id('reg2'), race_test.id('heat2'), 'x')$$, 'RACE_FORBIDDEN',
+  'permission denied', 'anon: cannot change event status (EXECUTE revoked)');
+select race_test.throws($$select race_lock_heats(race_test.id('event_a'))$$, 'permission denied', 'anon: cannot lock heats');
+select race_test.throws($$select race_move_athlete_heat(race_test.id('reg2'), race_test.id('heat2'), 'x')$$, 'permission denied',
   'anon: cannot move athletes');
 select race_test.ok((select is_started = false from race_server_time(race_test.id('event_a'))),
   'anon: public clock-sync endpoint works for a published event');

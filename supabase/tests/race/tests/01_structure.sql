@@ -3,7 +3,7 @@ reset role;
 
 select race_test.eq((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
                      where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%')::int,
-                    26, 'structure: 26 race_* tables created');
+                    27, 'structure: 27 race_* tables created');
 
 select race_test.ok(not exists (
   select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -35,10 +35,10 @@ select race_test.ok(not exists (
 select race_test.ok(not exists (
   select 1 from unnest(array['race_athletes', 'race_payments', 'race_payment_events', 'race_clock', 'race_pauses',
     'race_tie_draws', 'race_check_ins', 'race_start_slots', 'race_station_results', 'race_performance_events',
-    'race_action_reviews', 'race_ocr_records', 'race_result_corrections', 'race_rankings']) t
+    'race_action_reviews', 'race_ocr_records', 'race_result_corrections', 'race_rankings', 'race_event_counters']) t
   where has_any_column_privilege('authenticated', t, 'INSERT') or has_any_column_privilege('authenticated', t, 'UPDATE')
      or has_table_privilege('authenticated', t, 'DELETE')),
-  'lock-down: 14 ledger/state tables have NO client write privilege (RPC-only)');
+  'lock-down: 15 ledger/state tables have NO client write privilege (RPC-only)');
 
 select race_test.ok(not has_any_column_privilege('authenticated', 'race_registrations', 'INSERT')
                     and not has_column_privilege('authenticated', 'race_registrations', 'race_status', 'UPDATE')
