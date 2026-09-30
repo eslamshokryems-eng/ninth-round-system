@@ -210,29 +210,18 @@ begin
     raise exception 'RACE_NOT_STARTED' using errcode = 'check_violation';
   end if;
 
-  -- 3. the exact window rules (no grace period)
-  if p_type = 'TECHNIQUE_SCORE' and not st.has_technique then
+  -- 3. the exact window rules (no grace period). The phase is DERIVED from the race time stamped just now and the result's window —
+  --    never from a stored status that a slower caller might have read a moment earlier (that was a real race, found by the lock-race test).
+  if r.status in ('VOID_DNS', 'NOT_REACHED') then
+    v_status := 'REJECTED'; v_code := 'ATHLETE_NOT_RACING';
+  elsif p_type = 'TECHNIQUE_SCORE' and not st.has_technique then
     v_status := 'REJECTED'; v_code := 'NO_TECHNIQUE_AT_STATION';
-  elsif v_is_perf then
-    if r.status = 'ACTIVE' then
-      v_status := 'ACCEPTED';
-    elsif r.status = 'SCHEDULED' then
-      v_status := 'REJECTED'; v_code := 'NOT_STARTED';
-    elsif r.status in ('VOID_DNS', 'NOT_REACHED') then
-      v_status := 'REJECTED'; v_code := 'ATHLETE_NOT_RACING';
-    else
-      v_status := 'REJECTED'; v_code := 'WINDOW_CLOSED';
-    end if;
+  elsif v_now < r.window_start_race_ms then
+    v_status := 'REJECTED'; v_code := 'NOT_STARTED';
+  elsif v_now < r.window_end_race_ms or (not v_is_perf and v_now < r.window_end_race_ms + 30000) then
+    v_status := 'ACCEPTED';
   else
-    if r.status in ('ACTIVE', 'SCORING') then
-      v_status := 'ACCEPTED';
-    elsif r.status = 'SCHEDULED' then
-      v_status := 'REJECTED'; v_code := 'NOT_STARTED';
-    elsif r.status in ('VOID_DNS', 'NOT_REACHED') then
-      v_status := 'REJECTED'; v_code := 'ATHLETE_NOT_RACING';
-    else
-      v_status := 'REJECTED'; v_code := 'WINDOW_CLOSED';
-    end if;
+    v_status := 'REJECTED'; v_code := 'WINDOW_CLOSED';
   end if;
 
   -- a VOID must point at an accepted, not-yet-voided action of the SAME result

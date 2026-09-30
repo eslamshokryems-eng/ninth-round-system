@@ -371,3 +371,110 @@ cancelled=$(q "select count(*) from race_heats where event_id='$EVC6' and number
 audits=$(q "select count(*) from race_audit_log where action='race.heat.cancel' and metadata->>'event_id'='$EVC6'")
 [ "$succ" = "1" ] && [ "$cancelled" = "1" ] && [ "$audits" = "1" ] || fail "concurrency: 8 simultaneous 'close heat' — successes=$succ cancelled=$cancelled audits=$audits"
 pass "concurrency: 8 simultaneous CLOSE HEAT WITHOUT START → exactly 1 closes it, 1 audit row, the others are refused"
+
+# ============================ Judge scoring: performance-event concurrency + idempotency (the REAL judge RPC) ============================
+EVJ=$(setup_engine_event concurrency-judge 3)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVJ')" >/dev/null
+rewind "$EVJ" 100000
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVJ')" >/dev/null
+RES=$(q "select sr.id from race_station_results sr join race_stations st on st.id = sr.station_id join race_registrations r on r.id = sr.registration_id where sr.event_id='$EVJ' and st.number = 1 and r.race_number = 'N001'")
+[ -n "$RES" ] || fail "judge concurrency: no station result for athlete 1 (the athlete did not start)"
+rows() { q "select count(*) from race_performance_events where station_result_id='$RES'"; }
+score() { q "select coalesce(official_score, 0) from race_station_results where id='$RES'"; }
+act() { echo "select performance_event_id, duplicate from race_record_action('$RES', '$2', '$1'::uuid)"; }
+
+# --- 12. One action delivered by 30 sessions at once (a retry storm on a single tap) ----------------------------------------------------------
+CID=$(q "select gen_random_uuid()")
+rm -f "$WORK"/c/jd*
+barrier_hold 3
+for n in $(seq 1 30); do call "jd$n" "$(act "$CID" REP)" & done
+wait; sleep 1
+errs=$(cat "$WORK"/c/jd*.err | grep -c . || true)
+fresh=$(cat "$WORK"/c/jd*.out | grep -c '|f$' || true)
+dups=$(cat "$WORK"/c/jd*.out | grep -c '|t$' || true)
+[ "$errs" = "0" ] && [ "$fresh" = "1" ] && [ "$dups" = "29" ] && [ "$(rows)" = "1" ] && [ "$(score)" = "1" ] || fail "judge concurrency: one action from 30 sessions — errors=$errs fresh=$fresh duplicates=$dups rows=$(rows) score=$(score)"
+pass "judge concurrency: ONE action delivered by 30 sessions at once → exactly 1 performance event, 29 answered as duplicates of the original, score 1, 0 errors"
+
+# --- 13. Retry storm across many actions: 10 distinct actions, each sent 4 times simultaneously ----------------------------------------------------
+IDS=(); for i in $(seq 1 10); do IDS+=("$(q "select gen_random_uuid()")"); done
+rm -f "$WORK"/c/jr*
+barrier_hold 3
+for i in $(seq 0 9); do for rep in 1 2 3 4; do call "jr${i}_$rep" "$(act "${IDS[$i]}" REP)" & done; done
+wait; sleep 1
+errs=$(cat "$WORK"/c/jr*.err | grep -c . || true)
+fresh=$(cat "$WORK"/c/jr*.out | grep -c '|f$' || true)
+[ "$errs" = "0" ] && [ "$fresh" = "10" ] && [ "$(rows)" = "11" ] && [ "$(score)" = "11" ] || fail "judge concurrency: retry storm — errors=$errs fresh=$fresh rows=$(rows) score=$(score) (want 0/10/11/11)"
+pass "judge concurrency: 10 actions × 4 simultaneous retries → exactly 10 new events (11 in total), 30 duplicates answered, score 11"
+
+# --- 14. 20 judge devices, 5 distinct actions each, all at once --------------------------------------------------------------------------------------
+rm -f "$WORK"/c/jm*
+barrier_hold 3
+for d in $(seq 1 20); do
+  sqls=""; for k in 1 2 3 4 5; do sqls="$sqls select duplicate from race_record_action('$RES', 'REP', gen_random_uuid());"; done
+  call "jm$d" "$sqls" &
+done
+wait; sleep 1
+errs=$(cat "$WORK"/c/jm*.err | grep -c . || true)
+[ "$errs" = "0" ] && [ "$(rows)" = "111" ] && [ "$(score)" = "111" ] || fail "judge concurrency: 20 devices × 5 — errors=$errs rows=$(rows) score=$(score) (want 0/111/111)"
+pass "judge concurrency: 20 devices × 5 distinct actions in parallel → 100 more events, none lost, none doubled, score exactly 111, no deadlock"
+
+# --- 15a. Voiding the same action from 8 sessions -------------------------------------------------------------------------------------------------------
+rm -f "$WORK"/c/jw*
+TARGET=$(q "select id from race_performance_events where station_result_id='$RES' and status='ACCEPTED' order by server_race_ms limit 1")
+before=$(score)
+barrier_hold 3
+for n in $(seq 1 8); do call "jw$n" "select 1 from race_record_action('$RES','VOID',gen_random_uuid(),null,'ONLINE',null,null,null,null,'$TARGET')" & done
+wait; sleep 1
+voids=$(q "select count(*) from race_performance_events where voids_event_id='$TARGET' and status='ACCEPTED'")
+[ "$voids" = "1" ] && [ "$(score)" = "$((before - 1))" ] || fail "judge concurrency: 8 simultaneous VOIDs of one action — accepted voids=$voids score=$(score) (was $before)"
+pass "judge concurrency: 8 sessions voiding the same action → exactly 1 VOID accepted (the score drops by exactly 1)"
+
+# --- 15. Actions racing the 3:00 lock: nothing is accepted at or after the window end ---------------------------------------------------------------
+rewind "$EVJ" 235300   # the barrier holds ~2.3 s, so the burst starts ~1 s before the lock and runs ~1 s past it
+base_rows=$(rows); base_acc=$(q "select count(*) from race_performance_events where station_result_id='$RES' and status='ACCEPTED'"); base_score=$(score)
+rm -f "$WORK"/c/jl*
+barrier_hold 3
+for d in $(seq 1 40); do
+  sqls=""; for k in 1 2 3 4 5 6 7 8; do sqls="$sqls select duplicate from race_record_action('$RES', 'REP', gen_random_uuid()); select pg_sleep(0.25);"; done
+  call "jl$d" "$sqls" &
+done
+wait; sleep 1
+errs=$(cat "$WORK"/c/jl*.err | grep -c . || true)
+new_rows=$(( $(rows) - base_rows ))
+acc=$(( $(q "select count(*) from race_performance_events where station_result_id='$RES' and status='ACCEPTED'") - base_acc ))
+rej=$(q "select count(*) from race_performance_events where station_result_id='$RES' and status='REJECTED' and rejection_code='WINDOW_CLOSED'")
+late=$(q "select count(*) from race_performance_events e join race_station_results sr on sr.id = e.station_result_id where e.station_result_id='$RES' and e.status='ACCEPTED' and e.server_race_ms >= sr.window_end_race_ms")
+sc=$(score)
+[ "$errs" = "0" ] && [ "$new_rows" = "320" ] && [ "$late" = "0" ] && [ "$acc" -gt 0 ] && [ "$rej" -gt 0 ] && [ "$((acc + rej))" = "320" ] && [ "$sc" = "$((base_score + acc))" ] || fail "judge concurrency: lock race — errors=$errs new-rows=$new_rows accepted=$acc rejected=$rej accepted-after-end=$late score=$sc (was $base_score)"
+pass "judge concurrency: 320 actions from 40 devices racing the 3:00 lock → $acc accepted before it, $rej rejected WINDOW_CLOSED after it, 0 accepted at/after the end, none lost, score = previous + accepted ($sc)"
+
+# --- 16. Master Control review races: one pending action, 8 reviewers ---------------------------------------------------------------------------------
+PEND=$(q "select set_config('request.jwt.claim.sub','$FOUNDER',false)::text is not null; set role authenticated; select performance_event_id from race_record_action('$RES','REP',gen_random_uuid(),null,'OFFLINE_QUEUE',clock_timestamp() - interval '5 minutes',200000,1)" | tail -1)
+[ "$(q "select status from race_performance_events where id='$PEND'")" = "PENDING_MASTER_REVIEW" ] || fail "judge concurrency: the offline replay was not held for review"
+before=$(score)
+rm -f "$WORK"/c/jv*
+barrier_hold 3
+for n in $(seq 1 8); do call "jv$n" "select (race_review_action('$PEND','APPROVED','ok $n') ->> 'score')" & done
+wait; sleep 1
+succ=$(cat "$WORK"/c/jv?.out | grep -E '^[0-9.]+$' | wc -l || true)
+reviews=$(q "select count(*) from race_action_reviews where performance_event_id='$PEND'")
+[ "$succ" = "1" ] && [ "$reviews" = "1" ] && [ "$(score)" = "$((before + 1))" ] || fail "judge concurrency: 8 simultaneous reviews — successes=$succ review-rows=$reviews score=$(score) (was $before)"
+pass "judge concurrency: 8 Master Control reviews of one pending action at once → exactly 1 decision recorded, score +1 once"
+
+# --- 18. A judge submits after a blackout: the RPC itself derives that the window is long closed ---------------------------------------------------------------
+EVK2=$(setup_engine_event concurrency-judge-blackout 2)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVK2')" >/dev/null
+rewind "$EVK2" 100000
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVK2')" >/dev/null
+RES2=$(q "select sr.id from race_station_results sr join race_stations st on st.id = sr.station_id join race_registrations r on r.id = sr.registration_id where sr.event_id='$EVK2' and st.number = 1 and r.race_number = 'N001'")
+rewind "$EVK2" 2400000     # 40 minutes pass; nobody ticks, nobody looks
+rm -f "$WORK"/c/jb*
+barrier_hold 3
+for n in $(seq 1 12); do call "jb$n" "select status from race_record_action('$RES2','REP',gen_random_uuid())" & done
+wait; sleep 1
+acc=$(q "select count(*) from race_performance_events where station_result_id='$RES2' and status='ACCEPTED'")
+rej=$(q "select count(*) from race_performance_events where station_result_id='$RES2' and rejection_code='WINDOW_CLOSED'")
+st=$(q "select status from race_station_results where id='$RES2'")
+[ "$acc" = "0" ] && [ "$rej" = "12" ] && [ "$st" = "LOCKED" ] || fail "judge concurrency: blackout — accepted=$acc rejected=$rej result=$st"
+pass "judge concurrency: 40 minutes with no device ticking, then 12 judge submissions → all 12 REJECTED (WINDOW_CLOSED, kept in the ledger), result LOCKED — the RPC derived the state itself"
+q "select race_sim.check_invariants('$EVJ', race_now_ms('$EVJ'))" >/dev/null && pass "judge concurrency: timing invariants hold after the scoring storms"

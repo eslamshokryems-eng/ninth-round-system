@@ -88,6 +88,36 @@ export interface RaceDnsOverrideRow {
   slot_index: number | null;
 }
 export interface RaceCloseHeatRow { heat_number: number; athletes_dns: number; slots_emptied: number; next_heat_anchored: number | null }
+export type RaceActionType =
+  | "REP" | "NO_REP" | "LAP" | "PENALTY" | "HOLD_START" | "HOLD_BREAK" | "HOLD_RESUME" | "TECHNIQUE_SCORE" | "VOID";
+export type RaceActionStatus = "ACCEPTED" | "REJECTED" | "PENDING_MASTER_REVIEW";
+export interface RaceRecordActionRow {
+  performance_event_id: string;
+  status: RaceActionStatus;
+  rejection_code: string | null;
+  server_race_ms: number;
+  duplicate: boolean;
+  tally: Record<string, unknown>;
+}
+export interface RaceStationViewJson {
+  server_time: string;
+  station: { number: number; name: string; has_technique: boolean };
+  clock: { started: boolean; paused: boolean; finished: boolean; race_ms: number | null; version: number };
+  current: {
+    result_id: string;
+    race_number: string;
+    full_name: string;
+    category_code: string;
+    movement: string | null;
+    state: "WORK" | "TRANSITION";
+    window_start_ms: number;
+    window_end_ms: number;
+    scoring_end_ms: number;
+    remaining_ms: number;
+    tally: Record<string, unknown>;
+  } | null;
+  next: { race_number: string; full_name: string; starts_in_ms: number } | null;
+}
 export interface RaceMoveRow { heat_number: number; queue_position: number; slot_index: number | null }
 
 /** JSON returned by race_control_state (Master Control dashboard). */
@@ -254,6 +284,29 @@ export interface RaceDatabase {
       race_check_in: {
         Args: { p_registration_id: string };
         Returns: RaceCheckInRow[];
+      };
+      race_record_action: {
+        Args: {
+          p_station_result_id: string;
+          p_type: RaceActionType;
+          p_client_event_id: string;
+          p_value?: number | null;
+          p_origin?: "ONLINE" | "OFFLINE_QUEUE";
+          p_device_recorded_at?: string | null;
+          p_device_race_ms?: number | null;
+          p_device_seq?: number | null;
+          p_device_id?: string | null;
+          p_voids_event_id?: string | null;
+        };
+        Returns: RaceRecordActionRow[];
+      };
+      race_review_action: {
+        Args: { p_performance_event_id: string; p_decision: "APPROVED" | "REJECTED"; p_reason: string };
+        Returns: Record<string, unknown>;
+      };
+      race_station_view: {
+        Args: { p_event_id: string; p_station_number: number };
+        Returns: RaceStationViewJson;
       };
       race_close_heat_without_start: {
         Args: { p_event_id: string; p_heat_number: number; p_reason: string };

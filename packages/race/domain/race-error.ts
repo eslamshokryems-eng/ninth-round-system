@@ -59,6 +59,15 @@ const MESSAGES: Record<string, string> = {
   RACE_ATHLETE_HAS_SLOT: "That athlete already holds a start slot and cannot be moved.",
   RACE_MOVE_NOT_LATER: "An athlete can only be moved to a LATER heat.",
   RACE_MOVE_NOT_ELIGIBLE: "That athlete cannot be moved (already racing or finished).",
+  RACE_CLIENT_EVENT_REQUIRED: "Every action needs its own id.",
+  RACE_IDEMPOTENCY_CONFLICT: "That action id was already used for something else.",
+  RACE_ACTION_NOT_SUPPORTED: "That action is not scored here.",
+  RACE_INVALID_VALUE: "That value is not allowed.",
+  RACE_OFFLINE_METADATA_REQUIRED: "A replayed action must carry its device time and sequence number.",
+  RACE_VOID_TARGET_INVALID: "That action cannot be undone (unknown, from another athlete, or already undone).",
+  RACE_DEVICE_SEQ_CONFLICT: "That device sequence number was already used.",
+  RACE_NOT_PENDING: "Only an action waiting for review can be decided.",
+  RACE_ALREADY_REVIEWED: "This action already has a decision.",
   RACE_TIE_GROUP_CHANGED: "A tie group changed unexpectedly — tell the Event Manager.",
 };
 

@@ -1,6 +1,7 @@
 -- "No duplicate performance events". The judge ledger is idempotent BY CONSTRUCTION: every action carries a client-generated
 -- idempotency key (client_event_id, unique) and a per-device sequence number (unique per device), and the ledger is append-only.
--- (The judge RPC that writes it arrives with the judging phase; these are the guarantees it will stand on.)
+-- These are the table-level guarantees; the REAL judge RPC (race_record_action) is tested on top of them in 21_judge_scoring.sql and
+-- against parallel sessions in concurrency.sh (30 sessions / one action → 1 row; retry storms; the 3:00 lock race).
 reset role;
 select race_test.throws($$insert into race_performance_events (event_id, station_id, station_result_id, type, client_event_id, origin, server_race_ms, judge_profile_id, status)
                           select event_id, station_id, station_result_id, type, client_event_id, origin, server_race_ms + 500, judge_profile_id, status

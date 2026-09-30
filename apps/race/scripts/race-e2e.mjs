@@ -79,6 +79,16 @@ const controlState = () => {
   };
 };
 
+// ---- Judge mock: a station with one athlete; the server side is idempotent by client id, like the real RPC ---------------------------------------------
+const jd = { events: new Map(), mode: "ok", late: false, refuse: false };
+const jdTally = () => ({ reps: [...jd.events.values()].filter((e) => e.type === "REP" && e.status === "ACCEPTED" && !e.voided).length, no_reps: 0, scoring_type: "REPS", score: 0, technique: null, pending_review: 0 });
+const stationView = () => ({
+  server_time: new Date().toISOString(), station: { number: 1, name: "Squat", has_technique: false },
+  clock: { started: true, paused: false, finished: false, race_ms: 100000, version: 1 },
+  current: { result_id: "res-1", race_number: "N001", full_name: "Judge Test Athlete", category_code: "MEN", movement: "Barbell Squat", state: "WORK", window_start_ms: 60000, window_end_ms: 240000, scoring_end_ms: 270000, remaining_ms: 140000, tally: jdTally() },
+  next: null,
+});
+
 async function installMock(context) {
   context.on("request", (r) => seenUrls.push(r.url()));
   await context.route(`${SB}/**`, async (route) => {
@@ -113,6 +123,21 @@ async function installMock(context) {
           await new Promise((r) => setTimeout(r, 350));
           if (body.p_registration_id === "r28") return json(400, { code: "P0001", message: "RACE_NOT_CONFIRMED: payment must be confirmed before check-in", details: null, hint: null });
           return json(200, { check_in_id: "c1", checked_in_at: "2026-11-20T06:00:00Z", kind: body.p_registration_id === "late1" ? "LATE" : "ON_TIME", queue_position: 4, heat_number: 2, already_checked_in: body.p_registration_id === "r30" });
+        }
+        case "race_station_view": return json(200, stationView());
+        case "race_record_action": {
+          if (jd.refuse) return json(403, { code: "42501", message: "RACE_FORBIDDEN: only the judge of this station can score it", details: null, hint: null });
+          const known = jd.events.get(body.p_client_event_id);
+          if (jd.mode === "drop") return route.abort("connectionfailed");            // the request never reached the server
+          let row;
+          if (known) row = { ...known, duplicate: true };
+          else {
+            const rejected = jd.late;
+            row = { performance_event_id: "pe-" + (jd.events.size + 1), status: rejected ? "REJECTED" : "ACCEPTED", rejection_code: rejected ? "WINDOW_CLOSED" : null, server_race_ms: 100000, duplicate: false, type: body.p_type, client: body.p_client_event_id, origin: body.p_origin };
+            jd.events.set(body.p_client_event_id, row);
+          }
+          if (jd.mode === "lose-response") return route.abort("connectionreset");     // the server recorded it, the answer was lost
+          return json(200, { ...row, tally: jdTally() });
         }
         case "race_control_state":
           if (ctl.forbidden) return json(403, { code: "42501", message: "RACE_FORBIDDEN", details: null, hint: null });
@@ -605,6 +630,95 @@ const main = async () => {
     assert.equal(await p.getByRole("button", { name: "START EVENT" }).count(), 0, "no control buttons without a snapshot");
     await p.close();
     ctl.forbidden = false;
+  });
+
+
+  // ---------- Judge ----------
+  const jp = await recCtx.newPage();
+  await seedSession(jp);
+  jp.on("pageerror", (e) => errors.push(`pageerror(judge): ${e.message}`));
+  const tally = () => jp.locator("[data-testid=tally]").innerText();
+  const recCalls = () => callsOf("race_record_action");
+  const until = async (cond, what) => { for (let i = 0; i < 100 && !cond(); i++) await new Promise((r) => setTimeout(r, 100)); assert.ok(cond(), what); };
+
+  await step("judge: the console shows the athlete, the movement, the time left and the live tally", async () => {
+    await jp.goto(`${BASE}/race/judge/locked-2026/1`); await jp.waitForSelector("[data-testid=athlete]");
+    const t = await jp.locator("[data-testid=athlete]").innerText();
+    assert.match(t, /N001/); assert.match(t, /judge test athlete/i); assert.match(t, /Barbell Squat/);
+    assert.match(await jp.locator("[data-testid=countdown]").innerText(), /2:[0-9]{2}/);
+    assert.equal((await tally()).trim(), "0");
+    await jp.screenshot({ path: `${shots}/16-judge.png`, fullPage: true });
+  });
+
+  await step("judge: every tap has its OWN client id, sends only the athlete/action — never a time or a score", async () => {
+    const before = recCalls().length;
+    await jp.getByRole("button", { name: "+ REP" }).click(); await jp.waitForFunction(() => document.querySelector("[data-testid=tally]").textContent.trim() === "1");
+    await jp.getByRole("button", { name: "+ REP" }).click(); await jp.waitForFunction(() => document.querySelector("[data-testid=tally]").textContent.trim() === "2");
+    const sent = recCalls().slice(before);
+    assert.equal(sent.length, 2);
+    assert.notEqual(sent[0].body.p_client_event_id, sent[1].body.p_client_event_id);
+    assert.match(sent[0].body.p_client_event_id, /^[0-9a-f-]{36}$/);
+    assert.deepEqual(Object.keys(sent[0].body).sort(), ["p_client_event_id", "p_device_race_ms", "p_device_recorded_at", "p_device_seq", "p_origin", "p_station_result_id", "p_type", "p_value", "p_voids_event_id", "p_device_id"].filter((k) => k in sent[0].body).sort());
+    for (const k of ["server_race_ms", "score", "p_score", "p_server_race_ms"]) assert.ok(!(k in sent[0].body), `no ${k} is ever sent`);
+    assert.equal(sent[0].body.p_origin, "ONLINE");
+    assert.equal(sent[0].body.p_station_result_id, "res-1");
+  });
+
+  await step("judge: a tap while OFFLINE is saved, shown as waiting, and sent once — as OFFLINE_QUEUE with the SAME id — when the connection returns", async () => {
+    jd.mode = "drop";
+    const before = recCalls().length;
+    await jp.getByRole("button", { name: "+ REP" }).click();
+    await jp.waitForSelector("text=1 waiting to send");
+    await until(() => recCalls().length > before, "the first attempt reached the network layer");
+    const firstTry = recCalls().slice(before)[0].body;
+    jd.mode = "ok";
+    await jp.waitForSelector("text=All sent", { timeout: 15000 });
+    const attempts = recCalls().slice(before).filter((c) => c.body.p_client_event_id === firstTry.p_client_event_id);
+    assert.ok(attempts.length >= 2, "it was retried");
+    assert.equal(attempts.at(-1).body.p_origin, "OFFLINE_QUEUE");
+    assert.ok(attempts.at(-1).body.p_device_recorded_at && attempts.at(-1).body.p_device_seq >= 1, "a replay carries its device time and sequence number");
+    assert.equal(jd.events.size, 3, "the server holds exactly 3 events");
+    assert.equal((await tally()).trim(), "3");
+  });
+
+  await step("judge: a LOST RESPONSE (server recorded it, the answer never arrived) is retried with the same id and counted ONCE", async () => {
+    jd.mode = "lose-response";
+    await jp.getByRole("button", { name: "+ REP" }).click();
+    await jp.waitForSelector("text=1 waiting to send");
+    for (let i = 0; i < 50 && jd.events.size < 4; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(jd.events.size, 4, "the server already recorded it");
+    jd.mode = "ok";
+    await jp.waitForSelector("text=All sent", { timeout: 15000 });
+    assert.equal(jd.events.size, 4, "the retry created NO second event");
+    assert.equal((await tally()).trim(), "4");
+  });
+
+  await step("judge: a reload with unsent taps loses nothing (the outbox lives on the device)", async () => {
+    jd.mode = "drop";
+    await jp.getByRole("button", { name: "+ REP" }).click();
+    await jp.waitForSelector("text=1 waiting to send");
+    await jp.reload(); await jp.waitForSelector("[data-testid=athlete]"); await jp.waitForSelector("text=1 waiting to send");
+    jd.mode = "ok";
+    await jp.waitForSelector("text=All sent", { timeout: 15000 });
+    assert.equal(jd.events.size, 5);
+  });
+
+  await step("judge: an action that arrived after the lock is shown as NOT counted", async () => {
+    jd.late = true;
+    await jp.getByRole("button", { name: "+ REP" }).click();
+    await jp.waitForSelector("text=NOT counted");
+    jd.late = false;
+    assert.equal((await tally()).trim(), "5", "the rejected rep is not in the tally");
+  });
+
+  await step("judge: a refusal (not your station) is parked with its reason and never retried", async () => {
+    jd.refuse = true;
+    const before = recCalls().length;
+    await jp.getByRole("button", { name: "+ REP" }).click();
+    await jp.waitForSelector("text=Refused (not retried)");
+    await jp.waitForTimeout(3500);
+    assert.equal(recCalls().length - before, 1, "sent once, not retried");
+    jd.refuse = false;
   });
 
   // ---------- independence from the gym system ----------
