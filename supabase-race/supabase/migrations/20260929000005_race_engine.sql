@@ -331,6 +331,7 @@ begin
   loop
     perform public.race_audit('race.station.lock', p_event_id, 'race_station_results', r.id, null,
       jsonb_build_object('registration_id', r.registration_id), '{}'::jsonb);
+    perform public.race_recompute_result(r.id);   -- the final, derived score at the moment of the lock
     n_locked := n_locked + 1;
   end loop;
 
