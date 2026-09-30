@@ -47,10 +47,18 @@ begin
    where has_function_privilege('anon', f, 'EXECUTE') or has_function_privilege('authenticated', f, 'EXECUTE');
   if bad is not null then raise exception 'VERIFY FAIL: internal functions callable by API roles: %', bad; end if;
   select string_agg(f, ', ') into bad from unnest(array['race_start_event(uuid)', 'race_pause(uuid,text)', 'race_resume(uuid)', 'race_skip_athlete(uuid,text)', 'race_mark_dnf(uuid,text)',
-      'race_close_heat_without_start(uuid,integer,text)', 'race_correct_check_in(uuid,uuid,text)', 'race_override_dns(uuid,text)', 'race_control_state(uuid)', 'race_record_action(uuid,race_action_type,uuid,numeric,race_action_origin,timestamptz,bigint,bigint,uuid,uuid)', 'race_review_action(uuid,text,text)', 'race_station_view(uuid,integer)', 'race_set_account_flags(uuid,boolean,boolean,boolean)']) f
+      'race_close_heat_without_start(uuid,integer,text)', 'race_correct_check_in(uuid,uuid,text)', 'race_override_dns(uuid,text)', 'race_control_state(uuid)', 'race_record_action(uuid,race_action_type,uuid,numeric,race_action_origin,timestamptz,bigint,bigint,uuid,uuid)', 'race_review_action(uuid,text,text)', 'race_station_view(uuid,integer)', 'race_station_screen(uuid,integer)', 'race_set_account_flags(uuid,boolean,boolean,boolean)']) f
    where has_function_privilege('anon', f, 'EXECUTE');
   if bad is not null then raise exception 'VERIFY FAIL: control functions callable by anon: %', bad; end if;
   raise notice 'OK  functions pin search_path; engine internals and control RPCs are closed to anonymous callers';
+  -- 4b. the station screen: realtime nudges reach it, and the screen role can read no personal data directly
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'race_clock') then
+    raise exception 'VERIFY FAIL: race_clock is not in the supabase_realtime publication (screens would only poll)';
+  end if;
+  if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename in ('race_registrations', 'race_performance_events', 'race_profiles', 'race_staff', 'race_audit_log')) then
+    raise exception 'VERIFY FAIL: a personal-data/ledger table is published to realtime';
+  end if;
+  raise notice 'OK  race_clock is published to realtime for nudges; no personal-data or ledger table is';
 
   -- 6. storage
   select count(*) into n from storage.buckets where id in ('race-evidence', 'race-athlete-photos', 'race-documents') and not public;

@@ -89,6 +89,29 @@ const stationView = () => ({
   next: null,
 });
 
+
+// ---- Station screen mock: the SAME world as the unit tests, computed from a controllable race clock ----------------------------------
+//   N001 starts 1:00, N002 4:30, (N003 skipped), N004 11:30 and withdraws (DNF) at 12:30, slot 5 empty.  3:00 work + 0:30 transition.
+const sc = { started: true, paused: false, finished: false, baseMs: 0, baseAt: Date.now(), mode: "ok", score: (sinceStart) => Math.floor(sinceStart / 10000) };
+const scRace = () => (sc.paused ? sc.baseMs : sc.baseMs + (Date.now() - sc.baseAt));
+const scSet = (ms) => { sc.baseMs = ms; sc.baseAt = Date.now(); sc.paused = false; };
+const scSlots = [["N001", 60000, null], ["N002", 270000, null], ["N004", 690000, 750000]];
+const screenData = (n) => {
+  const t = scRace();
+  const live = scSlots.filter(([, , dnf]) => !(dnf !== null && t >= dnf));
+  const cur = live.find(([, st]) => st <= t && t < st + 210000);
+  const up = scSlots.find(([, st]) => st > t && st - 60000 <= t);
+  const planned = [60000, 270000, 480000, 690000, 900000].find((st) => st > t && !(up && up[1] === st)) ?? null;
+  return {
+    server_time: new Date().toISOString(), event: { name: "THE NINTH" }, station: { number: n, name: n === 1 ? "Squat" : "Station 0" + n, is_last: n === 9 },
+    clock: { started: sc.started, paused: sc.paused, finished: sc.finished, race_ms: sc.started ? t : null, version: 1 },
+    timing: { work_ms: 180000, transition_ms: 30000, get_ready_ms: 10000 },
+    current: cur ? { race_number: cur[0], category_code: "MEN", window_start_ms: cur[1], window_end_ms: cur[1] + 180000, scoring_end_ms: cur[1] + 210000, scoring_type: "REPS", score: sc.score(Math.min(t, cur[1] + 180000) - cur[1]) } : null,
+    upcoming: up ? { race_number: up[0], category_code: "MEN", window_start_ms: up[1] } : null,
+    planned_next_ms: planned, served_any: scSlots.some(([, st]) => st + 210000 <= t),
+  };
+};
+
 async function installMock(context) {
   context.on("request", (r) => seenUrls.push(r.url()));
   await context.route(`${SB}/**`, async (route) => {
@@ -125,6 +148,9 @@ async function installMock(context) {
           return json(200, { check_in_id: "c1", checked_in_at: "2026-11-20T06:00:00Z", kind: body.p_registration_id === "late1" ? "LATE" : "ON_TIME", queue_position: 4, heat_number: 2, already_checked_in: body.p_registration_id === "r30" });
         }
         case "race_station_view": return json(200, stationView());
+        case "race_station_screen":
+          if (sc.mode === "drop") return route.abort("connectionfailed");
+          return json(200, screenData(body.p_station_number));
         case "race_record_action": {
           if (jd.refuse) return json(403, { code: "42501", message: "RACE_FORBIDDEN: only the judge of this station can score it", details: null, hint: null });
           const known = jd.events.get(body.p_client_event_id);
@@ -719,6 +745,176 @@ const main = async () => {
     await jp.waitForTimeout(3500);
     assert.equal(recCalls().length - before, 1, "sent once, not retried");
     jd.refuse = false;
+  });
+
+
+  // ---------- Station screen (display-only, 1080 x 1920) ----------
+  const tv = await browser.newContext({ viewport: { width: 1080, height: 1920 } });
+  await installMock(tv);
+  for (const pg of recCtx.pages()) await pg.close();                      // only the screen talks to the mock from here on
+  const sp = await tv.newPage();
+  await seedSession(sp);
+  sp.on("pageerror", (e) => errors.push(`pageerror(screen): ${e.message}`));
+  const scState = () => sp.locator("[data-testid=screen-state]").getAttribute("data-state").catch(() => null);
+  // nothing may be clipped: the state's content must fit inside the 1920px stage and its own box
+  const scFits = async (state) => { const r = await sp.locator("[data-testid=screen-state]").evaluate((e) => { const b = e.getBoundingClientRect(); const kids = [...e.querySelectorAll("*")].filter((k) => k.children.length === 0 && k.textContent.trim()); return { over: e.scrollHeight - e.clientHeight, low: Math.max(0, ...kids.map((k) => k.getBoundingClientRect().bottom - b.bottom)), wide: Math.max(0, ...kids.map((k) => { const r = k.getBoundingClientRect(); return Math.max(b.left - r.left, r.right - b.right); })), n: kids.length }; }); assert.ok(r.over <= 1 && r.low <= 1 && r.wide <= 1, `${state} overflows its stage by ${r.over}/${r.low}/${r.wide}px`); };
+  const scText = () => sp.locator("[data-testid=screen-stage]").innerText();
+  const scUntil = async (state, what) => { let last = null; for (let i = 0; i < 60; i++) { last = await scState(); if (last === state) { await scFits(state); return; } await new Promise((r) => setTimeout(r, 100)); } assert.fail(`${what}: expected ${state}, screen shows ${last}`); };
+  const screenCalls = () => calls.slice(scCallsFrom).map((c) => c.fn);
+  let scCallsFrom = 0;
+
+  await step("screen: portrait 1080x1920 stage, black/red/white, and NO controls of any kind", async () => {
+    scSet(0);
+    scCallsFrom = calls.length;
+    await sp.goto(`${BASE}/race/station/locked-2026/1`);
+    await scUntil("WAITING", "before the first athlete");
+    const box = await sp.locator("[data-testid=screen-stage]").boundingBox();
+    assert.equal(Math.round(box.width), 1080); assert.equal(Math.round(box.height), 1920);
+    assert.ok(Math.abs(box.width / box.height - 9 / 16) < 0.001, "9:16");
+    assert.equal(await sp.locator("button, input, select, textarea, a, [role=button]").count(), 0, "no buttons, inputs or links on a signed-in screen");
+    const bg = await sp.locator("[data-testid=screen-stage]").evaluate((e) => getComputedStyle(e).backgroundColor);
+    assert.equal(bg, "rgb(5, 5, 5)");
+    const t = await scText();
+    assert.match(t, /STATION 01/); assert.match(t, /SQUAT/);
+    // very large type: the countdown is at least 200px tall on the 1920px stage
+    const fs = await sp.locator("[data-testid=screen-countdown]").evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    assert.ok(fs >= 200, `countdown font ${fs}px`);
+  });
+
+  await step("screen WAITING: station number + name, athlete not yet announced -> countdown to the next athlete", async () => {
+    scSet(20000);
+    await scUntil("WAITING", "waiting"); await new Promise((r) => setTimeout(r, 1200));
+    assert.match(await scText(), /N001/); assert.match(await scText(), /WAITING/); assert.match(await sp.locator("[data-testid=screen-countdown]").innerText(), /^(39|40)$/);
+    await sp.screenshot({ path: `${shots}/17-screen-waiting.png` });
+  });
+
+  await step("screen GET READY: athlete code, GET READY, 10-second countdown", async () => {
+    scSet(50500);
+    await scUntil("GET_READY", "get ready");
+    const t = await scText(); assert.match(t, /N001/); assert.match(t, /GET READY/);
+    assert.match(await sp.locator("[data-testid=screen-countdown]").innerText(), /^(9|10)$/);
+    await sp.screenshot({ path: `${shots}/18-screen-get-ready.png` });
+  });
+
+  await step("screen WORK: athlete code, station name, big remaining time, live score, clear WORK state", async () => {
+    scSet(100000);
+    await scUntil("WORK", "work");
+    const t = await scText(); assert.match(t, /N001/); assert.match(t, /SQUAT/); assert.match(t, /WORK/);
+    assert.match(await sp.locator("[data-testid=screen-countdown]").innerText(), /^2:(0[0-9]|[1-5][0-9])$/);
+    assert.equal((await sp.locator("[data-testid=screen-score]").innerText()).trim(), "4", "score derived server-side (4 tens of seconds)");
+    await sp.screenshot({ path: `${shots}/19-screen-work.png` });
+  });
+
+  await step("screen TRANSITION: TIME, final score, MOVE TO STATION 02, 30-second countdown", async () => {
+    scSet(240500);
+    await scUntil("TRANSITION", "transition");
+    const t = await scText(); assert.match(t, /TIME/); assert.match(t, /MOVE TO STATION 02/);
+    assert.equal((await sp.locator("[data-testid=screen-score]").innerText()).trim(), "18", "the final score is frozen at 3:00");
+    assert.match(await sp.locator("[data-testid=screen-countdown]").innerText(), /^(29|30)$/);
+    assert.match(await sp.locator("[data-testid=screen-strip]").innerText(), /NEXT\s+N002/i, "the incoming athlete is shown on the strip");
+    await sp.screenshot({ path: `${shots}/20-screen-transition.png` });
+  });
+
+  await step("screen NEXT ATHLETE: a skipped athlete leaves an empty slot; the screen shows the honest gap, then the next athlete", async () => {
+    scSet(560000);                        // N002 done at 7:30; slot 3 (N003) skipped; N004 not yet announced
+    await scUntil("NEXT_ATHLETE", "gap after the skipped athlete");
+    assert.match(await scText(), /NEXT ATHLETE/); assert.doesNotMatch(await scText(), /N003/, "the skipped athlete is never shown");
+    scSet(645000);
+    await new Promise((r) => setTimeout(r, 1200));
+    assert.match(await scText(), /N004/);
+    await sp.screenshot({ path: `${shots}/21-screen-next-athlete.png` });
+  });
+
+  await step("screen DNF: a withdrawn athlete disappears; EMPTY SLOT: nothing is shown for it", async () => {
+    scSet(740000); await scUntil("WORK", "N004 working");
+    scSet(760000); await scUntil("NEXT_ATHLETE", "N004 withdrawn"); assert.doesNotMatch(await scText(), /N004/);
+    scSet(1000000); await new Promise((r) => setTimeout(r, 1200));
+    assert.match(await scText(), /STATION FREE/);
+  });
+
+  await step("screen PAUSED: RACE PAUSED / PLEASE WAIT FOR OFFICIAL, and RESUME continues from the frozen moment", async () => {
+    scSet(100000); await scUntil("WORK", "work");
+    sc.baseMs = 100000; sc.paused = true;
+    await scUntil("PAUSED", "paused");
+    const t = await scText(); assert.match(t, /RACE\s+PAUSED/); assert.match(t, /PLEASE WAIT FOR OFFICIAL/);
+    await sp.screenshot({ path: `${shots}/22-screen-paused.png` });
+    await new Promise((r) => setTimeout(r, 2500));                       // pause for 2.5 s of real time
+    scSet(100000);                                                        // resume: race time continues from the frozen moment
+    await scUntil("WORK", "resumed");
+    const left = await sp.locator("[data-testid=screen-countdown]").innerText();
+    assert.match(left, /^2:(1[5-9]|20)$/, `no time added by the pause: ${left}`);
+  });
+
+  await step("screen RECONNECT during WORK: 30 s offline -> the correct remaining time at once, nothing restarted, score kept", async () => {
+    scSet(100000); await scUntil("WORK", "work");
+    const before = calls.length;
+    sc.mode = "drop";
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.equal(await scState(), "WORK", "keeps counting locally while offline (display only)");
+    sc.baseMs += 30000;                                                   // the race carried on for 30 s without the screen
+    sc.mode = "ok";
+    await scUntil("WORK", "reconnected");
+    await new Promise((r) => setTimeout(r, 1200));
+    const left = await sp.locator("[data-testid=screen-countdown]").innerText();
+    assert.match(left, /^1:(0[0-9]|[1-5][0-9])$/, `race time ~130-133 s -> about 1:45 left, got ${left}`);
+    assert.ok(parseInt(left.split(":")[1], 10) >= 40 && parseInt(left.split(":")[1], 10) <= 50, `remaining ${left}`);
+    assert.ok(parseInt(await sp.locator("[data-testid=screen-score]").innerText(), 10) >= 7, "score not lost (71 s into the window = 7)");
+    const fns = calls.slice(before).map((c) => c.fn); assert.deepEqual([...new Set(fns)], ["race_station_screen"], "reconnecting only READS");
+  });
+
+  await step("screen RECONNECT across the 3:00 boundary: WORK -> TRANSITION with the right countdown", async () => {
+    scSet(235000); await scUntil("WORK", "work");
+    sc.mode = "drop"; await new Promise((r) => setTimeout(r, 1000));
+    sc.baseMs += 20000; sc.mode = "ok";                                   // offline across 4:00, back at ~4:16
+    await scUntil("TRANSITION", "boundary crossed while offline");
+    const left = parseInt(await sp.locator("[data-testid=screen-countdown]").innerText(), 10);
+    assert.ok(left >= 12 && left <= 16, `remaining ${left}`);
+    assert.equal((await sp.locator("[data-testid=screen-score]").innerText()).trim(), "18", "final score = the score at 3:00, not at reconnect time");
+  });
+
+  await step("screen RECONNECT during TRANSITION and during PAUSE", async () => {
+    scSet(250000); await scUntil("TRANSITION", "transition");
+    sc.mode = "drop"; await new Promise((r) => setTimeout(r, 800)); sc.baseMs += 10000; sc.mode = "ok";
+    await new Promise((r) => setTimeout(r, 1300));
+    assert.notEqual(await scState(), "WORK");
+    scSet(100000); await scUntil("WORK", "work");
+    sc.mode = "drop"; await new Promise((r) => setTimeout(r, 800));
+    sc.baseMs = scRace(); sc.paused = true; sc.mode = "ok";              // paused while the screen was offline
+    await scUntil("PAUSED", "pause discovered on reconnect");
+    sc.paused = false; sc.baseAt = Date.now(); sc.mode = "ok";
+  });
+
+  await step("screen shows a RECONNECTING banner only after ~10 s without an answer, and it clears on reconnect", async () => {
+    scSet(100000); await scUntil("WORK", "work");
+    assert.equal(await sp.locator("[data-testid=screen-lost]").count(), 0);
+    sc.mode = "drop"; await new Promise((r) => setTimeout(r, 11500));
+    assert.equal(await sp.locator("[data-testid=screen-lost]").count(), 1, "banner after 10 s");
+    await sp.screenshot({ path: `${shots}/23-screen-reconnecting.png` });
+    sc.mode = "ok"; await new Promise((r) => setTimeout(r, 1500));
+    assert.equal(await sp.locator("[data-testid=screen-lost]").count(), 0, "cleared");
+  });
+
+  await step("screen SECURITY: it only reads (event lookup + race_station_screen) — no score, pause, skip or edit call exists", async () => {
+    const fns = [...new Set(screenCalls())].sort();
+    assert.deepEqual(fns, ["race_get_public_event", "race_station_screen"]);
+  });
+
+  await step("screen signed out: only a sign-in prompt, no race data", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1080, height: 1920 } }); await installMock(ctx);
+    const p = await ctx.newPage(); await p.goto(`${BASE}/race/station/locked-2026/1`);
+    await p.waitForSelector("text=SIGN IN THIS SCREEN");
+    assert.equal(await p.locator("[data-testid=screen-state]").count(), 0);
+    await ctx.close();
+  });
+
+  await step("screen scales the 1080x1920 stage to a smaller portrait TV without distortion", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 540, height: 960 } }); await installMock(ctx);
+    const p = await ctx.newPage(); await seedSession(p); scSet(100000);
+    await p.goto(`${BASE}/race/station/locked-2026/3`); await p.waitForSelector("[data-testid=screen-state]");
+    const box = await p.locator("[data-testid=screen-stage]").boundingBox();
+    assert.equal(Math.round(box.width), 540); assert.equal(Math.round(box.height), 960);
+    assert.match(await p.locator("[data-testid=screen-station-name]").innerText(), /STATION 03/i);
+    await ctx.close();
   });
 
   // ---------- independence from the gym system ----------

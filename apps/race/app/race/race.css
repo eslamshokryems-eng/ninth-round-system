@@ -202,3 +202,57 @@
 .race-table tr:hover td {
   background: rgba(255, 255, 255, 0.03);
 }
+
+/* ── Station screen: 1080 × 1920 portrait stage, display-only ─────────────────────────────────────────────── */
+.screen-viewport { position: fixed; inset: 0; overflow: hidden; background: #000; }
+.screen-stage {
+  position: absolute; left: 50%; top: 50%; transform-origin: center center; overflow: hidden;
+  background: #050505; color: #fff; font-family: var(--race-display); text-transform: uppercase;
+  display: flex; flex-direction: column; user-select: none; cursor: none;
+}
+.screen-stripe { height: 28px; flex: none; background: repeating-linear-gradient(-45deg, var(--race-red) 0 40px, #050505 40px 80px); }
+.screen-head { flex: none; padding: 40px 64px 28px; text-align: center; }
+.screen-brand { font-weight: 800; font-size: 64px; letter-spacing: 0.06em; }
+.screen-brand span { color: var(--race-red-hot); }
+.screen-station-no { font-weight: 800; font-size: 130px; line-height: 1; margin-top: 4px; }
+.screen-station-name { font-weight: 700; font-size: 84px; line-height: 1; color: var(--race-red-hot); margin-top: 8px; letter-spacing: 0.04em; }
+.screen-body { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 48px 56px; gap: 8px; }
+.screen-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 40px; padding: 48px; }
+.screen-tag { font-weight: 800; font-size: 96px; letter-spacing: 0.08em; padding: 4px 48px; border: 6px solid #fff; }
+.screen-tag-red { background: var(--race-red); border-color: var(--race-red); }
+.screen-label { font-weight: 700; font-size: 60px; letter-spacing: 0.1em; color: #b8b8b8; margin-top: 12px; }
+.screen-code-wrap { display: flex; flex-direction: column; align-items: center; }
+.screen-code { font-weight: 800; font-size: 240px; line-height: 1; letter-spacing: 0.02em; }
+.screen-cat { font-weight: 700; font-size: 56px; color: var(--race-red-hot); letter-spacing: 0.12em; }
+.screen-count { font-weight: 800; font-size: 260px; line-height: 1; font-variant-numeric: tabular-nums; }
+.screen-count-xl { font-size: 440px; }
+.screen-score { font-weight: 800; font-size: 420px; line-height: 0.95; color: var(--race-red-hot); font-variant-numeric: tabular-nums; }
+.screen-time-up { font-weight: 800; font-size: 300px; line-height: 1; background: var(--race-red); padding: 0 80px; }
+.screen-move { font-weight: 800; font-size: 96px; line-height: 1.05; margin-top: 16px; }
+.screen-strip { margin-top: 24px; font-weight: 700; font-size: 60px; letter-spacing: 0.08em; padding: 12px 36px; border: 4px solid rgba(255,255,255,.35); color: #ddd; }
+.screen-strip b { color: #fff; font-size: 72px; }
+.screen-strip-empty { border-color: transparent; }
+.screen-paused { display: flex; flex-direction: column; align-items: center; gap: 56px; }
+.screen-huge { font-weight: 800; font-size: 230px; line-height: 0.95; color: #fff; }
+.screen-sub { font-weight: 800; font-size: 62px; letter-spacing: 0.06em; color: var(--race-red-hot); }
+.screen-lost { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; background: var(--race-red); font-weight: 800; font-size: 64px; padding: 14px; letter-spacing: 0.1em; }
+.screen-signin { font-weight: 800; font-size: 64px; background: var(--race-red); padding: 20px 48px; color: #fff; text-decoration: none; cursor: pointer; }
+
+/* per-state sizing so every state fits the 1920px stage with the largest type its content allows */
+.screen-body[data-state="WORK"] .screen-tag { font-size: 80px; }
+.screen-body[data-state="WORK"] .screen-code { font-size: 200px; }
+.screen-body[data-state="WORK"] .screen-cat { font-size: 48px; }
+.screen-body[data-state="WORK"] .screen-count { font-size: 340px; }
+.screen-body[data-state="WORK"] .screen-label { font-size: 48px; margin-top: 0; }
+.screen-body[data-state="WORK"] .screen-score { font-size: 300px; }
+.screen-body[data-state="WORK"] .screen-strip { font-size: 48px; margin-top: 8px; }
+.screen-body[data-state="WORK"] .screen-strip b { font-size: 56px; }
+.screen-body[data-state="TRANSITION"] .screen-time-up { font-size: 220px; padding: 0 64px; }
+.screen-body[data-state="TRANSITION"] .screen-code { font-size: 170px; }
+.screen-body[data-state="TRANSITION"] .screen-label { font-size: 44px; margin-top: 0; }
+.screen-body[data-state="TRANSITION"] .screen-score { font-size: 280px; }
+.screen-body[data-state="TRANSITION"] .screen-move { font-size: 78px; white-space: nowrap; margin-top: 0; }
+.screen-body[data-state="TRANSITION"] .screen-count { font-size: 200px; }
+.screen-body[data-state="TRANSITION"] .screen-strip { font-size: 48px; margin-top: 8px; }
+.screen-body[data-state="TRANSITION"] .screen-strip b { font-size: 56px; }
+.screen-body[data-state="GET_READY"] .screen-count-xl { font-size: 520px; }
