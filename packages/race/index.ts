@@ -27,6 +27,8 @@ import {
 } from "./application/engine-use-cases";
 import { GetStationViewUseCase, RecordActionUseCase, ReviewActionUseCase } from "./application/judge-use-cases";
 import { SupabaseRaceJudgeRepository } from "./infrastructure/supabase-race-judge-repository";
+import { GetStationScreenUseCase } from "./application/station-screen-use-case";
+import { SupabaseRaceScreenRepository } from "./infrastructure/supabase-race-screen-repository";
 import { SupabaseRaceRegistrationRepository } from "./infrastructure/supabase-race-registration-repository";
 import { SupabaseRaceEngineRepository } from "./infrastructure/supabase-race-engine-repository";
 
@@ -39,6 +41,10 @@ export * from "./domain/race-number";
 export * from "./domain/race-error";
 export * from "./domain/registration";
 export * from "./domain/engine";
+export * from "./domain/station-screen";
+export type { RaceScreenRepository } from "./domain/race-screen-repository";
+export * from "./application/station-screen-use-case";
+export { SupabaseRaceScreenRepository } from "./infrastructure/supabase-race-screen-repository";
 export * from "./domain/judge";
 export * from "./domain/action-queue";
 export type { RaceJudgeRepository } from "./domain/race-judge-repository";
@@ -74,6 +80,7 @@ export function createRaceModule(client: RaceSupabaseClient) {
   const engine = new SupabaseRaceEngineRepository(client);
   const judge = new SupabaseRaceJudgeRepository(client);
   return {
+    getStationScreen: new GetStationScreenUseCase(new SupabaseRaceScreenRepository(client)),
     recordAction: new RecordActionUseCase(judge),
     reviewAction: new ReviewActionUseCase(judge),
     getStationView: new GetStationViewUseCase(judge),

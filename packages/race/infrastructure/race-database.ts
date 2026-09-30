@@ -118,6 +118,25 @@ export interface RaceStationViewJson {
   } | null;
   next: { race_number: string; full_name: string; starts_in_ms: number } | null;
 }
+export interface RaceStationScreenJson {
+  server_time: string;
+  event: { name: string };
+  station: { number: number; name: string; is_last: boolean };
+  clock: { started: boolean; paused: boolean; finished: boolean; race_ms: number | null; version: number };
+  timing: { work_ms: number; transition_ms: number; get_ready_ms: number };
+  current: {
+    race_number: string;
+    category_code: string;
+    window_start_ms: number;
+    window_end_ms: number;
+    scoring_end_ms: number;
+    scoring_type: string | null;
+    score: number | null;
+  } | null;
+  upcoming: { race_number: string; category_code: string; window_start_ms: number } | null;
+  planned_next_ms: number | null;
+  served_any: boolean;
+}
 export interface RaceMoveRow { heat_number: number; queue_position: number; slot_index: number | null }
 
 /** JSON returned by race_control_state (Master Control dashboard). */
@@ -284,6 +303,10 @@ export interface RaceDatabase {
       race_check_in: {
         Args: { p_registration_id: string };
         Returns: RaceCheckInRow[];
+      };
+      race_station_screen: {
+        Args: { p_event_id: string; p_station_number: number };
+        Returns: RaceStationScreenJson;
       };
       race_record_action: {
         Args: {
