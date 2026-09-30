@@ -72,10 +72,10 @@ select race_test.ok(race_test.count($$select 1 from race_station_results$$) = 1
 
 -- Station screen -------------------------------------------------------------------
 select race_test.login('screen1');
-select race_test.ok(race_test.count($$select 1 from race_station_results$$) = 1
+select race_test.ok(race_test.count($$select 1 from race_station_results$$) = 0
                     and race_test.count($$select 1 from race_performance_events$$) = 0
                     and race_test.count($$select 1 from race_athletes$$) = 0,
-  'screen: own station result only; no judge ledger, no PII');
+  'screen: reads NO result rows directly (tightened in Phase 8: it uses race_station_screen only), no judge ledger, no PII');
 select race_test.eq(race_test.affected($$update race_events set venue = 'x'$$), 0::bigint, 'screen: display-only (no writes)');
 
 -- Master control ---------------------------------------------------------------------

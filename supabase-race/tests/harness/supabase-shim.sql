@@ -76,3 +76,6 @@ begin
   return _parts[1:array_length(_parts, 1) - 1];
 end $$;
 grant execute on function storage.foldername(text) to anon, authenticated, service_role;
+
+-- Supabase ships an (empty) realtime publication; migrations add tables to it.
+create publication supabase_realtime;

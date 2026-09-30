@@ -347,7 +347,7 @@ begin
     raise exception 'RACE_NOT_FOUND: no such station' using errcode = 'no_data_found';
   end if;
   if public.race_is_control(p_event_id) is not true
-     and public.race_has_role(p_event_id, array['JUDGE', 'STATION_SCREEN']::public.race_role[], st.id) is not true then
+     and public.race_has_role(p_event_id, array['JUDGE']::public.race_role[], st.id) is not true then
     raise exception 'RACE_FORBIDDEN' using errcode = 'insufficient_privilege';
   end if;
   perform public.race_advance_core(p_event_id);
