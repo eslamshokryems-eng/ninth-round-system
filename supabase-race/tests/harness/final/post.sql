@@ -22,14 +22,16 @@ select race_final.chk('driver: no judge action failed for a technical reason (on
 
 -- the Event Manager corrects two ordinary results (reason mandatory) ---------------------------------------------------------------------------------
 do $$
-declare c jsonb; rid uuid;
+declare c jsonb; rid uuid; cn int;
 begin
   for c in select * from jsonb_array_elements(race_final.p() -> 'corrections') loop
-    select result_id into rid from race_final.res where n = (c ->> 'n')::int and station = (c ->> 'station')::int;
+    -- the live race decides who is skipped / withdraws: if the planned athlete did not get that station, the next finisher takes the correction
+    select result_id, n into rid, cn from race_final.res
+     where station = (c ->> 'station')::int and status = 'LOCKED' and n >= (c ->> 'n')::int order by (n = (c ->> 'n')::int) desc, n limit 1;
     perform race_final.as_user('f_bm');
     perform race_correct_station_result(rid, c ->> 'field', (c ->> 'value')::numeric, 'final validation: judge miscount found on video review');
     perform race_final.back();
-    insert into race_final.corrections_log values ((c ->> 'n')::int, (c ->> 'station')::int, c ->> 'field', (c ->> 'value')::numeric);
+    insert into race_final.corrections_log values (cn, (c ->> 'station')::int, c ->> 'field', (c ->> 'value')::numeric);
   end loop;
 end $$;
 
@@ -44,7 +46,7 @@ select race_final.back();
 do $$
 declare rid uuid; pn int := (race_final.p() -> 'postPublication' ->> 'n')::int; pd int := (race_final.p() -> 'postPublication' ->> 'distance')::int; j jsonb;
 begin
-  select r.result_id into rid from race_final.res r where r.n = pn and r.station = 9;
+  select r.result_id, r.n into rid, pn from race_final.res r where r.station = 9 and r.status in ('LOCKED', 'CORRECTED') and r.n >= pn order by (r.n = pn) desc, r.n limit 1;
   perform race_final.as_user('f_master');
   begin
     perform race_correct_rowing_result(rid, pd, 'x');

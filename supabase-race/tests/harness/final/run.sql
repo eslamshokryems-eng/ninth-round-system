@@ -326,6 +326,7 @@ begin
   t := target;
   -- 0. a device that comes back flushes its offline queue FIRST (inside the very millisecond it reconnects); the reconnect assertions come after
   for a in select * from race_final.act where not done and eff_ms is not null and eff_ms <= t order by eff_ms, abs_ms, id loop
+    if race_now_ms(st.event_id) > t and race_now_ms(st.event_id) - t < 2000 then perform race_sim.travel_to(st.event_id, t); end if;   -- the harness's own processing time is not race time
     if exists (select 1 from race_final.res rs where rs.n = a.n and rs.station = a.station and rs.status in ('VOID_DNS', 'NOT_REACHED')) then
       -- the athlete was skipped / withdrew since the plan was made: nobody judges an athlete who is not there
       insert into race_final.dropped values (a.n, a.station, a.kind, 1);
@@ -333,6 +334,8 @@ begin
     else perform race_final.do_ocr(a); end if;
     update race_final.act set done = true where id = a.id;
   end loop;
+  -- the harness's own processing time is not race time: put the race clock back on the scripted instant before anything that is time-exact
+  if race_now_ms(st.event_id) > t and race_now_ms(st.event_id) - t < 2000 then perform race_sim.travel_to(st.event_id, t); end if;
   -- 1. reconnects (a blackout ends)
   for b in select * from race_final.blackout where not done and "to" <= t order by "to" loop perform race_final.reconnect(b); perform race_final.refresh(); end loop;
   -- 2. the operators (scripted exceptions), then everything due

@@ -58,6 +58,10 @@ echo "final: the race ran in $(( $(date +%s) - START_TS )) s of wall time, $STEP
 "${PSQL[@]}" -d "$DB" -f "$FV/post.sql" >/dev/null 2>"$WORK/final/post.err" || { grep -m3 ERROR "$WORK/final/post.err"; fail "final: post-race step failed"; }
 pass "final: the event FINISHED by itself (heat 5 cancelled, did not block), Event Manager corrections applied, official results published, a post-publication correction wrote a new official snapshot version"
 
+# AUDIT RECONSTRUCTION + APPEND-ONLY ---------------------------------------------------------------------------------------------------------------------
+"${PSQL[@]}" -d "$DB" -f "$FV/audit.sql" >/dev/null 2>"$WORK/final/audit.err" || { grep -m3 ERROR "$WORK/final/audit.err"; fail "final: audit validation failed"; }
+pass "final: audit — complete event reconstructable (check-ins + correction, VOIDs, penalties, rejected/pending actions, Master reviews, OCR attempts/retakes/reviews/corrections, 7 pause/resume cycles, SKIP, DNF, DNS); every score reproducible from the ledger; history append-only"
+
 # EXPORT + INDEPENDENT COMPARISON ------------------------------------------------------------------------------------------------------------------------
 "${PSQL[@]}" -d "$DB" -v exportfile="$WORK/final/system.json" -At -q -f "$FV/export.sql" >/dev/null 2>"$WORK/final/export.err" || { grep -m3 ERROR "$WORK/final/export.err"; fail "final: export failed"; }
 [ -n "${FINAL_ARTIFACTS:-}" ] && { mkdir -p "$FINAL_ARTIFACTS"; cp "$WORK/final/system.json" "$WORK/final/plan.json" "$FINAL_ARTIFACTS/"; }

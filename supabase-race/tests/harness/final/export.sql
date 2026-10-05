@@ -6,6 +6,9 @@ create table race_final.export (doc jsonb not null);
 insert into race_final.export
 select jsonb_build_object(
   'config', (select jsonb_build_object('work_ms', work_ms, 'transition_ms', transition_ms, 'start_interval_ms', start_interval_ms, 'first_start_offset_ms', first_start_offset_ms) from race_events where id = race_final.ev()),
+  'pauses', (select coalesce(jsonb_agg(jsonb_build_object('race_ms', paused_race_ms, 'wall_ms', round(extract(epoch from resumed_at - paused_at) * 1000), 'at', paused_at, 'resumed', resumed_at) order by paused_at), '[]') from race_pauses where event_id = race_final.ev()),
+  'clock', (select jsonb_build_object('paused_total_ms', c.paused_total_ms, 'open_pause', c.paused_at is not null,
+              'finish_race_ms', (select (l.metadata ->> 'engine_race_ms')::bigint from race_audit_log l where l.action = 'race.event.finish' and l.metadata ->> 'event_id' = race_final.ev()::text limit 1)) from race_clock c where c.event_id = race_final.ev()),
   'athletes', (select jsonb_agg(jsonb_build_object('n', substr(g.race_number, 2)::int, 'status', g.race_status, 'heat', h.number) order by g.race_number) from race_registrations g left join race_heats h on h.id = g.heat_id where g.event_id = race_final.ev()),
   'heats', (select jsonb_agg(jsonb_build_object('number', number, 'status', status, 'anchor', anchor_race_ms) order by number) from race_heats where event_id = race_final.ev()),
   'slots', (select jsonb_agg(jsonb_build_object('heat', h.number, 'slot', s.slot_index, 'status', s.status,

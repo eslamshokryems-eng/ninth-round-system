@@ -529,6 +529,19 @@ stale=$(q "select count(*) from (select registration_id, station_placements, tot
 [ "$errs" = "0" ] && [ "$ok" = "8" ] && [ "$led" = "8" ] && [ "$chain" = "0" ] && [ "$final" = "$lastv" ] && [ "$stale" = "0" ] && [ "$latest" -ge 2 ] && [ "$(q "select count(distinct version) from race_rankings where category_id='$CATR'")" = "$latest" ] && [ "$(q "select count(*) from race_rankings where category_id='$CATR' and version >= 2 and not is_official")" = "0" ] || fail "rankings concurrency: 8 corrections — errors=$errs ok=$ok ledger=$led broken-chain=$chain final=$final last=$lastv snapshot-vs-live-diff=$stale latest-version=$latest"
 pass "rankings concurrency: 8 corrections of one result at once → 8 ledger rows in an unbroken old→new chain, final value = last ledger entry, snapshot versions 1..$latest are gap-free, every one after publication is official (versions are written only when the standing changes), and the latest equals the live ranking"
 
+# --- 21b. The SAME correction (same value, same reason) sent by eight sessions: idempotent, never eight rows -------------------------------------------
+RESI=$(q "select sr.id from race_station_results sr join race_stations st on st.id = sr.station_id where sr.event_id='$EVR' and st.number = 3 order by sr.registration_id limit 1")
+before=$(q "select count(*) from race_result_corrections where station_result_id='$RESI'")
+rm -f "$WORK"/c/ri*
+barrier_hold 3
+for n in $(seq 1 8); do call "ri$n" "select race_correct_station_result('$RESI', 'official_score', 77, 'same correction from desk $n') ->> 'status'" & done
+wait; sleep 1
+okc=$(cat "$WORK"/c/ri?.out | grep -c '^CORRECTED$' || true)
+bad=0; for f in "$WORK"/c/ri*.err; do [ -s "$f" ] && ! grep -q 'RACE_NO_CHANGE' "$f" && bad=$((bad + 1)); done
+led=$(q "select count(*) from race_result_corrections where station_result_id='$RESI'")
+[ "$okc" = "1" ] && [ "$((led - before))" = "1" ] && [ "$bad" = "0" ] && [ "$(q "select official_score from race_station_results where id='$RESI'")" = "77" ] || fail "correction concurrency: 8 identical corrections — accepted=$okc new ledger rows=$((led - before)) unexpected errors=$bad (want 1 / 1 / 0)"
+pass "correction concurrency: 8 IDENTICAL corrections at once → exactly 1 applied (1 ledger row), 7 refused as 'no change' — a repeated desk press cannot double-apply"
+
 # ============================ Phase 10: rowing evidence under concurrency (the REAL RPCs) ============================
 EVW=$(setup_engine_event concurrency-rowing 4)
 q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVW')" >/dev/null
@@ -602,4 +615,25 @@ refs=$(q "select count(*) from race_result_corrections where station_result_id='
 orig=$(q "select proposed_distance_m || ':' || status || ':' || confirmed_distance_m from race_ocr_records where id='$ATT'")
 [ "$errs" = "0" ] && [ "$ok" = "8" ] && [ "$led" = "8" ] && [ "$chain" = "0" ] && [ "$first" = "842" ] && [ "$final" = "$lastv" ] && [ "$refs" = "8" ] && [ "$orig" = "842:CONFIRMED:842" ] || fail "rowing concurrency: 8 corrections — errors=$errs ok=$ok ledger=$led broken-chain=$chain first-old=$first final=$final last=$lastv evidence-refs=$refs original=$orig"
 pass "rowing concurrency: 8 simultaneous Master Control corrections → 8 ledger rows in an unbroken chain starting from the OCR-confirmed 842, every row cites the original evidence, final value = last entry ($final), the OCR record untouched"
+# --- 26. Master Control review of a LATE confirmation, pressed by eight sessions at once ---------------------------------------------------------------
+RES2=$(q "select sr.id from race_station_results sr join race_stations st on st.id = sr.station_id join race_registrations r on r.id = sr.registration_id where sr.event_id='$EVW' and st.number = 9 and r.race_number = 'N002'")
+rewind "$EVW" 2140000          # N002's rowing window closed at 2,130,000; its 0:30 transition runs until 2,160,000: the photo is taken inside it
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVW')" >/dev/null
+q "insert into storage.objects (bucket_id, name, owner, metadata) values ('race-evidence', '$EVW/rowing/$RES2/late.jpg', '$FOUNDER', '{\"size\": 120000}') on conflict do nothing" >/dev/null
+ATT2=$(q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_ocr_capture('$RES2', gen_random_uuid(), '$EVW/rowing/$RES2/late.jpg', 'image/jpeg', 120000, '$SHA') ->> 'attempt_id'" | tail -1)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_ocr_submit('$ATT2', 'tesseract', 'tesseract.js@7', '655 m', '{}', 655, 0.97)" >/dev/null
+rewind "$EVW" 2170000          # ... and the judge only confirms after the transition: that needs Master Control
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVW')" >/dev/null
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_ocr_confirm('$ATT2', gen_random_uuid())" >/dev/null
+[ "$(q "select status from race_ocr_records where id='$ATT2'")" = "PENDING_REVIEW" ] || fail "rowing concurrency: setup — the late confirmation is not PENDING_REVIEW"
+rm -f "$WORK"/c/ov*
+barrier_hold 3
+for n in $(seq 1 8); do call "ov$n" "select race_ocr_review('$ATT2', 'APPROVED', 'review storm $n') ->> 'status'" & done
+wait; sleep 1
+fresh=$(cat "$WORK"/c/ov?.out | grep -c '^CONFIRMED$' || true)
+bad=0; for f in "$WORK"/c/ov*.err; do [ -s "$f" ] && ! grep -q 'RACE_OCR_NOT_PENDING' "$f" && bad=$((bad + 1)); done
+audits=$(q "select count(*) from race_audit_log where action = 'race.ocr.review' and metadata ->> 'result_id' = '$RES2'")
+score=$(q "select official_score from race_station_results where id='$RES2'")
+[ "$fresh" = "1" ] && [ "$bad" = "0" ] && [ "$audits" = "1" ] && [ "$score" = "655" ] || fail "rowing concurrency: 8 simultaneous Master reviews — decided=$fresh unexpected-errors=$bad audit-rows=$audits score=$score (want 1 / 0 / 1 / 655)"
+pass "rowing concurrency: 8 simultaneous Master Control REVIEWS of one late confirmation → exactly 1 decision (score 655, 1 audit row), 7 told 'not pending' — a double tap cannot decide twice"
 q "select race_sim.check_invariants('$EVW', race_now_ms('$EVW'))" >/dev/null && pass "rowing concurrency: timing invariants hold after the evidence storms"

@@ -326,6 +326,23 @@ export function compare(sys) {
     eq(s.start_ms, anchor + s.slot * I, `slot ${s.heat}/${s.slot} start`);
     ok(s.started_ms >= s.start_ms, `slot ${s.heat}/${s.slot} was never started early (planned ${s.start_ms}, recorded ${s.started_ms})`);
   }
+  // configuration: the rulebook numbers, exactly
+  eq(sys.config, { work_ms: W, transition_ms: TR, start_interval_ms: I, first_start_offset_ms: FIRST }, "event configuration (3:00 work, 0:30 transition, 3:30 interval, 60 s countdown)");
+  // pauses: every scripted pause happened once, at the scripted race time, for the scripted wall time; none overlap; race time excluded exactly that much
+  const planned = [...SCRIPT.pauses, ...SCRIPT.pause_reads].sort((a, b) => a[0] - b[0]);
+  eq(sys.pauses.length, planned.length, "number of pause/resume cycles");
+  sys.pauses.forEach((p, i) => {
+    near(p.race_ms, planned[i]?.[0] ?? -1, 60, `pause #${i + 1} started at the scripted race time`);
+    near(p.wall_ms, planned[i]?.[1] ?? -1, 100, `pause #${i + 1} lasted the scripted wall time`);
+    ok(p.resumed !== null, `pause #${i + 1} was resumed`);
+    if (i > 0) ok(new Date(sys.pauses[i - 1].resumed) <= new Date(p.at), `pause #${i} and #${i + 1} do not overlap`);
+  });
+  near(sys.clock.paused_total_ms, sys.pauses.reduce((t, p) => t + p.wall_ms, 0), 10, "race clock excluded exactly the paused wall time");
+  ok(sys.clock.open_pause === false, "no pause is left open");
+  // completion: the official finish is the end of the last 3:00 + 0:30 of the last athlete — never earlier, and (devices permitting) not later than a read away
+  const lastEnd = Math.max(...sys.windows.filter((w) => !["VOID_DNS", "NOT_REACHED"].includes(w.status)).map((w) => w.end));
+  ok(sys.clock.finish_race_ms >= lastEnd + TR, `event finished only after every required window completed (finish ${sys.clock.finish_race_ms} >= ${lastEnd + TR})`);
+  ok(sys.clock.finish_race_ms - (lastEnd + TR) <= 10_000, `event finished promptly (${sys.clock.finish_race_ms - (lastEnd + TR)} ms after the last window)`);
   const perStation = new Map();
   for (const w of sys.windows) { if (!perStation.has(w.station)) perStation.set(w.station, []); perStation.get(w.station).push(w); }
   for (const [st, ws] of perStation) { ws.sort((a, b) => a.start - b.start); for (let i = 1; i < ws.length; i++) ok(ws[i].start >= ws[i - 1].end + TR, `no overlap at station ${st}: N${ws[i - 1].n} / N${ws[i].n}`); }
