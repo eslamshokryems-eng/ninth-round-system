@@ -303,7 +303,7 @@ end $$;
 -- ONE step: advance to the next thing that happens, then do everything that is due -------------------------------------------------------------
 create function race_final.step() returns text language plpgsql as $$
 declare
-  st race_final.state; t bigint; tick bigint; ev bigint; act bigint; bo bigint; rv bigint; target bigint; b race_final.blackout; a race_final.act; s race_final.script; r race_final.review_due; doticks boolean; fin boolean; v_k int := 0; v_last text;
+  st race_final.state; t bigint; tick bigint; ev bigint; act bigint; bo bigint; rv bigint; target bigint; b race_final.blackout; a race_final.act; s race_final.script; r race_final.review_due; doticks boolean; fin boolean; v_k int := 0; v_key text; v_cnt jsonb := '{}';
 begin
   select * into st from race_final.state;
   if st.done then return 'done'; end if;
@@ -326,8 +326,9 @@ begin
   t := target;
   -- 0. a device that comes back flushes its offline queue FIRST (inside the very millisecond it reconnects); the reconnect assertions come after
   for a in select * from race_final.act where not done and eff_ms is not null and eff_ms <= t order by eff_ms, abs_ms, id loop
-    if v_last is distinct from (a.eff_ms || ':' || a.n || ':' || a.station) then v_k := 0; v_last := (a.eff_ms || ':' || a.n || ':' || a.station); end if;
-    if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_sim.travel_to(st.event_id, a.eff_ms + least(v_k, 100)); v_k := v_k + 1; end if;   -- the harness's own processing time is not race time; actions of one instant keep their send order (+1 ms each)
+    v_key := a.eff_ms || ':' || a.n || ':' || a.station; v_k := coalesce((v_cnt ->> v_key)::int, 0); v_cnt := jsonb_set(v_cnt, array[v_key], to_jsonb(v_k + 1));
+    -- the actions of ONE result that are sent in the same instant keep their send order in server time: 40 ms apart (far above the call jitter)
+    if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_sim.travel_to(st.event_id, a.eff_ms + least(v_k, 5) * 40); end if;
     if exists (select 1 from race_final.res rs where rs.n = a.n and rs.station = a.station and rs.status in ('VOID_DNS', 'NOT_REACHED')) then
       -- the athlete was skipped / withdrew since the plan was made: nobody judges an athlete who is not there
       insert into race_final.dropped values (a.n, a.station, a.kind, 1);
@@ -341,8 +342,9 @@ begin
   for b in select * from race_final.blackout where not done and "to" <= t order by "to" loop perform race_final.reconnect(b); perform race_final.refresh(); end loop;
   -- 1b. whatever the reconnect just made visible (a device flushing its queue) is sent in the same instant
   for a in select * from race_final.act where not done and eff_ms is not null and eff_ms <= t order by eff_ms, abs_ms, id loop
-    if v_last is distinct from (a.eff_ms || ':' || a.n || ':' || a.station) then v_k := 0; v_last := (a.eff_ms || ':' || a.n || ':' || a.station); end if;
-    if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_sim.travel_to(st.event_id, a.eff_ms + least(v_k, 100)); v_k := v_k + 1; end if;   -- the harness's own processing time is not race time; actions of one instant keep their send order (+1 ms each)
+    v_key := a.eff_ms || ':' || a.n || ':' || a.station; v_k := coalesce((v_cnt ->> v_key)::int, 0); v_cnt := jsonb_set(v_cnt, array[v_key], to_jsonb(v_k + 1));
+    -- the actions of ONE result that are sent in the same instant keep their send order in server time: 40 ms apart (far above the call jitter)
+    if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_sim.travel_to(st.event_id, a.eff_ms + least(v_k, 5) * 40); end if;
     if exists (select 1 from race_final.res rs where rs.n = a.n and rs.station = a.station and rs.status in ('VOID_DNS', 'NOT_REACHED')) then
       -- the athlete was skipped / withdrew since the plan was made: nobody judges an athlete who is not there
       insert into race_final.dropped values (a.n, a.station, a.kind, 1);
