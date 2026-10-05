@@ -112,6 +112,23 @@ const screenData = (n) => {
   };
 };
 
+// ---- Results mock: four finished MEN athletes, one DNF, one DNS; ranking computed like the database (sum of placements, ties share a place) ----------------------
+const rk = { official: false, racing: 2, unscored: 0, pending: 0, corrected: false, published: 0, corrections: [] };
+const rkAthletes = [["N001", "Ahmed A.", 15], ["N007", "Mona K.", 15], ["N004", "Omar F.", 12], ["N011", "Sara M.", 21]];
+const leaderboard = (eventId) => {
+  if (eventId !== LOCKED_ID) return { available: false };
+  const tot = rkAthletes.map(([n, name, t]) => ({ n, name, t: n === "N004" && rk.corrected ? 22 : t }));
+  const rows = tot.map((a) => ({ rank: 1 + tot.filter((b) => b.t < a.t).length, race_number: a.n, name: a.name, total_points: a.t,
+    placements: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => [String(i), Math.max(1, Math.round(a.t / 9) + (i % 3) - 1)])), tb_s04: null, tb_s07: null }))
+    .sort((a, b) => a.rank - b.rank || a.race_number.localeCompare(b.race_number));
+  return { available: true, server_time: new Date().toISOString(), event: { name: "THE NINTH" }, official: rk.official,
+    categories: [{ code: "MEN", name: "Men", state: rk.official ? "OFFICIAL" : "PROVISIONAL", version: rk.official ? 2 : null, rows, racing: rk.official ? 0 : rk.racing,
+      excluded: [{ race_number: "N005", name: "Hany S.", status: "DNS" }, { race_number: "N030", name: "Omar Z.", status: "DNF" }] },
+      { code: "WOMEN", name: "Women", state: rk.official ? "OFFICIAL" : "PROVISIONAL", version: null, rows: [], racing: 0, excluded: [] }] };
+};
+const rkBlockers = () => ({ ranked: 4, racing: rk.racing, pending_review: rk.pending, not_locked: 0, unscored: rk.unscored });
+const rkReady = () => rk.racing === 0 && rk.pending === 0 && rk.unscored === 0;
+
 async function installMock(context) {
   context.on("request", (r) => seenUrls.push(r.url()));
   await context.route(`${SB}/**`, async (route) => {
@@ -148,6 +165,18 @@ async function installMock(context) {
           return json(200, { check_in_id: "c1", checked_in_at: "2026-11-20T06:00:00Z", kind: body.p_registration_id === "late1" ? "LATE" : "ON_TIME", queue_position: 4, heat_number: 2, already_checked_in: body.p_registration_id === "r30" });
         }
         case "race_station_view": return json(200, stationView());
+        case "race_leaderboard": return json(200, leaderboard(body.p_event_id));
+        case "race_compute_rankings": return json(200, { official: rk.official, categories: [{ category_id: "cat-men", version: 1, official: rk.official, unchanged: true, ranked: 4, blockers: rkBlockers() }] });
+        case "race_publish_results":
+          if (rk.official) return json(200, { status: "RESULTS_OFFICIAL", already: true });
+          if (!rkReady()) return json(400, { code: "P0001", message: "RACE_RESULTS_NOT_READY: " + JSON.stringify(rkBlockers()), details: null, hint: null });
+          rk.official = true; rk.published += 1; return json(200, { status: "RESULTS_OFFICIAL", already: false });
+        case "race_athlete_results":
+          if (body.p_race_number !== "N004") return json(400, { code: "P0002", message: "RACE_NOT_FOUND: no athlete with that race number", details: null, hint: null });
+          return json(200, { race_number: "N004", name: "Omar Fathy", category_code: "MEN", race_status: "FINISHED", results: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ result_id: "res-4-" + n, station: n, station_name: "Station 0" + n, status: "LOCKED", official_score: 20 + n, technique_score: n === 4 || n === 7 ? 8 : null, has_technique: n === 4 || n === 7 })) });
+        case "race_correct_station_result":
+          rk.corrections.push(body); rk.corrected = true;
+          return json(200, { result_id: body.p_result_id, field: body.p_field, old: 22, new: body.p_value, status: "CORRECTED", snapshot: null });
         case "race_station_screen":
           if (sc.mode === "drop") return route.abort("connectionfailed");
           return json(200, screenData(body.p_station_number));
@@ -915,6 +944,113 @@ const main = async () => {
     assert.equal(Math.round(box.width), 540); assert.equal(Math.round(box.height), 960);
     assert.match(await p.locator("[data-testid=screen-station-name]").innerText(), /STATION 03/i);
     await ctx.close();
+  });
+
+
+  // ---------- Results & rankings ----------
+  const pub = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await installMock(pub);
+  const rp = await pub.newPage();
+  rp.on("pageerror", (e) => errors.push(`pageerror(results): ${e.message}`));
+  const rkText = () => rp.locator("[data-testid=results]").innerText();
+
+  await step("results: before the race is under way the public page says so (no data, no error)", async () => {
+    await rp.goto(`${BASE}/race/e/the-ninth-2026/results`);
+    await rp.waitForSelector("[data-testid=results-unavailable]");
+    assert.match(await rp.locator("[data-testid=results-unavailable]").innerText(), /once the race is under way/i);
+  });
+  await step("results: PROVISIONAL leaderboard — places, tied places shown as T2, points, who is still racing, DNS/DNF listed", async () => {
+    await rp.goto(`${BASE}/race/e/locked-2026/results`);
+    await rp.waitForSelector("[data-testid=leaderboard]");
+    assert.equal(await rp.locator("[data-testid=results]").getAttribute("data-official"), "false");
+    const t = await rkText();
+    assert.match(t, /PROVISIONAL/i); assert.match(t, /2 still racing/i); assert.match(t, /Live · provisional/i);
+    const rows = await rp.locator("[data-testid=row]").evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, " ")));
+    assert.equal(rows.length, 4);
+    assert.match(rows[0], /^1 N004 Omar F\. 12/); assert.match(rows[1], /^T2 N001/); assert.match(rows[2], /^T2 N007/); assert.match(rows[3], /^4 N011 Sara M\. 21/);
+    assert.match(await rp.locator("[data-testid=excluded]").innerText(), /N005 Hany S\. — DNS/); assert.match(await rp.locator("[data-testid=excluded]").innerText(), /N030 Omar Z\. — DNF/);
+    await rp.screenshot({ path: `${shots}/24-results-provisional-mobile.png`, fullPage: true });
+  });
+  await step("results privacy: the public page shows race number + 'First L.' only — no phone, e-mail, surname or id", async () => {
+    const html = await rp.content();
+    assert.doesNotMatch(html, /0100\d{7}|@x\.test|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
+    assert.doesNotMatch(await rkText(), /Fathy|Mohamed Ali/);
+  });
+  await step("results: the category tabs switch the board; an empty category says 'No finishers yet'", async () => {
+    await rp.getByRole("tab", { name: "Women", exact: true }).click();
+    await rp.waitForSelector("text=No finishers yet");
+    await rp.getByRole("tab", { name: "Men", exact: true }).click();
+    await rp.waitForSelector("[data-testid=leaderboard]");
+  });
+
+  const sc2 = await browser.newContext({ viewport: { width: 1360, height: 900 } }); await installMock(sc2);
+  const rd = await sc2.newPage(); await seedSession(rd);
+  rd.on("pageerror", (e) => errors.push(`pageerror(results desk): ${e.message}`));
+  const publishBtn = () => rd.getByRole("button", { name: "PUBLISH OFFICIAL RESULTS" });
+  await step("results desk: publishing is blocked and the blockers are named", async () => {
+    await rd.goto(`${BASE}/race/control/locked-2026/results`);
+    await rd.waitForSelector("[data-testid=blockers] li");
+    assert.match(await rd.locator("[data-testid=blockers]").innerText(), /2 athletes are still racing/);
+    assert.equal(await publishBtn().isDisabled(), true, "publish is disabled while anything is open");
+    await rd.screenshot({ path: `${shots}/25-results-desk-blocked.png`, fullPage: true });
+  });
+  await step("results desk: once everything is confirmed, publishing needs a deliberate second click and happens ONCE", async () => {
+    rk.racing = 0; rk.status = "FINISHED";
+    await rd.getByRole("button", { name: "Refresh" }).click();
+    await rd.waitForFunction(() => /ready to publish/i.test(document.querySelector("[data-testid=blockers]")?.textContent ?? ""));
+    // the mock event is HEATS_LOCKED, so the page keeps publishing closed until the race has finished
+    assert.equal(await publishBtn().isDisabled(), true, "closed until the event has finished");
+    assert.match(await rd.locator("[data-testid=publish-card]").innerText(), /opens when the race has finished/i);
+  });
+
+  const fin = await browser.newContext({ viewport: { width: 1360, height: 900 } });
+  await installMock(fin);
+  await fin.route(`${SB}/rest/v1/rpc/race_get_public_event`, async (route) => {      // registered last = wins: this event has FINISHED
+    await route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ ...LOCKED, status: "FINISHED" }) });
+  });
+  const rf = await fin.newPage(); await seedSession(rf);
+  rf.on("pageerror", (e) => errors.push(`pageerror(results desk 2): ${e.message}`));
+  await step("results desk: FINISHED + nothing open → PUBLISH asks for confirmation, then publishes exactly once", async () => {
+    await rf.goto(`${BASE}/race/control/locked-2026/results`);
+    await rf.waitForFunction(() => /ready to publish/i.test(document.querySelector("[data-testid=blockers]")?.textContent ?? ""));
+    const before = callsOf("race_publish_results").length;
+    await rf.getByRole("button", { name: "PUBLISH OFFICIAL RESULTS" }).click();
+    assert.equal(callsOf("race_publish_results").length, before, "the first click only asks");
+    await rf.getByRole("button", { name: /YES — PUBLISH/ }).click();
+    await rf.waitForSelector("[data-testid=results-msg]");
+    assert.equal(callsOf("race_publish_results").length, before + 1); assert.equal(rk.published, 1);
+    assert.match(await rf.locator("[data-testid=publish-card]").innerText(), /OFFICIAL/);
+    await rf.screenshot({ path: `${shots}/26-results-desk-published.png`, fullPage: true });
+  });
+  await step("results: the public page now shows the OFFICIAL leaderboard", async () => {
+    await rp.reload(); await rp.waitForSelector("[data-testid=leaderboard]");
+    assert.equal(await rp.locator("[data-testid=results]").getAttribute("data-official"), "true");
+    assert.match(await rkText(), /OFFICIAL/); assert.doesNotMatch(await rkText(), /still racing/);
+    await rp.screenshot({ path: `${shots}/27-results-official-mobile.png`, fullPage: true });
+  });
+  await step("results corrections: find an athlete, a reason is mandatory, the correction is sent exactly as typed and the board moves", async () => {
+    await rf.getByLabel("Race number").fill("4");
+    await rf.getByRole("button", { name: "Find athlete" }).click();
+    await rf.waitForSelector("[data-testid=athlete-results]");
+    assert.match(await rf.locator("[data-testid=athlete-results]").innerText(), /N004 · Omar Fathy/i);
+    await rf.getByRole("button", { name: "Edit score" }).nth(1).click();
+    const save = rf.getByRole("button", { name: "SAVE CORRECTION" });
+    await rf.getByLabel("New score").fill("40");
+    assert.equal(await save.isDisabled(), true, "no reason, no save");
+    await rf.getByLabel("Reason (required)").fill("judge miscounted — video review");
+    await save.click();
+    await rf.waitForSelector("[data-testid=correction-done]");
+    const c = rk.corrections.at(-1);
+    assert.deepEqual({ field: c.p_field, value: c.p_value, reason: c.p_reason, result: c.p_result_id }, { field: "official_score", value: 40, reason: "judge miscounted — video review", result: "res-4-2" });
+    await rf.screenshot({ path: `${shots}/28-results-correction.png`, fullPage: true });
+    await rp.reload(); await rp.waitForSelector("[data-testid=leaderboard]");
+    const rows = await rp.locator("[data-testid=row]").evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, " ")));
+    assert.match(rows[3], /N004 Omar F\. 22/, "the corrected athlete dropped to last");
+  });
+  await step("results corrections: an unknown race number is refused with a clear message", async () => {
+    await rf.getByLabel("Race number").fill("999");
+    await rf.getByRole("button", { name: "Find athlete" }).click();
+    await rf.waitForSelector("text=Not found");
   });
 
   // ---------- independence from the gym system ----------

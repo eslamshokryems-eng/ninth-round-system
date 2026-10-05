@@ -149,7 +149,7 @@ export function formatRaceTime(ms: number): string {
 }
 
 /** Links between the staff screens (Registrations · Check-in). */
-export function StaffNav({ slug, current }: { slug: string; current: "registrations" | "reception" | "control" }) {
+export function StaffNav({ slug, current }: { slug: string; current: "registrations" | "reception" | "control" | "results" }) {
   const item = (href: string, label: string, active: boolean) => (
     <a
       key={href}
@@ -164,6 +164,7 @@ export function StaffNav({ slug, current }: { slug: string; current: "registrati
   return (
     <nav className="flex flex-wrap justify-end gap-x-5 gap-y-1" aria-label="Staff screens">
       {item(`/race/control/${slug}`, "Control", current === "control")}
+      {item(`/race/control/${slug}/results`, "Results", current === "results")}
       {item(`/race/reception/${slug}`, "Check-in", current === "reception")}
       {item(`/race/admin/${slug}/registrations`, "Registrations", current === "registrations")}
     </nav>

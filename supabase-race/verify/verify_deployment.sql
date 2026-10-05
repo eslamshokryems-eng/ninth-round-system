@@ -43,14 +43,17 @@ begin
      and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%');
   if bad is not null then raise exception 'VERIFY FAIL: SECURITY DEFINER without search_path: %', bad; end if;
   select string_agg(f, ', ') into bad from unnest(array['race_advance_core(uuid)', 'race_advance_all()', 'race_bind_due_slots(uuid)', 'race_freeze_schedule(uuid)', 'race_wall_at(uuid,bigint)',
-      'race_result_tally(uuid)', 'race_recompute_result(uuid)', 'race_result_derived(uuid)', 'race_log_audit_event(text,text,uuid,jsonb,jsonb,jsonb)', 'race_audit(text,uuid,text,uuid,jsonb,jsonb,jsonb)']) f
+      'race_result_tally(uuid)', 'race_recompute_result(uuid)', 'race_result_derived(uuid)', 'race_log_audit_event(text,text,uuid,jsonb,jsonb,jsonb)', 'race_audit(text,uuid,text,uuid,jsonb,jsonb,jsonb)', 'race_rank_rows(uuid,uuid)', 'race_rank_blockers(uuid,uuid)', 'race_write_snapshot(uuid,uuid,boolean)', 'race_blockers_clear(jsonb)']) f
    where has_function_privilege('anon', f, 'EXECUTE') or has_function_privilege('authenticated', f, 'EXECUTE');
   if bad is not null then raise exception 'VERIFY FAIL: internal functions callable by API roles: %', bad; end if;
   select string_agg(f, ', ') into bad from unnest(array['race_start_event(uuid)', 'race_pause(uuid,text)', 'race_resume(uuid)', 'race_skip_athlete(uuid,text)', 'race_mark_dnf(uuid,text)',
-      'race_close_heat_without_start(uuid,integer,text)', 'race_correct_check_in(uuid,uuid,text)', 'race_override_dns(uuid,text)', 'race_control_state(uuid)', 'race_record_action(uuid,race_action_type,uuid,numeric,race_action_origin,timestamptz,bigint,bigint,uuid,uuid)', 'race_review_action(uuid,text,text)', 'race_station_view(uuid,integer)', 'race_station_screen(uuid,integer)', 'race_set_account_flags(uuid,boolean,boolean,boolean)']) f
+      'race_close_heat_without_start(uuid,integer,text)', 'race_correct_check_in(uuid,uuid,text)', 'race_override_dns(uuid,text)', 'race_control_state(uuid)', 'race_record_action(uuid,race_action_type,uuid,numeric,race_action_origin,timestamptz,bigint,bigint,uuid,uuid)', 'race_review_action(uuid,text,text)', 'race_station_view(uuid,integer)', 'race_station_screen(uuid,integer)', 'race_compute_rankings(uuid,uuid,boolean)', 'race_publish_results(uuid)', 'race_athlete_results(uuid,text)', 'race_correct_station_result(uuid,text,numeric,text)', 'race_set_account_flags(uuid,boolean,boolean,boolean)']) f
    where has_function_privilege('anon', f, 'EXECUTE');
   if bad is not null then raise exception 'VERIFY FAIL: control functions callable by anon: %', bad; end if;
   raise notice 'OK  functions pin search_path; engine internals and control RPCs are closed to anonymous callers';
+  -- 5b. the public leaderboard is the ONLY results function anonymous callers may run
+  if not has_function_privilege('anon', 'race_leaderboard(uuid,text)', 'EXECUTE') then raise exception 'VERIFY FAIL: the public leaderboard is not callable by anon'; end if;
+  raise notice 'OK  race_leaderboard is public; ranking, publication and correction functions are staff-only';
   -- 4b. the station screen: realtime nudges reach it, and the screen role can read no personal data directly
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'race_clock') then
     raise exception 'VERIFY FAIL: race_clock is not in the supabase_realtime publication (screens would only poll)';

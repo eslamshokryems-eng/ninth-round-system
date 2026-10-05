@@ -478,3 +478,52 @@ st=$(q "select status from race_station_results where id='$RES2'")
 [ "$acc" = "0" ] && [ "$rej" = "12" ] && [ "$st" = "LOCKED" ] || fail "judge concurrency: blackout — accepted=$acc rejected=$rej result=$st"
 pass "judge concurrency: 40 minutes with no device ticking, then 12 judge submissions → all 12 REJECTED (WINDOW_CLOSED, kept in the ledger), result LOCKED — the RPC derived the state itself"
 q "select race_sim.check_invariants('$EVJ', race_now_ms('$EVJ'))" >/dev/null && pass "judge concurrency: timing invariants hold after the scoring storms"
+
+# ============================ Phase 9: rankings, publication, corrections under concurrency ============================
+EVR=$(setup_engine_event concurrency-rankings 6)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVR')" >/dev/null
+rewind "$EVR" 3000000
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVR')" >/dev/null
+[ "$(q "select status from race_events where id='$EVR'")" = "FINISHED" ] || fail "rankings concurrency: setup — the event did not finish"
+q "update race_station_results sr set official_score = 10 + (abs(hashtext(sr.registration_id::text || st.number)) % 4) * 5, technique_score = case when st.has_technique then 6 + (abs(hashtext(sr.registration_id::text || 't' || st.number)) % 3) * 0.5 end from race_stations st where st.id = sr.station_id and sr.event_id='$EVR' and sr.status = 'LOCKED'" >/dev/null
+CATR=$(q "select category_id from race_registrations where event_id='$EVR' limit 1")
+ranked=$(q "select count(*) from race_registrations where event_id='$EVR' and race_status = 'FINISHED'")
+
+# --- 19. Ten sessions compute the same provisional ranking at the same instant ---------------------------------------------------------------------
+rm -f "$WORK"/c/rk*
+barrier_hold 3
+for n in $(seq 1 10); do call "rk$n" "select race_compute_rankings('$EVR', '$CATR')" & done
+wait; sleep 1
+errs=$(cat "$WORK"/c/rk*.err | grep -c . || true)
+vers=$(q "select count(distinct version) from race_rankings where category_id='$CATR'")
+rows=$(q "select count(*) from race_rankings where category_id='$CATR'")
+[ "$errs" = "0" ] && [ "$vers" = "1" ] && [ "$rows" = "$ranked" ] || fail "rankings concurrency: 10 simultaneous computes — errors=$errs versions=$vers rows=$rows (want 1 version of $ranked rows)"
+pass "rankings concurrency: 10 sessions compute the ranking at once → exactly 1 snapshot version ($rows rows), no errors, no duplicates"
+
+# --- 20. Publish pressed by eight sessions at once ------------------------------------------------------------------------------------------------
+rm -f "$WORK"/c/rp*
+barrier_hold 3
+for n in $(seq 1 8); do call "rp$n" "select race_publish_results('$EVR') ->> 'already'" & done
+wait; sleep 1
+fresh=$(cat "$WORK"/c/rp?.out | grep -c '^false$' || true); again=$(cat "$WORK"/c/rp?.out | grep -c '^true$' || true)
+vers=$(q "select string_agg(distinct version::text, ',' order by version::text) from race_rankings where category_id='$CATR'")
+off=$(q "select count(*) from race_audit_log where action = 'race.results.publish' and metadata ->> 'event_id' = '$EVR'")
+[ "$fresh" = "1" ] && [ "$again" = "7" ] && [ "$vers" = "1,2" ] && [ "$off" = "1" ] && [ "$(q "select status from race_events where id='$EVR'")" = "RESULTS_OFFICIAL" ] || fail "rankings concurrency: 8 publishes — fresh=$fresh already=$again versions=$vers publish-audits=$off"
+pass "rankings concurrency: 8 simultaneous PUBLISH → exactly 1 publication (7 'already'), official snapshot is version 2, 1 audit row"
+
+# --- 21. Eight corrections of the same result at the same instant ------------------------------------------------------------------------------------------
+RESC=$(q "select sr.id from race_station_results sr join race_stations st on st.id = sr.station_id where sr.event_id='$EVR' and st.number = 2 order by sr.registration_id limit 1")
+rm -f "$WORK"/c/rc*
+barrier_hold 3
+for n in $(seq 1 8); do call "rc$n" "select race_correct_station_result('$RESC', 'official_score', $((60 + n)), 'storm $n') ->> 'status'" & done
+wait; sleep 1
+errs=$(cat "$WORK"/c/rc*.err | grep -c . || true)
+ok=$(cat "$WORK"/c/rc?.out | grep -c '^CORRECTED$' || true)
+led=$(q "select count(*) from race_result_corrections where station_result_id='$RESC'")
+chain=$(q "select count(*) from (select old_value, lag(new_value) over (order by corrected_at, id) prev from race_result_corrections where station_result_id='$RESC') x where prev is not null and old_value is distinct from prev")
+final=$(q "select official_score from race_station_results where id='$RESC'")
+lastv=$(q "select (new_value #>> '{}')::numeric from race_result_corrections where station_result_id='$RESC' order by corrected_at desc, id desc limit 1")
+latest=$(q "select max(version) from race_rankings where category_id='$CATR'")
+stale=$(q "select count(*) from (select registration_id, station_placements, total_points, overall_rank from race_rankings where category_id='$CATR' and version=$latest except select registration_id, placements, total_points, overall_rank from race_rank_rows('$EVR','$CATR')) x")
+[ "$errs" = "0" ] && [ "$ok" = "8" ] && [ "$led" = "8" ] && [ "$chain" = "0" ] && [ "$final" = "$lastv" ] && [ "$stale" = "0" ] && [ "$latest" -ge 2 ] && [ "$(q "select count(distinct version) from race_rankings where category_id='$CATR'")" = "$latest" ] && [ "$(q "select count(*) from race_rankings where category_id='$CATR' and version >= 2 and not is_official")" = "0" ] || fail "rankings concurrency: 8 corrections — errors=$errs ok=$ok ledger=$led broken-chain=$chain final=$final last=$lastv snapshot-vs-live-diff=$stale latest-version=$latest"
+pass "rankings concurrency: 8 corrections of one result at once → 8 ledger rows in an unbroken old→new chain, final value = last ledger entry, snapshot versions 1..$latest are gap-free, every one after publication is official (versions are written only when the standing changes), and the latest equals the live ranking"

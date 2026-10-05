@@ -28,6 +28,8 @@ import {
 import { GetStationViewUseCase, RecordActionUseCase, ReviewActionUseCase } from "./application/judge-use-cases";
 import { SupabaseRaceJudgeRepository } from "./infrastructure/supabase-race-judge-repository";
 import { GetStationScreenUseCase } from "./application/station-screen-use-case";
+import { ComputeRankingsUseCase, CorrectResultUseCase, GetAthleteResultsUseCase, GetLeaderboardUseCase, PublishResultsUseCase } from "./application/results-use-cases";
+import { SupabaseRaceResultsRepository } from "./infrastructure/supabase-race-results-repository";
 import { SupabaseRaceScreenRepository } from "./infrastructure/supabase-race-screen-repository";
 import { SupabaseRaceRegistrationRepository } from "./infrastructure/supabase-race-registration-repository";
 import { SupabaseRaceEngineRepository } from "./infrastructure/supabase-race-engine-repository";
@@ -42,6 +44,10 @@ export * from "./domain/race-error";
 export * from "./domain/registration";
 export * from "./domain/engine";
 export * from "./domain/station-screen";
+export * from "./domain/ranking";
+export type { RaceResultsRepository } from "./domain/race-results-repository";
+export * from "./application/results-use-cases";
+export { SupabaseRaceResultsRepository } from "./infrastructure/supabase-race-results-repository";
 export type { RaceScreenRepository } from "./domain/race-screen-repository";
 export * from "./application/station-screen-use-case";
 export { SupabaseRaceScreenRepository } from "./infrastructure/supabase-race-screen-repository";
@@ -79,7 +85,13 @@ export function createRaceModule(client: RaceSupabaseClient) {
   const registrations = new SupabaseRaceRegistrationRepository(client);
   const engine = new SupabaseRaceEngineRepository(client);
   const judge = new SupabaseRaceJudgeRepository(client);
+  const results = new SupabaseRaceResultsRepository(client);
   return {
+    getLeaderboard: new GetLeaderboardUseCase(results),
+    computeRankings: new ComputeRankingsUseCase(results),
+    publishResults: new PublishResultsUseCase(results),
+    getAthleteResults: new GetAthleteResultsUseCase(results),
+    correctResult: new CorrectResultUseCase(results),
     getStationScreen: new GetStationScreenUseCase(new SupabaseRaceScreenRepository(client)),
     recordAction: new RecordActionUseCase(judge),
     reviewAction: new ReviewActionUseCase(judge),

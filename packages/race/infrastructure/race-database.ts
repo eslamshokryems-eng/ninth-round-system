@@ -137,6 +137,45 @@ export interface RaceStationScreenJson {
   planned_next_ms: number | null;
   served_any: boolean;
 }
+export interface RaceRankRowJson {
+  rank: number;
+  race_number: string;
+  name: string;
+  total_points: number;
+  placements: Record<string, number>;
+  tb_s04: number | null;
+  tb_s07: number | null;
+}
+export interface RaceLeaderboardJson {
+  available: boolean;
+  server_time?: string;
+  event?: { name: string };
+  official?: boolean;
+  categories?: {
+    code: string;
+    name: string;
+    state: "OFFICIAL" | "PROVISIONAL";
+    version: number | null;
+    rows: RaceRankRowJson[];
+    racing: number;
+    excluded: { race_number: string; name: string; status: "DNS" | "DNF" | "WITHDRAWN" }[];
+  }[];
+}
+export interface RaceSnapshotJson {
+  category_id: string;
+  version: number | null;
+  official: boolean;
+  unchanged: boolean;
+  ranked: number;
+  blockers: { ranked: number; racing: number; pending_review: number; not_locked: number; unscored: number };
+}
+export interface RaceAthleteResultsJson {
+  race_number: string;
+  name: string;
+  category_code: string;
+  race_status: string;
+  results: { result_id: string; station: number; station_name: string; status: string; official_score: number | null; technique_score: number | null; has_technique: boolean }[];
+}
 export interface RaceMoveRow { heat_number: number; queue_position: number; slot_index: number | null }
 
 /** JSON returned by race_control_state (Master Control dashboard). */
@@ -303,6 +342,26 @@ export interface RaceDatabase {
       race_check_in: {
         Args: { p_registration_id: string };
         Returns: RaceCheckInRow[];
+      };
+      race_leaderboard: {
+        Args: { p_event_id: string; p_category_code?: string | null };
+        Returns: RaceLeaderboardJson;
+      };
+      race_compute_rankings: {
+        Args: { p_event_id: string; p_category_id?: string | null; p_official?: boolean };
+        Returns: { official: boolean; categories: RaceSnapshotJson[] };
+      };
+      race_publish_results: {
+        Args: { p_event_id: string };
+        Returns: { status: string; already: boolean; rankings?: { official: boolean; categories: RaceSnapshotJson[] } };
+      };
+      race_athlete_results: {
+        Args: { p_event_id: string; p_race_number: string };
+        Returns: RaceAthleteResultsJson;
+      };
+      race_correct_station_result: {
+        Args: { p_result_id: string; p_field: string; p_value: number; p_reason: string };
+        Returns: { result_id: string; field: string; old: number | null; new: number; status: string; snapshot: RaceSnapshotJson | null };
       };
       race_station_screen: {
         Args: { p_event_id: string; p_station_number: number };
