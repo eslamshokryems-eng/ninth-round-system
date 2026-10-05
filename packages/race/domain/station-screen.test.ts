@@ -113,6 +113,19 @@ describe("state machine — every state", () => {
   });
 });
 
+describe("rowing station (distance read from the photo)", () => {
+  const row = (score: number | null): StationScreenData => ({ ...serverAt(1_930_000), current: { raceNumber: "N001", categoryCode: "MEN", windowStartMs: 1_740_000, windowEndMs: 1_920_000, scoringEndMs: 1_950_000, scoringType: "DISTANCE_M", score } });
+  it("has no live count during WORK", () => {
+    expect(deriveScreenState(row(null), 1_800_000)).toMatchObject({ kind: "WORK", score: null, unit: "M" });
+  });
+  it("TRANSITION shows no final score until the distance is confirmed (PENDING EVIDENCE)", () => {
+    expect(deriveScreenState(row(null), 1_930_000)).toMatchObject({ kind: "TRANSITION", finalScore: null, unit: "M", remainingMs: 20_000 });
+  });
+  it("… and the confirmed distance once it is", () => {
+    expect(deriveScreenState(row(842), 1_940_000)).toMatchObject({ kind: "TRANSITION", finalScore: 842, unit: "M" });
+  });
+});
+
 describe("state machine — the whole race, every 100 ms", () => {
   const seq: string[] = [];
   let prevRemaining: number | null = null;

@@ -8,6 +8,7 @@ import { getRaceModule } from "../../../../../src/lib/composition-root";
 import { useAuthStore } from "../../../../../src/features/auth/store";
 import { useStationView } from "../../../../../src/features/race/use-station-view";
 import { RaceBadge, RaceButton, RaceHeader, RaceNotice, RacePage, RaceSpinner } from "../../../../../src/components/race/race-ui";
+import { RowingConsole } from "../../../../../src/components/race/rowing-console";
 
 function browserStorage(key: string): QueueStorage {
   return {
@@ -57,6 +58,8 @@ export default function JudgePage() {
   }
   if (loadError) return <Shell><RaceNotice>{loadError}</RaceNotice></Shell>;
   if (!event || !Number.isInteger(stationNumber)) return <Shell><RaceSpinner /></Shell>;
+  // Station 09 (Rowing) is scored from the photographed display, not from taps: its own evidence console
+  if (stationNumber === 9) return <Shell><RowingConsole eventId={event.eventId} /></Shell>;
   return <Console event={event} stationNumber={stationNumber} />;
 }
 

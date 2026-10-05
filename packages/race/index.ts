@@ -30,6 +30,8 @@ import { SupabaseRaceJudgeRepository } from "./infrastructure/supabase-race-judg
 import { GetStationScreenUseCase } from "./application/station-screen-use-case";
 import { ComputeRankingsUseCase, CorrectResultUseCase, GetAthleteResultsUseCase, GetLeaderboardUseCase, PublishResultsUseCase } from "./application/results-use-cases";
 import { SupabaseRaceResultsRepository } from "./infrastructure/supabase-race-results-repository";
+import { CorrectRowingUseCase, GetEvidenceHistoryUseCase, GetEvidenceImageUseCase, GetRowingViewUseCase, ReviewEvidenceUseCase } from "./application/rowing-use-cases";
+import { SupabaseRaceRowingRepository } from "./infrastructure/supabase-race-rowing-repository";
 import { SupabaseRaceScreenRepository } from "./infrastructure/supabase-race-screen-repository";
 import { SupabaseRaceRegistrationRepository } from "./infrastructure/supabase-race-registration-repository";
 import { SupabaseRaceEngineRepository } from "./infrastructure/supabase-race-engine-repository";
@@ -45,6 +47,11 @@ export * from "./domain/registration";
 export * from "./domain/engine";
 export * from "./domain/station-screen";
 export * from "./domain/ranking";
+export * from "./domain/rowing";
+export * from "./domain/evidence-queue";
+export type * from "./domain/race-rowing-repository";
+export * from "./application/rowing-use-cases";
+export { SupabaseRaceRowingRepository } from "./infrastructure/supabase-race-rowing-repository";
 export type { RaceResultsRepository } from "./domain/race-results-repository";
 export * from "./application/results-use-cases";
 export { SupabaseRaceResultsRepository } from "./infrastructure/supabase-race-results-repository";
@@ -86,7 +93,14 @@ export function createRaceModule(client: RaceSupabaseClient) {
   const engine = new SupabaseRaceEngineRepository(client);
   const judge = new SupabaseRaceJudgeRepository(client);
   const results = new SupabaseRaceResultsRepository(client);
+  const rowing = new SupabaseRaceRowingRepository(client);
   return {
+    rowingRepository: rowing,
+    getRowingView: new GetRowingViewUseCase(rowing),
+    getEvidenceHistory: new GetEvidenceHistoryUseCase(rowing),
+    getEvidenceImage: new GetEvidenceImageUseCase(rowing),
+    reviewEvidence: new ReviewEvidenceUseCase(rowing),
+    correctRowing: new CorrectRowingUseCase(rowing),
     getLeaderboard: new GetLeaderboardUseCase(results),
     computeRankings: new ComputeRankingsUseCase(results),
     publishResults: new PublishResultsUseCase(results),

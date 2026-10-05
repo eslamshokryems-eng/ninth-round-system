@@ -162,8 +162,14 @@ function Body({ state, data }: { state: ScreenState; data: StationScreenData }) 
           <div className="screen-tag screen-tag-red">WORK</div>
           <Code code={state.raceNumber} category={state.categoryCode} />
           <div className="screen-count screen-count-xl" data-testid="screen-countdown">{formatCountdown(state.remainingMs)}</div>
-          <div className="screen-label">{state.unit}</div>
-          <div className="screen-score" data-testid="screen-score">{state.score}</div>
+          {state.score === null ? (
+            <div className="screen-label" data-testid="screen-rowing-note">ROW — YOUR DISTANCE IS READ AT THE END</div>
+          ) : (
+            <>
+              <div className="screen-label">{state.unit}</div>
+              <div className="screen-score" data-testid="screen-score">{state.score}</div>
+            </>
+          )}
           <Strip next={state.then} />
         </>
       );
@@ -172,8 +178,17 @@ function Body({ state, data }: { state: ScreenState; data: StationScreenData }) 
         <>
           <div className="screen-time-up">TIME</div>
           <Code code={state.raceNumber} />
-          <div className="screen-label">FINAL SCORE · {state.unit}</div>
-          <div className="screen-score" data-testid="screen-score">{state.finalScore}</div>
+          {state.finalScore === null ? (
+            <>
+              <div className="screen-label">FINAL DISTANCE</div>
+              <div className="screen-pending" data-testid="screen-pending">CONFIRMING…</div>
+            </>
+          ) : (
+            <>
+              <div className="screen-label">FINAL SCORE · {state.unit}</div>
+              <div className="screen-score" data-testid="screen-score">{state.finalScore}</div>
+            </>
+          )}
           <div className="screen-move" data-testid="screen-move">
             {state.moveTo === null ? "FINISHED — WELL DONE" : `MOVE TO STATION ${String(state.moveTo).padStart(2, "0")}`}
           </div>

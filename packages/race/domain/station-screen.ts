@@ -28,7 +28,7 @@ export interface StationScreenData {
   servedAny: boolean;
 }
 
-export type ScoreUnit = "REPS" | "LAPS" | "SEC";
+export type ScoreUnit = "REPS" | "LAPS" | "SEC" | "M";
 
 export interface NextAthlete {
   raceNumber: string;
@@ -39,8 +39,10 @@ export interface NextAthlete {
 export type ScreenState =
   | { kind: "WAITING"; next: NextAthlete | null; plannedInMs: number | null; raceStarted: boolean }
   | { kind: "GET_READY"; raceNumber: string; categoryCode: string; startsInMs: number }
-  | { kind: "WORK"; raceNumber: string; categoryCode: string; remainingMs: number; score: number; unit: ScoreUnit; then: NextAthlete | null }
-  | { kind: "TRANSITION"; raceNumber: string; finalScore: number; unit: ScoreUnit; remainingMs: number; moveTo: number | null; then: NextAthlete | null }
+  /** `score` is null at the rowing station: its distance is read from the display photo after the 3:00, there is no live count. */
+  | { kind: "WORK"; raceNumber: string; categoryCode: string; remainingMs: number; score: number | null; unit: ScoreUnit; then: NextAthlete | null }
+  /** `finalScore` is null while a rowing distance is still PENDING EVIDENCE (not yet confirmed by the judge). */
+  | { kind: "TRANSITION"; raceNumber: string; finalScore: number | null; unit: ScoreUnit; remainingMs: number; moveTo: number | null; then: NextAthlete | null }
   | { kind: "NEXT_ATHLETE"; next: NextAthlete | null; plannedInMs: number | null }
   | { kind: "PAUSED" }
   | { kind: "FINISHED" };
@@ -48,6 +50,7 @@ export type ScreenState =
 export function scoreUnit(scoringType: string | null): ScoreUnit {
   if (scoringType === "LAPS") return "LAPS";
   if (scoringType === "HOLD_MS") return "SEC";
+  if (scoringType === "DISTANCE_M") return "M";
   return "REPS";
 }
 
@@ -71,13 +74,13 @@ export function deriveScreenState(data: StationScreenData, raceMs: number | null
   if (c) {
     const unit = scoreUnit(c.scoringType);
     if (raceMs < c.windowEndMs) {
-      return { kind: "WORK", raceNumber: c.raceNumber, categoryCode: c.categoryCode, remainingMs: Math.max(c.windowEndMs - raceMs, 0), score: displayScore(c.score, unit), unit, then: nxt };
+      return { kind: "WORK", raceNumber: c.raceNumber, categoryCode: c.categoryCode, remainingMs: Math.max(c.windowEndMs - raceMs, 0), score: unit === "M" ? null : displayScore(c.score, unit), unit, then: nxt };
     }
     if (raceMs < c.scoringEndMs) {
       return {
         kind: "TRANSITION",
         raceNumber: c.raceNumber,
-        finalScore: displayScore(c.score, unit),
+        finalScore: unit === "M" && c.score === null ? null : displayScore(c.score, unit),
         unit,
         remainingMs: Math.max(c.scoringEndMs - raceMs, 0),
         moveTo: data.station.isLast ? null : data.station.number + 1,

@@ -12,10 +12,11 @@
  *
  * Env: RACE_E2E_BASE (default http://localhost:3100), CHROMIUM_PATH (optional), RACE_E2E_SHOTS (screenshot dir).
  */
-/* global document, window, localStorage, getComputedStyle, URL, setTimeout */
+/* global document, window, localStorage, getComputedStyle, URL, setTimeout, Buffer */
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const BASE = process.env.RACE_E2E_BASE ?? "http://localhost:3100";
@@ -97,6 +98,13 @@ const scRace = () => (sc.paused ? sc.baseMs : sc.baseMs + (Date.now() - sc.baseA
 const scSet = (ms) => { sc.baseMs = ms; sc.baseAt = Date.now(); sc.paused = false; };
 const scSlots = [["N001", 60000, null], ["N002", 270000, null], ["N004", 690000, 750000]];
 const screenData = (n) => {
+  if (n === 9) {            // the rowing screen: the SAME payload shape — a distance only once the judge has confirmed it, and never any evidence
+    const t = rwRace(); const r = rw.results.N005;
+    return { server_time: new Date().toISOString(), event: { name: "THE NINTH" }, station: { number: 9, name: "Rowing", is_last: true }, clock: { started: true, paused: false, finished: false, race_ms: t, version: 1 },
+      timing: { work_ms: 180000, transition_ms: 30000, get_ready_ms: 10000 },
+      current: t >= r.end - 180000 && t < r.scoringEnd ? { race_number: "N005", category_code: "MEN", window_start_ms: r.end - 180000, window_end_ms: r.end, scoring_end_ms: r.scoringEnd, scoring_type: "DISTANCE_M", score: r.official } : null,
+      upcoming: null, planned_next_ms: null, served_any: true };
+  }
   const t = scRace();
   const live = scSlots.filter(([, , dnf]) => !(dnf !== null && t >= dnf));
   const cur = live.find(([, st]) => st <= t && t < st + 210000);
@@ -129,6 +137,113 @@ const leaderboard = (eventId) => {
 const rkBlockers = () => ({ ranked: 4, racing: rk.racing, pending_review: rk.pending, not_locked: 0, unscored: rk.unscored });
 const rkReady = () => rk.racing === 0 && rk.pending === 0 && rk.unscored === 0;
 
+// ---- Rowing (Station 09) mock: a stateful evidence backend. Idempotent by client ids, like the real RPCs; refuses what the real ones refuse. -----------------------
+const TINY_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+const RW_LIMITS = { min_confidence: 0.6, review_confidence: 0.85, max_distance_m: 1500 };
+const rwClassify = (d, c) => d === null || d < 0 || d > 1500 ? "FAILED" : c === null ? "LOW_CONFIDENCE" : c < 0.6 ? "FAILED" : c < 0.85 ? "LOW_CONFIDENCE" : "SUCCEEDED";
+const rw = { baseMs: 1800000, baseAt: Date.now(), mode: "ok", loseNext: false, uploads: new Map(), uploadCalls: [], captureCalls: 0, submitCalls: 0, confirmCalls: [], retakeCalls: [], reviews: [], corrections: [], audit: [], forbidden: false,
+  results: { N001: mkRw("row-1", "N001", "Ahmed A.", 1920000), N002: mkRw("row-2", "N002", "Omar F.", 2130000), N003: mkRw("row-3", "N003", "Sara M.", 2340000), N004: mkRw("row-4", "N004", "Hany S.", 2550000), N005: mkRw("row-5", "N005", "Nour E.", 2760000) } };
+function mkRw(id, race, name, end) { return { id, race, name, end, scoringEnd: end + 30000, attempts: [], official: null, corrected: false }; }
+const rwRace = () => rw.baseMs + (Date.now() - rw.baseAt);
+const rwSet = (ms) => { rw.baseMs = ms; rw.baseAt = Date.now(); };
+const rwByResult = (id) => Object.values(rw.results).find((r) => r.id === id);
+const rwByAttempt = (id) => Object.values(rw.results).find((r) => r.attempts.some((a) => a.id === id));
+const rwState = (r) => r.official !== null ? "OFFICIAL" : r.attempts.some((a) => a.status === "PENDING_REVIEW") ? "PENDING_MASTER_REVIEW" : "PENDING_EVIDENCE";
+const rwAttemptJson = (a) => ({ attempt_id: a.id, attempt_no: a.no, status: a.status, ocr_status: a.ocr_status, proposed_distance_m: a.distance, confidence: a.confidence, ocr_text: a.text, ocr_engine: a.engine,
+  captured_at: a.capturedAt, capture_race_ms: a.captureMs, image_path: a.path, confirmed_distance_m: a.confirmed ?? null, retake_reason: a.retakeReason ?? null, confirmed_after_transition: a.late === true,
+  review_reason: a.reviewReason ?? null, origin: a.origin });
+const rwView = () => {
+  const t = rwRace();
+  return { server_time: new Date().toISOString(), station: { number: 9, name: "Rowing" }, clock: { started: true, paused: false, finished: false, race_ms: t, version: 1 }, transition_ms: 30000,
+    items: Object.values(rw.results).filter((r) => t >= r.end - 180000).map((r) => ({ result_id: r.id, race_number: r.race, name: r.name, category_code: "MEN", window_start_ms: r.end - 180000, window_end_ms: r.end, scoring_end_ms: r.scoringEnd,
+      phase: t < r.end ? "WORK" : t < r.scoringEnd ? "TRANSITION" : "AFTER", result_status: t < r.scoringEnd ? "SCORING" : r.corrected ? "CORRECTED" : "LOCKED", evidence_state: rwState(r), official_distance_m: r.official,
+      limits: RW_LIMITS, attempts: r.attempts.map(rwAttemptJson) })) };
+};
+const rwErr = (route, message, code = "P0001") => route.fulfill({ status: 400, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ code, message, details: null, hint: null }) });
+function rwRpc(fn, body, json, route) {
+  const t = rwRace();
+  const log = (action, extra = {}) => rw.audit.push({ at: new Date().toISOString(), action: "race.ocr." + action, actor: "Judge", target_id: extra.id ?? "", after: null, metadata: extra });
+  switch (fn) {
+    case "race_rowing_view":
+      if (rw.forbidden) return rwErr(route, "RACE_FORBIDDEN: only the rowing judge (or race control) can open the evidence view", "42501");
+      return json(200, rwView());
+    case "race_ocr_capture": {
+      rw.captureCalls += 1;
+      const r = rwByResult(body.p_station_result_id);
+      const known = Object.values(rw.results).flatMap((x) => x.attempts).find((a) => a.cid === body.p_client_capture_id);
+      if (known) return json(200, { attempt_id: known.id, attempt_no: known.no, status: known.status, ocr_status: known.ocr_status, duplicate: true, capture_race_ms: known.captureMs, after_transition: null });
+      if (!r) return rwErr(route, "RACE_NOT_FOUND");
+      if (t < r.end) return rwErr(route, "RACE_OCR_TOO_EARLY: the rowing display is final only when the 3:00 work window has ended");
+      if (rwState(r) === "OFFICIAL") return rwErr(route, "RACE_OCR_ALREADY_CONFIRMED: this rowing distance is already official");
+      if (r.attempts.some((a) => ["CAPTURED", "PENDING_REVIEW"].includes(a.status))) return rwErr(route, "RACE_OCR_ATTEMPT_ACTIVE: confirm or retake the current photo first");
+      if (!rw.uploads.has(body.p_storage_path)) return rwErr(route, "RACE_OCR_IMAGE_MISSING: upload the photo before registering it");
+      const a = { id: "att-" + r.race + "-" + (r.attempts.length + 1), no: r.attempts.length + 1, cid: body.p_client_capture_id, status: "CAPTURED", ocr_status: "PENDING", distance: null, confidence: null, text: null, engine: null,
+        capturedAt: new Date().toISOString(), captureMs: t, path: body.p_storage_path, origin: body.p_origin, offlineMeta: { at: body.p_device_recorded_at, seq: body.p_device_seq, ms: body.p_device_race_ms } };
+      r.attempts.push(a); log("capture", { id: a.id });
+      const resp = { attempt_id: a.id, attempt_no: a.no, status: a.status, ocr_status: a.ocr_status, duplicate: false, capture_race_ms: t, after_transition: t >= r.scoringEnd };
+      if (rw.loseNext) { rw.loseNext = false; return route.abort("connectionreset"); }
+      return json(200, resp);
+    }
+    case "race_ocr_submit": {
+      rw.submitCalls += 1;
+      const r = rwByAttempt(body.p_attempt_id); const a = r?.attempts.find((x) => x.id === body.p_attempt_id);
+      if (!a) return rwErr(route, "RACE_NOT_FOUND");
+      if (a.ocr_status !== "PENDING") return json(200, { attempt_id: a.id, ocr_status: a.ocr_status, proposed_distance_m: a.distance, confidence: a.confidence, duplicate: true });
+      a.distance = body.p_distance_m; a.confidence = body.p_confidence; a.text = body.p_raw_text; a.engine = body.p_engine; a.ocr_status = rwClassify(a.distance, a.confidence); a.submitted = body; log("result", { id: a.id });
+      return json(200, { attempt_id: a.id, ocr_status: a.ocr_status, proposed_distance_m: a.distance, confidence: a.confidence, duplicate: false, requires_acknowledgement: a.ocr_status === "LOW_CONFIDENCE", can_confirm: a.ocr_status !== "FAILED" });
+    }
+    case "race_ocr_confirm": {
+      rw.confirmCalls.push(body);
+      const r = rwByAttempt(body.p_attempt_id); const a = r?.attempts.find((x) => x.id === body.p_attempt_id);
+      if (!a) return rwErr(route, "RACE_NOT_FOUND");
+      if (a.confirmId === body.p_client_event_id) return json(200, { attempt_id: a.id, status: a.status, official: a.status === "CONFIRMED", duplicate: true, after_transition: a.late === true, distance_m: a.distance });
+      if (a.status === "CONFIRMED") return rwErr(route, "RACE_OCR_ALREADY_CONFIRMED: this photo is already confirmed");
+      if (a.status !== "CAPTURED") return rwErr(route, "RACE_OCR_NOT_ACTIVE: this photo can no longer be confirmed");
+      if (a.ocr_status === "PENDING") return rwErr(route, "RACE_OCR_NOT_PROCESSED: the OCR result is not in yet");
+      if (a.ocr_status === "FAILED") return rwErr(route, "RACE_OCR_UNREADABLE: the display could not be read");
+      if (a.ocr_status === "LOW_CONFIDENCE" && body.p_acknowledge_low_confidence !== true) return rwErr(route, "RACE_OCR_LOW_CONFIDENCE: the reading is uncertain");
+      a.confirmId = body.p_client_event_id;
+      if (t >= r.scoringEnd) { a.status = "PENDING_REVIEW"; a.late = true; log("confirm_late", { id: a.id }); return json(200, { attempt_id: a.id, status: a.status, official: false, duplicate: false, after_transition: true, distance_m: a.distance }); }
+      a.status = "CONFIRMED"; a.confirmed = a.distance; r.official = a.distance; log("confirm", { id: a.id });
+      return json(200, { attempt_id: a.id, status: a.status, official: true, duplicate: false, after_transition: false, distance_m: a.distance });
+    }
+    case "race_ocr_retake": {
+      rw.retakeCalls.push(body);
+      const r = rwByAttempt(body.p_attempt_id); const a = r?.attempts.find((x) => x.id === body.p_attempt_id);
+      if (!a) return rwErr(route, "RACE_NOT_FOUND");
+      if (a.retakeId === body.p_client_event_id) return json(200, { attempt_id: a.id, status: a.status, duplicate: true });
+      if (a.status !== "CAPTURED") return rwErr(route, "RACE_OCR_NOT_ACTIVE: this photo can no longer be retaken");
+      a.status = "RETAKEN"; a.retakeId = body.p_client_event_id; a.retakeReason = body.p_reason; log("retake", { id: a.id });
+      return json(200, { attempt_id: a.id, status: a.status, duplicate: false });
+    }
+    case "race_ocr_review": {
+      rw.reviews.push(body);
+      const r = rwByAttempt(body.p_attempt_id); const a = r?.attempts.find((x) => x.id === body.p_attempt_id);
+      if (!a || a.status !== "PENDING_REVIEW") return rwErr(route, "RACE_OCR_NOT_PENDING: this confirmation is not waiting for review");
+      if (!body.p_reason || !body.p_reason.trim()) return rwErr(route, "RACE_REASON_REQUIRED");
+      a.reviewReason = body.p_reason;
+      if (body.p_decision === "APPROVED") { a.status = "CONFIRMED"; a.confirmed = a.distance; r.official = a.distance; } else a.status = "REJECTED";
+      log("review", { id: a.id });
+      return json(200, { attempt_id: a.id, status: a.status, official: a.status === "CONFIRMED", score: r.official });
+    }
+    case "race_correct_rowing_result": {
+      rw.corrections.push(body);
+      const r = rwByResult(body.p_result_id); if (!r) return rwErr(route, "RACE_NOT_FOUND");
+      const old = r.official; r.official = body.p_distance_m; r.corrected = true; log("manual_correction", { id: r.id });
+      return json(200, { result_id: r.id, old, new: body.p_distance_m, status: "CORRECTED", evidence_attempt_id: body.p_evidence_attempt_id, score: body.p_distance_m, snapshot: null });
+    }
+    case "race_evidence_history": {
+      const r = rwByResult(body.p_result_id);
+      return json(200, { result_id: r.id, evidence_state: rwState(r), official_distance_m: r.official, result_status: "LOCKED",
+        attempts: r.attempts.map((a) => ({ id: a.id, attempt_no: a.no, status: a.status, ocr_status: a.ocr_status, proposed_distance_m: a.distance, confidence: a.confidence, ocr_text: a.text, ocr_engine: a.engine, captured_at: a.capturedAt,
+          capture_race_ms: a.captureMs, storage_path: a.path, confirmed_distance_m: a.confirmed ?? null, retake_reason: a.retakeReason ?? null, confirmed_after_transition: a.late === true, review_reason: a.reviewReason ?? null, origin: a.origin })),
+        corrections: rw.corrections.filter((c) => c.p_result_id === r.id).map((c, i) => ({ id: "c" + i, old: null, new: c.p_distance_m, reason: c.p_reason, by: "u", at: new Date().toISOString(), evidence_attempt_id: c.p_evidence_attempt_id })),
+        audit: rw.audit.filter((x) => r.attempts.some((a) => a.id === x.target_id) || x.target_id === r.id) });
+    }
+  }
+  return null;
+}
+
 async function installMock(context) {
   context.on("request", (r) => seenUrls.push(r.url()));
   await context.route(`${SB}/**`, async (route) => {
@@ -136,11 +251,30 @@ async function installMock(context) {
     const url = new URL(req.url());
     const json = (status, body) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(body) });
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
+    // evidence storage (private bucket): upload is immutable (a second upload of the same path is a 409), reads go through signed URLs
+    const stg = /\/storage\/v1\/object\/(sign\/)?race-evidence\/(.+)$/.exec(url.pathname);
+    if (stg) {
+      const path = decodeURIComponent(stg[2]);
+      if (rw.mode === "drop") return route.abort("connectionfailed");
+      if (stg[1] && req.method() === "POST") return json(200, { signedURL: `/object/sign/race-evidence/${stg[2]}?token=t` });
+      if (stg[1] && req.method() === "GET") return route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: TINY_PNG });
+      if (req.method() === "POST") {
+        rw.uploadCalls.push(path);
+        if (rw.uploads.has(path)) return json(409, { statusCode: "409", error: "Duplicate", message: "The resource already exists" });
+        rw.uploads.set(path, true);
+        return json(200, { Key: "race-evidence/" + path, Id: "obj" });
+      }
+    }
     const rpc = /\/rest\/v1\/rpc\/([a-z_]+)/.exec(url.pathname);
     if (rpc) {
       const fn = rpc[1];
       const body = req.postData() ? JSON.parse(req.postData()) : {};
       calls.push({ fn, body });
+      if (fn.startsWith("race_ocr_") || fn === "race_rowing_view" || fn === "race_correct_rowing_result" || fn === "race_evidence_history") {
+        if (rw.mode === "drop") return route.abort("connectionfailed");
+        const handled = rwRpc(fn, body, json, route);
+        if (handled !== null) return handled;
+      }
       switch (fn) {
         case "race_get_public_event": return body.p_slug === "locked-2026" ? json(200, LOCKED) : body.p_slug === "the-ninth-2026" ? json(200, EVENT) : json(406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned", details: "The result contains 0 rows", hint: null });
         case "race_register_athlete":
@@ -1051,6 +1185,248 @@ const main = async () => {
     await rf.getByLabel("Race number").fill("999");
     await rf.getByRole("button", { name: "Find athlete" }).click();
     await rf.waitForSelector("text=Not found");
+  });
+
+  // ---------- Rowing (Station 09): CAPTURE -> OCR -> CONFIRM / RETAKE -> OFFICIAL ----------
+  for (const c of [tv, pub, sc2, fin]) { try { await c.close(); } catch { /* already closed */ } }     // nothing else polls the mock from here on
+  const rwFrom = calls.length;
+  const displayPng = async (text, name) => {
+    const pg = await browser.newPage();
+    const url = await pg.evaluate((t) => { const c = document.createElement("canvas"); c.width = 900; c.height = 520; const x = c.getContext("2d"); x.fillStyle = "#0b0b0b"; x.fillRect(0, 0, 900, 520);
+      x.fillStyle = "#f2f2f2"; x.font = "bold 250px Arial"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(t, 450, 270); return c.toDataURL("image/png"); }, text);
+    await pg.close();
+    const file = path.join(shots, name); fs.writeFileSync(file, Buffer.from(url.split(",")[1], "base64")); return file;
+  };
+  const jc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await installMock(jc);
+  const jr = await jc.newPage(); await seedSession(jr);
+  jr.on("pageerror", (e) => errors.push(`pageerror(rowing): ${e.message}`));
+  const card = (race) => jr.locator(`[data-testid=rowing-card][data-race-number=${race}]`);
+  const scripted = (text, confidence, digits = true) => jr.evaluate(([t, c, d]) => {
+    window.__raceE2eOcr = { name: "scripted", recognize: async () => ({ text: t, words: d && c !== null ? [{ text: t.replace(/\D/g, ""), confidence: c }] : [], confidence: c, engine: "scripted@1" }) };
+  }, [text, confidence, digits]);
+  const unscripted = () => jr.evaluate(() => { delete window.__raceE2eOcr; });
+  const rwUntil = async (cond, what, ms = 15000) => { const end = Date.now() + ms; while (Date.now() < end && !(await cond())) await new Promise((r) => setTimeout(r, 100)); assert.ok(await cond(), what); };
+  const stateOf = (race) => card(race).locator("[data-testid=evidence-state]").innerText();
+
+  await step("rowing judge: while the 3:00 work window is open there is NO capture control — the display is not final", async () => {
+    rwSet(1800000);
+    await jr.goto(`${BASE}/race/judge/locked-2026/9`); await jr.waitForSelector("[data-testid=rowing-card]");
+    assert.equal(await card("N001").getAttribute("data-phase"), "WORK");
+    assert.match(await card("N001").locator("[data-testid=wait]").innerText(), /3:00 WORK WINDOW IS OPEN/i);
+    assert.equal(await jr.locator("[data-testid=capture-input]").count(), 0);
+    assert.match(await stateOf("N001"), /PENDING EVIDENCE/i);
+    await jr.screenshot({ path: `${shots}/29-rowing-work-wait.png`, fullPage: true });
+  });
+  await step("rowing judge: after 3:00 the CAPTURE DISPLAY PHOTO button appears; the transition clock runs", async () => {
+    rwSet(1925000);
+    await rwUntil(async () => (await card("N001").getAttribute("data-phase")) === "TRANSITION", "transition phase");
+    assert.equal(await jr.locator("[data-testid=capture-input]").count(), 1);
+    assert.match(await card("N001").innerText(), /CAPTURE DISPLAY PHOTO/i);
+    assert.match(await card("N001").locator("[data-testid=phase-clock]").innerText(), /TRANSITION 0:[0-2][0-9]/);
+    await jr.screenshot({ path: `${shots}/30-rowing-capture.png`, fullPage: true });
+  });
+  await step("rowing: a REAL OCR engine (tesseract.js, in the browser) reads '842 m' from the photo; raw output, distance and confidence are sent", async () => {
+    await unscripted();
+    const file = await displayPng("842 m", "display-842.png");
+    await jr.setInputFiles("[data-testid=capture-input]", file);
+    await jr.waitForSelector("[data-testid=ocr-distance]", { timeout: 90000 });
+    assert.equal((await card("N001").locator("[data-testid=ocr-distance]").innerText()).trim().toLowerCase(), "842 m");
+    await rwUntil(() => rw.submitCalls >= 1, "the OCR result was submitted");
+    const a = rw.results.N001.attempts[0];
+    assert.equal(a.distance, 842); assert.match(a.text, /842/); assert.equal(a.engine, "tesseract.js@7"); assert.ok(a.confidence > 0.5, `confidence ${a.confidence}`);
+    assert.equal(a.submitted.p_provider, "device-ocr"); assert.ok(a.submitted.p_raw_response.text.includes("842"));
+    assert.equal(a.path, rw.uploadCalls[0], "the original image was stored at the registered path");
+    assert.match(a.path, new RegExp(`^${LOCKED_ID}/rowing/row-1/[0-9a-f-]{36}\\.png$`));
+    assert.ok(await jr.locator("[data-testid=thumb]").count() === 1, "the judge sees the photo he took");
+    assert.equal(rw.confirmCalls.length, 0, "nothing is confirmed by itself");
+    assert.match(await stateOf("N001"), /PENDING EVIDENCE/i);
+    assert.equal(await jr.locator("[data-testid=official-distance]").count(), 0, "no official distance before confirmation");
+    await jr.screenshot({ path: `${shots}/31-rowing-ocr-result.png`, fullPage: true });
+  });
+  await step("rowing: the judge sees OCR RESULT with CONFIRM and RETAKE PHOTO — and nowhere to type or edit a distance", async () => {
+    assert.match(await card("N001").innerText(), /OCR RESULT/i);
+    const a0 = rw.results.N001.attempts[0];
+    // The real engine read the right number but is only ~80% sure: below the 85% line the judge must acknowledge it (the rule working as designed)
+    if (a0.ocr_status === "LOW_CONFIDENCE") {
+      assert.equal(await card("N001").getByRole("button", { name: "CONFIRM" }).isDisabled(), true, "low confidence: CONFIRM waits for the acknowledgement");
+      await card("N001").locator("[data-testid=ack] input").check();
+    }
+    assert.equal(await card("N001").getByRole("button", { name: "CONFIRM" }).isEnabled(), true, `real OCR said ${a0.distance} @ ${a0.confidence} -> ${a0.ocr_status}`);
+    assert.equal(await card("N001").getByRole("button", { name: "RETAKE PHOTO" }).isEnabled(), true);
+    assert.equal(await card("N001").locator("input:not([type=file]):not([type=checkbox])").count(), 0, "no input can change the number");
+    assert.equal(await card("N001").locator("[contenteditable]").count(), 0);
+  });
+  await step("rowing: CONFIRM -> Station 09 = OFFICIAL, with the confirmed distance; one confirmation, sent once", async () => {
+    await card("N001").getByRole("button", { name: "CONFIRM" }).click();
+    await rwUntil(async () => /OFFICIAL/.test(await stateOf("N001")), "official after confirmation");
+    assert.equal((await card("N001").locator("[data-testid=official-distance]").innerText()).trim().toLowerCase(), "842 m");
+    assert.equal(rw.confirmCalls.length, 1); assert.equal(rw.confirmCalls[0].p_attempt_id, "att-N001-1");
+    assert.equal(rw.confirmCalls[0].p_acknowledge_low_confidence, rw.results.N001.attempts[0].ocr_status === "LOW_CONFIDENCE");
+    assert.equal(rw.results.N001.official, 842);
+    await jr.screenshot({ path: `${shots}/32-rowing-official.png`, fullPage: true });
+  });
+
+  await step("rowing RETAKE: a wrong OCR reading (342) is retaken; the first attempt is KEPT; the second one is confirmed", async () => {
+    rwSet(2140000);
+    await rwUntil(async () => (await card("N002").count()) === 1 && (await jr.locator("[data-testid=capture-input]").count()) === 1, "N002 is on the machine");
+    await scripted("342 m", 0.93);
+    await jr.setInputFiles("[data-testid=capture-input]", await displayPng("861 m", "display-861.png"));
+    await card("N002").locator("[data-testid=ocr-distance]").waitFor();
+    assert.equal((await card("N002").locator("[data-testid=ocr-distance]").innerText()).trim().toLowerCase(), "342 m", "the engine got it wrong (the display says 861)");
+    await jr.screenshot({ path: `${shots}/33-rowing-wrong-ocr.png`, fullPage: true });
+    await jr.getByRole("button", { name: "RETAKE PHOTO" }).click();
+    await rwUntil(() => rw.retakeCalls.length === 1, "retake sent");
+    await rwUntil(async () => /CAPTURE DISPLAY PHOTO/i.test(await card("N002").innerText()), "back to CAPTURE");
+    assert.equal(rw.results.N002.attempts[0].status, "RETAKEN"); assert.equal(rw.results.N002.attempts[0].distance, 342, "the wrong reading is evidence history, not deleted");
+    await jr.locator("[data-testid=history] summary").click();
+    assert.match(await jr.locator("[data-testid=history]").innerText(), /1 earlier attempt.*#1 · RETAKEN · OCR 342 m/is);
+    await scripted("861 m", 0.95);
+    await jr.setInputFiles("[data-testid=capture-input]", await displayPng("861 m", "display-861b.png"));
+    await card("N002").locator("[data-testid=ocr-distance]").waitFor();
+    await rwUntil(async () => (await card("N002").locator("[data-testid=ocr-distance]").innerText()).trim().toLowerCase() === "861 m", "second reading");
+    await rwUntil(() => rw.results.N002.attempts[1]?.ocr_status === "SUCCEEDED", "second reading stored");
+    await jr.getByRole("button", { name: "CONFIRM" }).click();
+    await rwUntil(async () => /OFFICIAL/.test(await stateOf("N002")), "official after the retake");
+    assert.equal(rw.results.N002.official, 861); assert.equal(rw.results.N002.attempts.length, 2);
+    assert.equal(rw.results.N002.attempts[1].no, 2);
+    await jr.screenshot({ path: `${shots}/34-rowing-retake-official.png`, fullPage: true });
+  });
+
+  await step("rowing: an unreadable photo cannot be confirmed (RETAKE only); a low-confidence reading needs the judge's explicit acknowledgement", async () => {
+    rwSet(2350000);
+    await rwUntil(async () => (await card("N003").count()) === 1 && (await jr.locator("[data-testid=capture-input]").count()) === 1, "N003 is on the machine");
+    await scripted("#@ ~", 0.2, false);
+    await jr.setInputFiles("[data-testid=capture-input]", await displayPng("glare", "display-glare.png"));
+    await card("N003").locator("[data-testid=unreadable]").waitFor();
+    assert.match(await card("N003").locator("[data-testid=ocr-distance]").innerText(), /UNREADABLE/i);
+    assert.equal(await jr.getByRole("button", { name: "CONFIRM" }).isDisabled(), true, "FAILED reading cannot be confirmed");
+    await jr.getByRole("button", { name: "RETAKE PHOTO" }).click();
+    await rwUntil(async () => /CAPTURE DISPLAY PHOTO/i.test(await card("N003").innerText()), "back to CAPTURE");
+    await scripted("700 m", 0.72);
+    await jr.setInputFiles("[data-testid=capture-input]", await displayPng("700 m", "display-700.png"));
+    await card("N003").locator("[data-testid=ack]").waitFor();
+    assert.match(await jr.locator("[data-testid=ocr-status]").innerText(), /LOW CONFIDENCE/i);
+    assert.match(await jr.locator("[data-testid=ocr-confidence]").innerText(), /72%/);
+    assert.equal(await jr.getByRole("button", { name: "CONFIRM" }).isDisabled(), true, "needs the acknowledgement first");
+    await jr.screenshot({ path: `${shots}/35-rowing-low-confidence.png`, fullPage: true });
+    await jr.locator("[data-testid=ack] input").check();
+    assert.equal(await jr.getByRole("button", { name: "CONFIRM" }).isEnabled(), true);
+    await rwUntil(() => rw.results.N003.attempts[1]?.ocr_status === "LOW_CONFIDENCE", "stored as LOW_CONFIDENCE");
+    await jr.getByRole("button", { name: "CONFIRM" }).click();
+    await rwUntil(async () => /OFFICIAL/.test(await stateOf("N003")), "official with acknowledgement");
+    assert.equal(rw.confirmCalls.at(-1).p_acknowledge_low_confidence, true); assert.equal(rw.results.N003.official, 700);
+  });
+
+  await step("rowing OFFLINE: the photo, its OCR reading and the decision are saved on the device; reload keeps them; reconnect sends each ONCE (lost response included) — late, so PENDING MASTER REVIEW", async () => {
+    rwSet(2560000);
+    await rwUntil(async () => (await card("N004").count()) === 1 && (await jr.locator("[data-testid=capture-input]").count()) === 1, "N004 is on the machine");
+    rw.mode = "drop";                                                     // the connection dies
+    await scripted("655 m", 0.9);
+    await jr.setInputFiles("[data-testid=capture-input]", await displayPng("655 m", "display-655.png"));
+    await card("N004").locator("[data-testid=ocr-distance]").waitFor();   // OCR runs on the device: no connection needed
+    assert.equal((await card("N004").locator("[data-testid=ocr-distance]").innerText()).trim().toLowerCase(), "655 m");
+    assert.match(await jr.locator("[data-testid=outbox-count]").innerText(), /1/);
+    await card("N004").getByRole("button", { name: "CONFIRM" }).click();
+    await jr.waitForSelector("[data-testid=decision-sent]");
+    assert.match(await jr.locator("[data-testid=decision-sent]").innerText(), /CONFIRMED ON THIS DEVICE/);
+    assert.equal(rw.results.N004.attempts.length, 0, "nothing reached the server yet");
+    await jr.screenshot({ path: `${shots}/36-rowing-offline.png`, fullPage: true });
+    await jr.reload();
+    await jr.waitForSelector("[data-testid=outbox-count]");
+    assert.match(await jr.locator("[data-testid=outbox-count]").innerText(), /1/, "the outbox survived the reload");
+    // reconnect — after the 30-second transition (2,580,000); the answer to the FIRST capture is lost on the way back
+    rwSet(2590000); rw.loseNext = true; rw.mode = "ok";
+    await rwUntil(() => rw.results.N004.attempts[0]?.status === "PENDING_REVIEW", "the confirmation arrived and was held for review", 30000);
+    assert.equal(rw.results.N004.attempts.length, 1, "a lost response never created a second attempt");
+    assert.equal(rw.results.N004.attempts[0].origin, "OFFLINE_QUEUE"); assert.ok(rw.results.N004.attempts[0].offlineMeta.seq >= 1);
+    assert.equal(rw.results.N004.attempts[0].late, true);
+    assert.ok(rw.captureCalls >= 2, "the capture was retried with the same id");
+    assert.equal(rw.confirmCalls.filter((c) => c.p_attempt_id === "att-N004-1").length, 1, "one confirmation, sent once");
+    await rwUntil(async () => /PENDING MASTER REVIEW/i.test(await stateOf("N004")), "the judge sees PENDING MASTER REVIEW", 15000);
+    await rwUntil(async () => (await jr.locator("[data-testid=outbox-count]").count()) === 0, "outbox empty");
+    await jr.screenshot({ path: `${shots}/37-rowing-late-review.png`, fullPage: true });
+  });
+
+  const rwJudgeTo = calls.length;                                           // everything the judge's phone sent up to here
+  const mc = await browser.newContext({ viewport: { width: 1360, height: 900 } }); await installMock(mc);
+  const mp = await mc.newPage(); await seedSession(mp);
+  mp.on("pageerror", (e) => errors.push(`pageerror(evidence): ${e.message}`));
+  const ecard = (race) => mp.locator(`[data-testid=evidence-card][data-race-number=${race}]`);
+  await step("master evidence page: the late confirmation, its photo and reading; APPROVE needs a reason; the decision makes Station 09 official", async () => {
+    await mp.goto(`${BASE}/race/control/locked-2026/evidence`); await mp.waitForSelector("[data-testid=evidence-card]");
+    assert.equal(await ecard("N004").getAttribute("data-evidence"), "PENDING_MASTER_REVIEW");
+    assert.deepEqual(await mp.locator("[data-testid=evidence-card]").evaluateAll((els) => els.map((e) => e.dataset.raceNumber).sort()), ["N004", "N005"], "only what needs attention is listed by default: the late confirmation and the athlete still rowing — not the three official results");
+    await mp.waitForSelector("[data-testid=evidence-photo]");
+    assert.match(await ecard("N004").innerText(), /655 m/); assert.match(await ecard("N004").innerText(), /late/i); assert.match(await ecard("N004").innerText(), /offline/i);
+    assert.equal(await mp.locator("[data-testid=approve]").isDisabled(), true, "no reason, no decision");
+    await mp.screenshot({ path: `${shots}/38-evidence-review.png`, fullPage: true });
+    await mp.getByLabel("Reason").fill("photo is clear — 655 m matches the display");
+    await mp.locator("[data-testid=approve]").click();
+    await mp.waitForSelector("[data-testid=evidence-msg]");
+    assert.equal(rw.reviews.length, 1); assert.deepEqual({ d: rw.reviews[0].p_decision, a: rw.reviews[0].p_attempt_id, r: rw.reviews[0].p_reason }, { d: "APPROVED", a: "att-N004-1", r: "photo is clear — 655 m matches the display" });
+    assert.equal(rw.results.N004.official, 655);
+  });
+  await step("master evidence page: manual correction cites the evidence, requires a reason, never edits the OCR record; the audit trail shows every step", async () => {
+    await mp.locator("[data-testid=filter-all]").click();
+    await mp.waitForSelector("[data-testid=evidence-card][data-race-number=N002]");
+    const c = ecard("N002");
+    assert.equal(await c.locator("[data-testid=attempt]").count(), 2, "both attempts are listed");
+    assert.match(await c.innerText(), /RETAKEN/); assert.match(await c.innerText(), /342 m/);
+    await c.locator("[data-testid=start-correction]").click();
+    await c.getByLabel("Corrected distance (m)").fill("870");
+    assert.equal(await c.getByRole("button", { name: "SAVE CORRECTION" }).isDisabled(), true, "a reason is mandatory");
+    await c.getByLabel("Reason (required)").fill("recount from the referee's video: 870 m");
+    await mp.screenshot({ path: `${shots}/39-evidence-correction.png`, fullPage: true });
+    await c.getByRole("button", { name: "SAVE CORRECTION" }).click();
+    await rwUntil(() => rw.corrections.length === 1, "the correction was sent");
+    await mp.locator("[data-testid=evidence-msg]").filter({ hasText: /corrected 655|corrected .* → 870/i }).waitFor();
+    const k = rw.corrections.at(-1);
+    assert.deepEqual({ r: k.p_result_id, d: k.p_distance_m, why: k.p_reason, ev: k.p_evidence_attempt_id }, { r: "row-2", d: 870, why: "recount from the referee's video: 870 m", ev: "att-N002-2" });
+    assert.equal(rw.results.N002.attempts[1].distance, 861, "the OCR record is untouched");
+    await c.locator("[data-testid=show-history]").click();
+    await c.locator("[data-testid=history-panel]").waitFor();
+    const h = await c.locator("[data-testid=history-panel]").innerText();
+    for (const w of ["capture", "result", "retake", "confirm", "manual_correction"]) assert.match(h, new RegExp(w), `audit trail has ${w}`);
+    assert.match(h, /Correction .* → 870 m/);
+  });
+
+  const tvc = await browser.newContext({ viewport: { width: 1080, height: 1920 } }); await installMock(tvc);
+  const tvp = await tvc.newPage(); await seedSession(tvp);
+  await step("rowing STATION SCREEN: shows CONFIRMING… until the judge confirms, then the distance — and never receives a photo, OCR text or any evidence request", async () => {
+    rwSet(2770000);
+    const from = seenUrls.length; const callsFrom = calls.length;
+    await jc.close(); await mc.close();                                    // the judge phone and the Master page stop polling: only the screen talks to the mock now
+    await tvp.goto(`${BASE}/race/station/locked-2026/9`);
+    await tvp.waitForSelector("[data-testid=screen-state][data-state=TRANSITION]");
+    await tvp.waitForSelector("[data-testid=screen-pending]");
+    assert.match(await tvp.locator("[data-testid=screen-stage]").innerText(), /CONFIRMING/);
+    assert.equal(await tvp.locator("[data-testid=screen-score]").count(), 0, "no distance before confirmation");
+    await tvp.screenshot({ path: `${shots}/40-screen-rowing-pending.png` });
+    rw.results.N005.official = 780;
+    await tvp.waitForSelector("[data-testid=screen-score]");
+    assert.equal((await tvp.locator("[data-testid=screen-score]").innerText()).trim(), "780");
+    await tvp.screenshot({ path: `${shots}/41-screen-rowing-confirmed.png` });
+    const text = await tvp.locator("[data-testid=screen-stage]").innerText();
+    assert.doesNotMatch(text, /photo|image|ocr|\.jpg|\.png|rowing\//i);
+    assert.deepEqual([...new Set(calls.slice(callsFrom).map((c) => c.fn))].sort(), ["race_get_public_event", "race_station_screen"]);
+    assert.deepEqual(seenUrls.slice(from).filter((u) => /storage\/v1/.test(u)), [], "the screen made no storage request");
+  });
+  await step("rowing security in the UI: a signed-out device gets a sign-in prompt; an account that is not the station's judge gets the refusal and NO capture control", async () => {
+    const c0 = await browser.newContext({ viewport: { width: 390, height: 844 } }); await installMock(c0);
+    const p0 = await c0.newPage(); await p0.goto(`${BASE}/race/judge/locked-2026/9`); await p0.waitForSelector("text=Sign in required");
+    assert.equal(await p0.locator("[data-testid=capture-input]").count(), 0); await c0.close();
+    rw.forbidden = true;
+    const c1 = await browser.newContext({ viewport: { width: 390, height: 844 } }); await installMock(c1);
+    const p1 = await c1.newPage(); await seedSession(p1); await p1.goto(`${BASE}/race/judge/locked-2026/9`);
+    await p1.waitForSelector("text=not allowed");
+    assert.equal(await p1.locator("[data-testid=capture-input]").count(), 0); await c1.close();
+    rw.forbidden = false;
+  });
+  await step("rowing: the judge page only calls the evidence RPCs (+ the storage upload) — no score, pause, skip or result-editing call exists on it", async () => {
+    const used = new Set(calls.slice(rwFrom, rwJudgeTo).map((c) => c.fn));
+    assert.deepEqual([...used].sort(), ["race_get_public_event", "race_ocr_capture", "race_ocr_confirm", "race_ocr_retake", "race_ocr_submit", "race_rowing_view"]);
+    assert.ok(!calls.some((c) => c.fn === "race_record_action" && c.body.p_station_result_id?.startsWith("row-")), "no tap-based score on the rowing results");
   });
 
   // ---------- independence from the gym system ----------

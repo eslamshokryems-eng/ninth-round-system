@@ -55,10 +55,10 @@ describe("ranking helpers", () => {
     expect(rows.map((r) => placeLabel(rows, r))).toEqual(["1", "T2", "T2", "4"]);
   });
   it("blockers", () => {
-    expect(blockersClear({ ranked: 5, racing: 0, pendingReview: 0, notLocked: 0, unscored: 0 })).toBe(true);
-    const b = { ranked: 5, racing: 2, pendingReview: 1, notLocked: 0, unscored: 3 };
+    expect(blockersClear({ ranked: 5, racing: 0, pendingReview: 0, notLocked: 0, unscored: 0, pendingEvidence: 0 })).toBe(true);
+    const b = { ranked: 5, racing: 2, pendingReview: 1, notLocked: 0, unscored: 3, pendingEvidence: 2 };
     expect(blockersClear(b)).toBe(false);
-    expect(describeBlockers(b)).toEqual(["2 athletes are still racing", "1 result is waiting for a Master Control review", "3 results have no score"]);
+    expect(describeBlockers(b)).toEqual(["2 athletes are still racing", "1 result is waiting for a Master Control review", "2 rowing results are waiting for confirmed photo evidence", "3 results have no score"]);
   });
 });
 
@@ -74,7 +74,7 @@ describe("mappers", () => {
     expect(toLeaderboard({ available: false })).toEqual({ available: false });
   });
   it("maps snapshots and athlete results", () => {
-    expect(toSnapshot({ category_id: "c", version: 2, official: true, unchanged: false, ranked: 9, blockers: { ranked: 9, racing: 0, pending_review: 1, not_locked: 2, unscored: 3 } }).blockers).toEqual({ ranked: 9, racing: 0, pendingReview: 1, notLocked: 2, unscored: 3 });
+    expect(toSnapshot({ category_id: "c", version: 2, official: true, unchanged: false, ranked: 9, blockers: { ranked: 9, racing: 0, pending_review: 1, not_locked: 2, unscored: 3, pending_evidence: 4 } }).blockers).toEqual({ ranked: 9, racing: 0, pendingReview: 1, notLocked: 2, unscored: 3, pendingEvidence: 4 });
     expect(toAthleteResults({ race_number: "N001", name: "A", category_code: "MEN", race_status: "FINISHED", results: [{ result_id: "r", station: 4, station_name: "Jab", status: "LOCKED", official_score: 3, technique_score: 8, has_technique: true }] }).results[0]).toMatchObject({ resultId: "r", hasTechnique: true, techniqueScore: 8 });
   });
 });

@@ -40,7 +40,7 @@ export function toSnapshot(j: RaceSnapshotJson): SnapshotInfo {
     official: j.official,
     unchanged: j.unchanged,
     ranked: j.ranked,
-    blockers: { ranked: j.blockers.ranked, racing: j.blockers.racing, pendingReview: j.blockers.pending_review, notLocked: j.blockers.not_locked, unscored: j.blockers.unscored },
+    blockers: { ranked: j.blockers.ranked, racing: j.blockers.racing, pendingReview: j.blockers.pending_review, notLocked: j.blockers.not_locked, unscored: j.blockers.unscored, pendingEvidence: j.blockers.pending_evidence ?? 0 },
   };
 }
 

@@ -34,6 +34,8 @@ export interface Blockers {
   pendingReview: number;
   notLocked: number;
   unscored: number;
+  /** Rowing results whose distance is not yet confirmed from the photo evidence. */
+  pendingEvidence: number;
 }
 
 export interface SnapshotInfo {
@@ -67,7 +69,7 @@ export type CorrectableField = "official_score" | "technique_score";
 
 /** True when nothing stands between this category and an official result. */
 export function blockersClear(b: Blockers): boolean {
-  return b.racing === 0 && b.pendingReview === 0 && b.notLocked === 0 && b.unscored === 0;
+  return b.racing === 0 && b.pendingReview === 0 && b.notLocked === 0 && b.unscored === 0 && b.pendingEvidence === 0;
 }
 
 /** Human list of what is still open, empty when ready. */
@@ -76,6 +78,7 @@ export function describeBlockers(b: Blockers): string[] {
   if (b.racing > 0) out.push(`${b.racing} athlete${b.racing === 1 ? " is" : "s are"} still racing`);
   if (b.notLocked > 0) out.push(`${b.notLocked} result${b.notLocked === 1 ? " is" : "s are"} not locked yet`);
   if (b.pendingReview > 0) out.push(`${b.pendingReview} result${b.pendingReview === 1 ? " is" : "s are"} waiting for a Master Control review`);
+  if (b.pendingEvidence > 0) out.push(`${b.pendingEvidence} rowing result${b.pendingEvidence === 1 ? ' is' : 's are'} waiting for confirmed photo evidence`);
   if (b.unscored > 0) out.push(`${b.unscored} result${b.unscored === 1 ? " has" : "s have"} no score`);
   return out;
 }

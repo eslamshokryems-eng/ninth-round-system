@@ -167,7 +167,7 @@ export interface RaceSnapshotJson {
   official: boolean;
   unchanged: boolean;
   ranked: number;
-  blockers: { ranked: number; racing: number; pending_review: number; not_locked: number; unscored: number };
+  blockers: { ranked: number; racing: number; pending_review: number; not_locked: number; unscored: number; pending_evidence?: number };
 }
 export interface RaceAthleteResultsJson {
   race_number: string;
@@ -175,6 +175,35 @@ export interface RaceAthleteResultsJson {
   category_code: string;
   race_status: string;
   results: { result_id: string; station: number; station_name: string; status: string; official_score: number | null; technique_score: number | null; has_technique: boolean }[];
+}
+export interface RaceOcrAttemptJson {
+  attempt_id: string; attempt_no: number; status: string; ocr_status: string; proposed_distance_m: number | null; confidence: number | null;
+  ocr_text: string | null; ocr_engine: string | null; captured_at: string; capture_race_ms: number | null; image_path: string;
+  confirmed_distance_m: number | null; retake_reason: string | null; confirmed_after_transition: boolean; review_reason: string | null; origin: string;
+}
+export interface RaceRowingViewJson {
+  server_time: string;
+  station: { number: number; name: string };
+  clock: { started: boolean; paused: boolean; finished: boolean; race_ms: number | null; version: number };
+  transition_ms: number;
+  items: {
+    result_id: string; race_number: string; name: string; category_code: string; window_start_ms: number; window_end_ms: number; scoring_end_ms: number;
+    phase: string; result_status: string; evidence_state: string; official_distance_m: number | null;
+    limits: { min_confidence: number; review_confidence: number; max_distance_m: number };
+    attempts: RaceOcrAttemptJson[];
+  }[];
+}
+export interface RaceOcrCaptureJson { attempt_id: string; attempt_no: number; status: string; ocr_status: string; duplicate: boolean; capture_race_ms: number | null; after_transition: boolean | null }
+export interface RaceOcrSubmitJson { attempt_id: string; ocr_status: string; proposed_distance_m: number | null; confidence: number | null; duplicate: boolean; requires_acknowledgement?: boolean; can_confirm?: boolean }
+export interface RaceOcrConfirmJson { attempt_id: string; status: string; official: boolean; duplicate: boolean; after_transition: boolean | null; distance_m: number | null; score?: number | null }
+export interface RaceOcrRetakeJson { attempt_id: string; status: string; duplicate: boolean }
+export interface RaceOcrReviewJson { attempt_id: string; status: string; official: boolean; score: number | null }
+export interface RaceRowingCorrectionJson { result_id: string; old: number | null; new: number; status: string; evidence_attempt_id: string | null; score: number | null; snapshot: RaceSnapshotJson | null }
+export interface RaceEvidenceHistoryJson {
+  result_id: string; evidence_state: string; official_distance_m: number | null; result_status: string;
+  attempts: Record<string, unknown>[];
+  corrections: { id: string; old: number | null; new: number; reason: string; by: string; at: string; evidence_attempt_id: string | null }[];
+  audit: { at: string; action: string; actor: string | null; target_id: string; after: unknown; metadata: Record<string, unknown> }[];
 }
 export interface RaceMoveRow { heat_number: number; queue_position: number; slot_index: number | null }
 
@@ -343,6 +372,23 @@ export interface RaceDatabase {
         Args: { p_registration_id: string };
         Returns: RaceCheckInRow[];
       };
+      race_rowing_view: { Args: { p_event_id: string; p_all?: boolean }; Returns: RaceRowingViewJson };
+      race_ocr_capture: {
+        Args: {
+          p_station_result_id: string; p_client_capture_id: string; p_storage_path: string; p_image_mime: string; p_image_bytes: number; p_image_sha256: string;
+          p_origin?: "ONLINE" | "OFFLINE_QUEUE"; p_device_recorded_at?: string | null; p_device_race_ms?: number | null; p_device_seq?: number | null; p_device_id?: string | null;
+        };
+        Returns: RaceOcrCaptureJson;
+      };
+      race_ocr_submit: {
+        Args: { p_attempt_id: string; p_provider: string; p_engine: string; p_raw_text: string; p_raw_response: Record<string, unknown>; p_distance_m: number | null; p_confidence: number | null };
+        Returns: RaceOcrSubmitJson;
+      };
+      race_ocr_confirm: { Args: { p_attempt_id: string; p_client_event_id: string; p_acknowledge_low_confidence?: boolean }; Returns: RaceOcrConfirmJson };
+      race_ocr_retake: { Args: { p_attempt_id: string; p_client_event_id: string; p_reason?: string | null }; Returns: RaceOcrRetakeJson };
+      race_ocr_review: { Args: { p_attempt_id: string; p_decision: "APPROVED" | "REJECTED"; p_reason: string }; Returns: RaceOcrReviewJson };
+      race_correct_rowing_result: { Args: { p_result_id: string; p_distance_m: number; p_reason: string; p_evidence_attempt_id?: string | null }; Returns: RaceRowingCorrectionJson };
+      race_evidence_history: { Args: { p_result_id: string }; Returns: RaceEvidenceHistoryJson };
       race_leaderboard: {
         Args: { p_event_id: string; p_category_code?: string | null };
         Returns: RaceLeaderboardJson;

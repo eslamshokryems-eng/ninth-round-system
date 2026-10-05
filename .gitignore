@@ -39,3 +39,6 @@ pnpm-debug.log*
 
 # Coverage
 coverage/
+
+# THE NINTH: generated OCR engine files (see apps/race/scripts/copy-ocr-assets.mjs)
+apps/race/public/race-ocr/
