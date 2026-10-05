@@ -486,6 +486,7 @@ rewind "$EVR" 3000000
 q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVR')" >/dev/null
 [ "$(q "select status from race_events where id='$EVR'")" = "FINISHED" ] || fail "rankings concurrency: setup — the event did not finish"
 q "update race_station_results sr set official_score = 10 + (abs(hashtext(sr.registration_id::text || st.number)) % 4) * 5, technique_score = case when st.has_technique then 6 + (abs(hashtext(sr.registration_id::text || 't' || st.number)) % 3) * 0.5 end from race_stations st where st.id = sr.station_id and sr.event_id='$EVR' and sr.status = 'LOCKED'" >/dev/null
+q "insert into race_ocr_records (event_id, station_id, station_result_id, storage_path, provider, proposed_distance_m, confidence, ocr_status, status, confirmed_distance_m, confirmed_by, captured_by, client_capture_id) select sr.event_id, sr.station_id, sr.id, sr.event_id::text || '/rowing/' || sr.id::text || '/fixture.jpg', 'fixture', coalesce(sr.official_score, 0)::int, 0.99, 'SUCCEEDED', 'CONFIRMED', coalesce(sr.official_score, 0)::int, '$FOUNDER', '$FOUNDER', gen_random_uuid() from race_station_results sr join race_stations st on st.id = sr.station_id where st.requires_ocr and sr.event_id='$EVR' and sr.status = 'LOCKED'" >/dev/null   # Phase 10: rowing needs confirmed evidence
 CATR=$(q "select category_id from race_registrations where event_id='$EVR' limit 1")
 ranked=$(q "select count(*) from race_registrations where event_id='$EVR' and race_status = 'FINISHED'")
 
@@ -527,3 +528,78 @@ latest=$(q "select max(version) from race_rankings where category_id='$CATR'")
 stale=$(q "select count(*) from (select registration_id, station_placements, total_points, overall_rank from race_rankings where category_id='$CATR' and version=$latest except select registration_id, placements, total_points, overall_rank from race_rank_rows('$EVR','$CATR')) x")
 [ "$errs" = "0" ] && [ "$ok" = "8" ] && [ "$led" = "8" ] && [ "$chain" = "0" ] && [ "$final" = "$lastv" ] && [ "$stale" = "0" ] && [ "$latest" -ge 2 ] && [ "$(q "select count(distinct version) from race_rankings where category_id='$CATR'")" = "$latest" ] && [ "$(q "select count(*) from race_rankings where category_id='$CATR' and version >= 2 and not is_official")" = "0" ] || fail "rankings concurrency: 8 corrections — errors=$errs ok=$ok ledger=$led broken-chain=$chain final=$final last=$lastv snapshot-vs-live-diff=$stale latest-version=$latest"
 pass "rankings concurrency: 8 corrections of one result at once → 8 ledger rows in an unbroken old→new chain, final value = last ledger entry, snapshot versions 1..$latest are gap-free, every one after publication is official (versions are written only when the standing changes), and the latest equals the live ranking"
+
+# ============================ Phase 10: rowing evidence under concurrency (the REAL RPCs) ============================
+EVW=$(setup_engine_event concurrency-rowing 4)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVW')" >/dev/null
+rewind "$EVW" 1925000          # N001's rowing work window (ends 1:32:00 race time = 1,920,000 ms) has just closed; its 0:30 transition is running
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVW')" >/dev/null
+RESW=$(q "select sr.id from race_station_results sr join race_stations st on st.id = sr.station_id join race_registrations r on r.id = sr.registration_id where sr.event_id='$EVW' and st.number = 9 and r.race_number = 'N001'")
+img() { q "insert into storage.objects (bucket_id, name, owner, metadata) values ('race-evidence', '$EVW/rowing/$RESW/$1', '$FOUNDER', '{\"size\": 120000}') on conflict do nothing" >/dev/null; }
+SHA=$(printf 'a%.0s' $(seq 1 64))
+capsql() { echo "select race_ocr_capture('$RESW', '$1', '$EVW/rowing/$RESW/$2', 'image/jpeg', 120000, '$SHA') ->> 'duplicate'"; }
+
+# --- 22. The same photo registered by 20 sessions at once (a retried upload, a double tap, an outbox replay) -----------------------------------------
+img same.jpg; CID=$(q "select gen_random_uuid()")
+rm -f "$WORK"/c/oc*
+barrier_hold 3
+for n in $(seq 1 20); do call "oc$n" "$(capsql "$CID" same.jpg)" & done
+wait; sleep 1
+errs=$(cat "$WORK"/c/oc*.err | grep -c . || true)
+fresh=$(cat "$WORK"/c/oc*.out | grep -c '^false$' || true); dups=$(cat "$WORK"/c/oc*.out | grep -c '^true$' || true)
+rows=$(q "select count(*) from race_ocr_records where station_result_id='$RESW'")
+[ "$errs" = "0" ] && [ "$fresh" = "1" ] && [ "$dups" = "19" ] && [ "$rows" = "1" ] || fail "rowing concurrency: 20 simultaneous registrations of one capture — errors=$errs fresh=$fresh duplicates=$dups attempts=$rows"
+pass "rowing concurrency: ONE photo registered by 20 sessions at once → exactly 1 attempt (1 new, 19 duplicates), no errors — a retried upload never creates a second OCR attempt"
+ATT=$(q "select id from race_ocr_records where station_result_id='$RESW'")
+
+# --- 23. Eleven DIFFERENT photos registered at the same instant for the same result: only one attempt can be active -------------------------------
+#         (first retake the current attempt so a new one is allowed)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_ocr_retake('$ATT', gen_random_uuid(), 'concurrency test')" >/dev/null
+rm -f "$WORK"/c/od*
+for n in $(seq 1 11); do img "diff$n.jpg"; done
+barrier_hold 3
+for n in $(seq 1 11); do call "od$n" "$(capsql "$(q "select gen_random_uuid()")" "diff$n.jpg")" & done
+wait; sleep 1
+fresh=$(cat "$WORK"/c/od*.out | grep -c '^false$' || true)
+active=$(cat "$WORK"/c/od*.err | grep 'ERROR' | grep -c 'RACE_OCR_ATTEMPT_ACTIVE' || true)
+other=$(cat "$WORK"/c/od*.err | grep 'ERROR' | grep -vc 'RACE_OCR_ATTEMPT_ACTIVE' || true)
+open=$(q "select count(*) from race_ocr_records where station_result_id='$RESW' and status in ('CAPTURED','PENDING_REVIEW','CONFIRMED')")
+total=$(q "select count(*) from race_ocr_records where station_result_id='$RESW'")
+[ "$fresh" = "1" ] && [ "$active" = "10" ] && [ "$other" = "0" ] && [ "$open" = "1" ] && [ "$total" = "2" ] || fail "rowing concurrency: 11 different captures at once — new=$fresh refused-active=$active other-errors=$other active-attempts=$open attempts=$total"
+pass "rowing concurrency: 11 different photos at the same instant → exactly 1 new attempt, 10 refused 'confirm or retake first', still exactly one active attempt, the retaken one kept"
+ATT=$(q "select id from race_ocr_records where station_result_id='$RESW' and status = 'CAPTURED'")
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_ocr_submit('$ATT', 'tesseract', 'tesseract.js@7', '842 m', '{}', 842, 0.97)" >/dev/null
+
+# --- 24. Eight confirmations of the same attempt at once (4 different client ids, each sent twice) --------------------------------------------------
+IDS=(); for n in 1 2 3 4; do IDS+=("$(q "select gen_random_uuid()")"); done
+rm -f "$WORK"/c/ok*
+barrier_hold 3
+for n in 0 1 2 3 4 5 6 7; do call "ok$n" "select race_ocr_confirm('$ATT', '${IDS[$((n % 4))]}') ->> 'duplicate'" & done
+wait; sleep 1
+fresh=$(cat "$WORK"/c/ok?.out | grep -c '^false$' || true)
+conf=$(q "select count(*) from race_ocr_records where station_result_id='$RESW' and status = 'CONFIRMED'")
+bad=$(cat "$WORK"/c/ok?.err | grep 'ERROR' | grep -vc 'RACE_OCR_ALREADY_CONFIRMED' || true)
+score=$(q "select official_score from race_station_results where id='$RESW'")
+audits=$(q "select count(*) from race_audit_log where action = 'race.ocr.confirm' and target_id='$ATT'")
+[ "$fresh" = "1" ] && [ "$conf" = "1" ] && [ "$bad" = "0" ] && [ "$score" = "842" ] && [ "$audits" = "1" ] || fail "rowing concurrency: 8 simultaneous confirmations — new=$fresh confirmed-rows=$conf unexpected-errors=$bad score=$score audit-rows=$audits"
+pass "rowing concurrency: 8 simultaneous CONFIRMs of one photo → exactly 1 confirmation (score 842, 1 audit row); the rest are idempotent replays or the clean refusal 'already confirmed' — never a raw database error"
+
+# --- 25. Eight Master Control corrections of the same result at once ---------------------------------------------------------------------------------
+rewind "$EVW" 1960000          # the 0:30 transition is over; the result is LOCKED
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_advance('$EVW')" >/dev/null
+rm -f "$WORK"/c/ow*
+barrier_hold 3
+for n in $(seq 1 8); do call "ow$n" "select race_correct_rowing_result('$RESW', $((900 + n)), 'storm $n') ->> 'status'" & done
+wait; sleep 1
+errs=$(cat "$WORK"/c/ow*.err | grep -c . || true)
+ok=$(cat "$WORK"/c/ow?.out | grep -c '^CORRECTED$' || true)
+led=$(q "select count(*) from race_result_corrections where station_result_id='$RESW' and field = 'rowing_distance_m'")
+chain=$(q "select count(*) from (select old_value, lag(new_value) over (order by corrected_at, id) prev from race_result_corrections where station_result_id='$RESW' and field = 'rowing_distance_m') x where prev is not null and old_value is distinct from prev")
+first=$(q "select old_value #>> '{}' from race_result_corrections where station_result_id='$RESW' and field = 'rowing_distance_m' order by corrected_at, id limit 1")
+final=$(q "select official_score from race_station_results where id='$RESW'")
+lastv=$(q "select new_value #>> '{}' from race_result_corrections where station_result_id='$RESW' and field = 'rowing_distance_m' order by corrected_at desc, id desc limit 1")
+refs=$(q "select count(*) from race_result_corrections where station_result_id='$RESW' and field = 'rowing_distance_m' and evidence_ocr_id = '$ATT'")
+orig=$(q "select proposed_distance_m || ':' || status || ':' || confirmed_distance_m from race_ocr_records where id='$ATT'")
+[ "$errs" = "0" ] && [ "$ok" = "8" ] && [ "$led" = "8" ] && [ "$chain" = "0" ] && [ "$first" = "842" ] && [ "$final" = "$lastv" ] && [ "$refs" = "8" ] && [ "$orig" = "842:CONFIRMED:842" ] || fail "rowing concurrency: 8 corrections — errors=$errs ok=$ok ledger=$led broken-chain=$chain first-old=$first final=$final last=$lastv evidence-refs=$refs original=$orig"
+pass "rowing concurrency: 8 simultaneous Master Control corrections → 8 ledger rows in an unbroken chain starting from the OCR-confirmed 842, every row cites the original evidence, final value = last entry ($final), the OCR record untouched"
+q "select race_sim.check_invariants('$EVW', race_now_ms('$EVW'))" >/dev/null && pass "rowing concurrency: timing invariants hold after the evidence storms"

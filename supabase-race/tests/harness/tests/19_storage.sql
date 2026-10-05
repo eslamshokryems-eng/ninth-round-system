@@ -14,12 +14,18 @@ end $$;
 grant execute on function race_test.obj(text, text, text) to anon, authenticated, service_role;
 
 -- Evidence ------------------------------------------------------------------------------------------------------------------------------
-select race_test.login('judge1');
+-- Phase 10 tightened this: a JUDGE may only upload under <event>/rowing/<result>/ for a result at THEIR station (see 24_rowing_evidence.sql);
+-- race control (here the Event Manager) may still upload anywhere under <event>/.
+select race_test.login('bm_a');
 select race_test.obj('race-evidence', race_test.id('event_a')::text || '/1/rowing-001.jpg');
-select race_test.ok(exists (select 1 from storage.objects where bucket_id = 'race-evidence'), 'evidence: a Judge of the event can upload under <event>/…');
+select race_test.ok(exists (select 1 from storage.objects where bucket_id = 'race-evidence'), 'evidence: the Event Manager can upload under <event>/…');
 select race_test.throws($$select race_test.obj('race-evidence', race_test.id('event_b')::text || '/1/x.jpg')$$, 'row-level security', 'evidence: … but not for another event');
 select race_test.throws($$select race_test.obj('race-evidence', 'not-an-event/1/x.jpg')$$, 'row-level security', 'evidence: a path whose first folder is not an event is refused');
 select race_test.throws($$select race_test.obj('race-evidence', gen_random_uuid()::text || '/1/x.jpg')$$, 'row-level security', 'evidence: … including an unknown event id');
+select race_test.login('judge1');
+select race_test.throws($$select race_test.obj('race-evidence', race_test.id('event_a')::text || '/1/judge-upload.jpg')$$, 'row-level security', 'evidence: a Judge can no longer upload outside <event>/rowing/<result>/ (Phase 10 tightening)');
+select race_test.eq(race_test.count($$select 1 from storage.objects where bucket_id = 'race-evidence'$$), 0::bigint, 'evidence: … and a judge of another station cannot read it');
+select race_test.login('bm_a');
 select race_test.eq(race_test.count($$select 1 from storage.objects where bucket_id = 'race-evidence'$$), 1::bigint, 'evidence: the uploader reads their own object');
 select race_test.eq(race_test.affected($$update storage.objects set name = name || 'x' where bucket_id = 'race-evidence'$$), 0::bigint, 'evidence: nobody can rename evidence (no UPDATE policy)');
 select race_test.eq(race_test.affected($$delete from storage.objects where bucket_id = 'race-evidence'$$), 0::bigint, 'evidence: the uploader cannot delete it either (immutable)');

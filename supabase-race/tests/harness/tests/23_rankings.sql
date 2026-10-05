@@ -17,11 +17,20 @@ update race_registrations set category_id = (select id from race_categories wher
 create function race_test.cat(p text) returns uuid language sql stable as $$ select id from race_categories where event_id = race_test.id('ev_s') and code::text = p $$;
 
 -- Scores with MANY ties (6 distinct values among ~18 athletes per category) so every tie path is exercised.
+-- (hashed from the race NUMBER, not the random registration uuid, so the data — and therefore which ties exist — is identical on every run)
 update race_station_results sr set
-  official_score = 10 + (abs(hashtext(sr.registration_id::text || st.number)) % 6) * 5,
-  technique_score = case when st.has_technique then 6 + (abs(hashtext(sr.registration_id::text || 'tech' || st.number)) % 5) * 0.5 end
-from race_stations st
-where st.id = sr.station_id and sr.event_id = race_test.id('ev_s') and sr.status = 'LOCKED';
+  official_score = 10 + (abs(hashtext(g.race_number || st.number)) % 6) * 5,
+  technique_score = case when st.has_technique then 6 + (abs(hashtext(g.race_number || 'tech' || st.number)) % 5) * 0.5 end
+from race_stations st, race_registrations g
+where st.id = sr.station_id and g.id = sr.registration_id and sr.event_id = race_test.id('ev_s') and sr.status = 'LOCKED';
+
+-- Phase 10: a rowing (Station 09) result only counts once its distance is CONFIRMED evidence. This suite is about the ranking, so every finished
+-- athlete gets a confirmed rowing record as a fixture (the evidence workflow itself is 24_rowing_evidence.sql).
+insert into race_ocr_records (event_id, station_id, station_result_id, storage_path, provider, proposed_distance_m, confidence, ocr_status, status, confirmed_distance_m, confirmed_by, captured_by, client_capture_id)
+select sr.event_id, sr.station_id, sr.id, sr.event_id::text || '/rowing/' || sr.id::text || '/fixture.jpg', 'fixture', coalesce(sr.official_score, 0)::int, 0.99, 'SUCCEEDED', 'CONFIRMED',
+       coalesce(sr.official_score, 0)::int, race_test.id('bm_a'), race_test.id('bm_a'), gen_random_uuid()
+  from race_station_results sr join race_stations st on st.id = sr.station_id
+ where st.requires_ocr and sr.event_id = race_test.id('ev_s') and sr.status = 'LOCKED';
 
 -- An INDEPENDENT oracle: no window functions — each placement is "1 + number of athletes strictly better".
 create function race_test.oracle(p_cat uuid) returns table (reg uuid, total int, rnk int) language sql stable as $$
