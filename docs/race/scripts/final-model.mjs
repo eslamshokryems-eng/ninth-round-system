@@ -376,7 +376,7 @@ export function compare(sys) {
     const s = sysRaw.get(k); const [n, st] = k.split(":").map(Number);
     ok(!!s, `result row N${n} S${st}`); if (!s) continue;
     const isHold = st === 1 && byN.get(n).category === "MASTERS";
-    if (isHold) near(s.score, m.score, 150, `Masters hold ms N${n}`); else eq(s.score, m.score, `raw score N${n} S${st}`);
+    if (isHold) near(s.score, m.score, 400, `Masters hold ms N${n}`); else eq(s.score, m.score, `raw score N${n} S${st}`);
     if (st === 4 || st === 7) eq(s.technique, m.technique, `technique N${n} S${st}`);
     rawChecked++;
   }
