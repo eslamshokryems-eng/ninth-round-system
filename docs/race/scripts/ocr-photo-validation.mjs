@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global window, document, createImageBitmap, atob, Blob, Tesseract */
 // REAL-WORLD OCR VALIDATION for THE NINTH's Rowing (Station 09) reader.
 //
 //   node docs/race/scripts/ocr-photo-validation.mjs <photos-dir> <truth.csv> [--out report.json] [--min-accuracy 0.9]

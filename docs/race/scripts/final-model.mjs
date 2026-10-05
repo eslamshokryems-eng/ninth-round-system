@@ -289,7 +289,6 @@ export function compare(sys) {
   eq(DYN.skipped.size, 1, "exactly one athlete was skipped"); eq(DYN.dnf.size, 1, "exactly one athlete withdrew");
   const byN = new Map(roster.map((a) => [a.n, a]));
   const win = new Map(); for (const w of sys.windows) win.set(`${w.n}:${w.station}`, w);
-  const raceMsOf = (x) => x;
 
   // ---- 1. who finished / DNF / DNS -------------------------------------------------------------------------------------------------
   const sysStatus = new Map(sys.athletes.map((a) => [a.n, a.status]));

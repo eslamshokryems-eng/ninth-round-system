@@ -17,7 +17,6 @@ const X = (ms) => (ms / total) * 1500;
 const rows = [...Array(9)].map((_, i) => i + 1);
 let svg = `<svg width="1620" height="${rows.length * 44 + 120}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial" font-size="12">`;
 svg += `<rect width="100%" height="100%" fill="#0b0f14"/>`;
-let cum = 0;
 for (const p of s.pauses) { const x = X(p.race_ms); svg += `<rect x="${60 + x}" y="30" width="3" height="${rows.length * 44 + 20}" fill="#ef4444" opacity="0.9"/>`; svg += `<text x="${60 + x + 5}" y="26" fill="#ef4444">pause ${Math.round(p.wall_ms / 1000)}s</text>`; }
 for (const st of rows) {
   const y = 40 + (st - 1) * 44;
