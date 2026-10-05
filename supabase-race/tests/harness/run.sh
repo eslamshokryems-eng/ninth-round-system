@@ -66,6 +66,8 @@ total=0
 node "$ROOT/docs/race/scripts/timing-validation.mjs" --csv > "$WORK/js_schedule.csv"
 "${PSQL[@]}" -d "$DB" -c "\\copy race_test.js_schedule from '$WORK/js_schedule.csv' with (format csv)" >/dev/null
 for t in "$HERE"/tests/*.sql; do
+  # ONLY_FINAL=1 (development shortcut): skip the suites, run only the final validation (it builds everything it needs itself)
+  if [ -n "${ONLY_FINAL:-}" ]; then continue; fi
   echo "-- $(basename "$t")"
   if ! "${PSQL[@]}" -d "$DB" -f "$t" > "$WORK/out" 2>&1; then
     { grep -oE 'PASS  .*' "$WORK/out" || true; }; grep -E 'ERROR|FAIL' "$WORK/out" || true; exit 1
@@ -76,8 +78,13 @@ done
 
 echo "== $total assertions passed"
 
+if [ -z "${ONLY_FINAL:-}" ]; then
 step "5b. Concurrency (parallel sessions)"
 source "$HERE/concurrency.sh"
+fi
+
+step "5c. FINAL END-TO-END VALIDATION (50 athletes, 6 heats, every exception, independent model)"
+source "$HERE/final_validation.sh"
 
 step "6. Restorability: dump the tested database, restore it into a brand-new one, compare"
 "${RUN_AS[@]}" pg_dump -h "$WORK" -p "$PORT" -U postgres -d "$DB" --no-owner -Fc -f "$WORK/race.dump"
