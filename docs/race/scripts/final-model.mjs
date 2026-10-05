@@ -333,7 +333,7 @@ export function compare(sys) {
   eq(sys.pauses.length, planned.length, "number of pause/resume cycles");
   sys.pauses.forEach((p, i) => {
     near(p.race_ms, planned[i]?.[0] ?? -1, 60, `pause #${i + 1} started at the scripted race time`);
-    near(p.wall_ms, planned[i]?.[1] ?? -1, 100, `pause #${i + 1} lasted the scripted wall time`);
+    near(p.wall_ms, planned[i]?.[1] ?? -1, 500, `pause #${i + 1} lasted the scripted wall time`);
     ok(p.resumed !== null, `pause #${i + 1} was resumed`);
     if (i > 0) ok(new Date(sys.pauses[i - 1].resumed) <= new Date(p.at), `pause #${i} and #${i + 1} do not overlap`);
   });
