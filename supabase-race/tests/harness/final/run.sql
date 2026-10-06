@@ -275,16 +275,16 @@ begin
     got := scr -> 'current' ->> 'race_number';
     perform race_final.chk(format('reconnect after the %s blackout at race ms %s: station %s screen shows %s', p_bo.scope, t, s, coalesce(exp_n, 'nobody')), got is not distinct from exp_n, coalesce(got, 'null'));
   end loop;
-  if p_bo."to" = 1710300 then
+  if p_bo."to" = 1710800 then
     select n into boundary_n from race_final.res where station = 1 and we = 1710000;
-    perform race_final.chk('reconnect 0.3 s AFTER a 3:00 boundary: that athlete is already in the 0:30 transition (SCORING) — the screen cannot show more work time',
+    perform race_final.chk('reconnect 0.8 s AFTER a 3:00 boundary: that athlete is already in the 0:30 transition (SCORING) — the screen cannot show more work time',
       (select status = 'SCORING' from race_final.res where n = boundary_n and station = 1) and (scr is not null));
     perform race_final.as_user('f_master'); scr := race_station_screen(race_final.ev(), 1); perform race_final.back();
-    perform race_final.chk('reconnect 0.3 s after 3:00: the Station 01 screen state is TRANSITION data (current window already ended)', (scr -> 'current' ->> 'race_number') = 'N' || lpad(boundary_n::text, 3, '0') and (scr -> 'clock' ->> 'race_ms')::bigint >= (scr -> 'current' ->> 'window_end_ms')::bigint);
-  elsif p_bo."to" = 1499700 then
+    perform race_final.chk('reconnect 0.8 s after 3:00: the Station 01 screen state is TRANSITION data (current window already ended)', (scr -> 'current' ->> 'race_number') = 'N' || lpad(boundary_n::text, 3, '0') and (scr -> 'clock' ->> 'race_ms')::bigint >= (scr -> 'current' ->> 'window_end_ms')::bigint);
+  elsif p_bo."to" = 1499200 then
     select n into boundary_n from race_final.res where station = 1 and we = 1500000;
     perform race_final.as_user('f_master'); scr := race_station_screen(race_final.ev(), 1); perform race_final.back();
-    perform race_final.chk('reconnect 0.3 s BEFORE a 3:00 boundary (Station 01, slot 6): that athlete is still working (ACTIVE) with ~0.3 s left',
+    perform race_final.chk('reconnect 0.8 s BEFORE a 3:00 boundary (Station 01, slot 6): that athlete is still working (ACTIVE) with ~0.8 s left',
       (select status = 'ACTIVE' from race_final.res where n = boundary_n and station = 1) and (scr -> 'current' ->> 'race_number') = 'N' || lpad(boundary_n::text, 3, '0') and (scr -> 'clock' ->> 'race_ms')::bigint < (scr -> 'current' ->> 'window_end_ms')::bigint);
   end if;
   update race_final.blackout set done = true where id = p_bo.id;

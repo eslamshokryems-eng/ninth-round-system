@@ -47,7 +47,7 @@ Config read back from the event: **3:00 work · 0:30 transition · 3:30 start in
 | Invariant | Result |
 |---|---|
 | No early start | every slot's recorded start ≥ its planned start; planned start = heat anchor + slot × 3:30 exactly (42 slots) |
-| No more than 3:00 of work, no grace | all 342 windows are exactly 180,000 ms; actions at 0.3 s before the end are accepted, at the end / 0.3 s after are not (see boundary cases, §4) |
+| No more than 3:00 of work, no grace | all 342 windows are exactly 180,000 ms; actions at 0.8 s before the end are accepted, at the end / 0.8 s after are not (see boundary cases, §4) |
 | Every transition exactly 0:30 | lock time − window end = 30,000 ms for every reached window |
 | Every start interval exactly 3:30 | consecutive slots 210,000 ms apart; heat anchors 60,000 / 2,340,000 / 4,620,000 / 6,900,000 and **heat 6 at 9,180,000 even though heat 5 was cancelled** |
 | No overlap | per station, window *n+1* starts ≥ window *n* end + 0:30 (checked for every pair) |
@@ -77,7 +77,7 @@ Recorded start lag: when *no device at all* reads for minutes, the engine only *
 | **Station Screen disconnect / reconnect** | each blackout ends with every station screen compared with the arithmetic |
 | **Complete client disconnect** | all devices offline 5 min (twice) + two 1-minute blackouts ending at the 3:00 boundary |
 | Reconnect during **WORK**, **TRANSITION**, **PAUSE** | explicit assertions for each (race time frozen during PAUSE, every screen says so) |
-| **Exactly around the 3:00 boundary** | all devices reconnect **0.3 s before** the end (queued actions accepted, athlete still ACTIVE) and **0.3 s after** (queued actions → Master review, never silently accepted) |
+| **Exactly around the 3:00 boundary** | all devices reconnect **0.8 s before** the end (queued actions accepted, athlete still ACTIVE) and **0.8 s after** (queued actions → Master review, never silently accepted) |
 | **Offline judge actions** | 408 delivered from queues; the ones that lost to the lock became PENDING_MASTER_REVIEW and were approved/rejected by Master Control |
 | **Offline OCR capture** | rowing judge's phone offline ~7 min |
 | **OCR retake / confirmation / Master correction** | see §7 |
@@ -177,7 +177,7 @@ Harness defects found and fixed along the way (not product bugs, listed because 
 | # | Item | Status | Evidence |
 |---|---|---|---|
 | 1 | Timing is authoritative (server/official time only) | ✅ | §3; invariants every 5 s tick and from the export |
-| 2 | Survives UI disconnect | ✅ | Master / judge / station / all-device blackouts, incl. 0.3 s around the 3:00 boundary |
+| 2 | Survives UI disconnect | ✅ | Master / judge / station / all-device blackouts, incl. 0.8 s around the 3:00 boundary |
 | 3 | No client needed to advance state | ✅ | state is derived from official time; reconnect after total blackout equals the arithmetic (start *lag* recorded, official time unchanged — §3) |
 | 4 | Scoring is race-time locked | ✅ | window rules without grace; 320-action lock race; late offline replays → Master review |
 | 5 | Judge scoring is idempotent | ✅ | 30-session duplicate storm, retry storms, offline replays |

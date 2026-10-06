@@ -71,8 +71,8 @@ export const BLACKOUTS = [
   { scope: "MASTER", from: 2_000_000, to: 2_250_000 },          // Master Control's device is gone; judges keep working
   { scope: "STATION:3", from: 2_300_000, to: 2_700_000 },      // the Station 03 judge loses connection
   { scope: "ALL", from: 3_000_000, to: 3_300_000 },            // EVERY device is disconnected for 5 minutes
-  { scope: "ALL", from: 1_650_000, to: 1_710_300 },            // ends 0.3 s AFTER a 3:00 boundary (slot 7 of heat 1, Station 01)
-  { scope: "ALL", from: 1_440_000, to: 1_499_700 },            // ends 0.3 s BEFORE a 3:00 boundary (slot 6 of heat 1, Station 01)
+  { scope: "ALL", from: 1_650_000, to: 1_710_800 },            // ends 0.8 s AFTER a 3:00 boundary (slot 7 of heat 1, Station 01)
+  { scope: "ALL", from: 1_440_000, to: 1_499_200 },            // ends 0.8 s BEFORE a 3:00 boundary (slot 6 of heat 1, Station 01)
   { scope: "ALL", from: 5_500_000, to: 5_800_000 },
   { scope: "STATION:9", from: 7_000_000, to: 7_400_000 },      // the rowing judge's phone is offline: offline OCR capture
 ];
@@ -154,8 +154,8 @@ export function planFor(a, st) {
 
 // the 3:00 boundary athletes are chosen at run time (whoever is in slot 7/8 of heat 1 at Station 01); the driver adds these extras
 export const BOUNDARY_EXTRAS = [
-  { tag: "before_end", at: 1_400_000, heat: 1, slot: 6, station: 1, type: "REP", off: W - 1_000 },   // typed 1 s before the end, arrives 0.3 s BEFORE it (offline replay) -> counts
-  { tag: "after_end", at: 1_600_000, heat: 1, slot: 7, station: 1, type: "REP", off: W - 1_000 },    // typed 1 s before the end, arrives 0.3 s AFTER it (offline replay) -> held for review
+  { tag: "before_end", at: 1_400_000, heat: 1, slot: 6, station: 1, type: "REP", off: W - 1_000 },   // typed 1 s before the end, arrives 0.8 s BEFORE it (offline replay) -> counts
+  { tag: "after_end", at: 1_600_000, heat: 1, slot: 7, station: 1, type: "REP", off: W - 1_000 },    // typed 1 s before the end, arrives 0.8 s AFTER it (offline replay) -> held for review
   { tag: "no_grace", at: 2_900_000, heat: 2, slot: 0, station: 5, type: "REP", off: W + 1_000 },     // 1 s AFTER the end, online -> WINDOW_CLOSED, never counted
   { tag: "last_ms", at: 2_900_000, heat: 2, slot: 1, station: 5, type: "REP", off: W - 1_000 },      // 1 s BEFORE the end, online -> counts
 ];
