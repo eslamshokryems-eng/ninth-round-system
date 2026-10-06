@@ -9,6 +9,8 @@ describe("race errors", () => {
   });
   it("uses friendly wording for known codes and the server text otherwise", () => {
     expect(describeRaceError("RACE_WAIVER_REQUIRED")).toMatch(/waiver/i);
+    expect(describeRaceError("RACE_RATE_LIMITED")).toMatch(/wait|try again/i);
+    expect(parseRaceErrorCode("RACE_RATE_LIMITED: too many registrations from this connection")).toBe("RACE_RATE_LIMITED");
     expect(describeRaceError("RACE_SOMETHING_NEW", "server detail")).toBe("server detail");
     expect(describeRaceError("RACE_SOMETHING_NEW")).toMatch(/try again/i);
   });

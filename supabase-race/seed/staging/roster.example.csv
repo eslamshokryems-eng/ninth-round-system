@@ -1,0 +1,16 @@
+# role,email,station   (fake addresses — copy to a private roster.csv outside git and replace)
+EVENT_MANAGER,manager@example.invalid,
+MASTER_CONTROL,master@example.invalid,
+RECEPTION,reception1@example.invalid,
+RECEPTION,reception2@example.invalid,
+JUDGE,judge1@example.invalid,1
+JUDGE,judge2@example.invalid,2
+JUDGE,judge3@example.invalid,3
+JUDGE,judge4@example.invalid,4
+JUDGE,judge5@example.invalid,5
+JUDGE,judge6@example.invalid,6
+JUDGE,judge7@example.invalid,7
+JUDGE,judge8@example.invalid,8
+JUDGE,judge9@example.invalid,9
+STATION_SCREEN,screen1@example.invalid,1
+STATION_SCREEN,screen9@example.invalid,9

@@ -1,6 +1,7 @@
 /** User-facing wording for the database's RACE_* error codes (the raw server text is the fallback). */
 const MESSAGES: Record<string, string> = {
   RACE_REGISTRATION_CLOSED: "Registration is not open for this event.",
+  RACE_RATE_LIMITED: "Too many registrations from this connection right now. Please wait a few minutes and try again (or ask the front desk to register you).",
   RACE_ALREADY_REGISTERED: "This athlete is already registered for the event.",
   RACE_WAIVER_REQUIRED: "The waiver must be accepted to register.",
   RACE_EMERGENCY_CONTACT_REQUIRED: "Enter an emergency contact name and phone number.",

@@ -3,7 +3,7 @@ reset role;
 
 select race_test.eq((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
                      where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%')::int,
-                    30, 'structure: 30 race_* tables (Phase 6 added race_check_in_corrections; the standalone project adds race_profiles and race_audit_log)');
+                    33, 'structure: 33 race_* tables (30 + the 3 of registration abuse protection: settings, per-event overrides, hashed-IP attempts)');
 
 select race_test.ok(not exists (
   select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace

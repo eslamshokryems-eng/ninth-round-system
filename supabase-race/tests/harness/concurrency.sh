@@ -479,6 +479,58 @@ st=$(q "select status from race_station_results where id='$RES2'")
 pass "judge concurrency: 40 minutes with no device ticking, then 12 judge submissions → all 12 REJECTED (WINDOW_CLOSED, kept in the ledger), result LOCKED — the RPC derived the state itself"
 q "select race_sim.check_invariants('$EVJ', race_now_ms('$EVJ'))" >/dev/null && pass "judge concurrency: timing invariants hold after the scoring storms"
 
+# ============================ Registration abuse protection under concurrency (runbook §11) ============================
+EVA=$(q "select set_config('request.jwt.claim.sub','$FOUNDER',false)::text is not null; select race_create_event('concurrency-abuse',date '2027-02-10')" | tail -1)
+q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_set_event_status('$EVA','REGISTRATION_OPEN')" >/dev/null
+limits() { q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_set_registration_limits('$EVA', $1, $2, $3, true, 'concurrency test')" >/dev/null; }
+rega() { # $1=person index, $2=output file, $3=ip
+  "${PSQL[@]}" -d "$DB" -At -c "set role anon; select set_config('request.headers', '{\"x-forwarded-for\":\"$3\"}', false); select pg_advisory_lock_shared(777); select pg_advisory_unlock_shared(777); select race_number from race_register_athlete('$EVA','Abuse $1','0133$(printf %07d "$1")',null,'male','1990-01-01','MEN',null,true,'{\"name\":\"F\",\"phone\":\"01011112222\"}'::jsonb)" \
+    > "$WORK/c/$2.out" 2> "$WORK/c/$2.err" || true
+}
+ahash() { q "select encode(sha256(convert_to(s.ip_salt || ':' || '$1', 'UTF8')), 'hex') from race_registration_settings s where s.id"; }
+
+# --- 27. Thirty simultaneous registrations from ONE address with a limit of 8 / 10 min: exactly 8 get through -------------------------------------
+limits 8 30 100
+rm -f "$WORK"/c/ra*
+barrier_hold 4
+for n in $(seq 1 30); do rega "$n" "ra$n" 203.0.113.77 & done
+wait; sleep 1
+okc=$(cat "$WORK"/c/ra*.out | grep -c '^N' || true)
+lim=$(cat "$WORK"/c/ra*.err | grep -c 'RACE_RATE_LIMITED' || true)
+other=$(for f in "$WORK"/c/ra*.err; do [ -s "$f" ] && ! grep -q 'RACE_RATE_LIMITED' "$f" && echo x; done | wc -l)
+rows=$(q "select count(*) from race_registration_attempts where event_id='$EVA' and ip_hash='$(ahash 203.0.113.77)'")
+ath=$(q "select count(*) from race_registrations where event_id='$EVA'")
+nums=$(q "select string_agg(race_number, ',' order by race_number) from race_registrations where event_id='$EVA'")
+[ "$okc" = "8" ] && [ "$lim" = "22" ] && [ "$other" = "0" ] && [ "$rows" = "8" ] && [ "$ath" = "8" ] && [ "$nums" = "N001,N002,N003,N004,N005,N006,N007,N008" ] || fail "registration-abuse concurrency: 30 simultaneous from one IP — accepted=$okc limited=$lim other-errors=$other attempt-rows=$rows registrations=$ath numbers=$nums (want 8 / 22 / 0 / 8 / 8 / N001..N008)"
+pass "registration-abuse concurrency: 30 simultaneous registrations from one address (limit 8) → exactly 8 accepted, 22 refused RACE_RATE_LIMITED, exactly 8 counted, race numbers N001–N008 gapless (refusals consumed none), no other error"
+
+# --- 28. Forty simultaneous registrations from FORTY different addresses with an event ceiling of 10 / minute ---------------------------------------------
+q "update race_registration_attempts set created_at = created_at - interval '3 hours' where event_id='$EVA'" >/dev/null
+limits 100 100 10
+rm -f "$WORK"/c/rb*
+barrier_hold 4
+for n in $(seq 101 140); do rega "$n" "rb$n" "198.51.100.$((n - 100))" & done
+wait; sleep 1
+okc=$(cat "$WORK"/c/rb*.out | grep -c '^N' || true)
+lim=$(cat "$WORK"/c/rb*.err | grep -c 'RACE_RATE_LIMITED' || true)
+rows=$(q "select count(*) from race_registration_attempts where event_id='$EVA' and created_at > clock_timestamp() - interval '1 minute'")
+[ "$okc" = "10" ] && [ "$lim" = "30" ] && [ "$rows" = "10" ] || fail "registration-abuse concurrency: 40 addresses, ceiling 10 — accepted=$okc limited=$lim counted=$rows (want 10 / 30 / 10)"
+pass "registration-abuse concurrency: 40 simultaneous registrations from 40 different addresses (event ceiling 10/min) → exactly 10 accepted, 30 refused, exactly 10 counted"
+
+# --- 29. One person submitted 12 times at once from one address: one registration, ONE unit of quota, 11 clean duplicates ---------------------------------
+q "update race_registration_attempts set created_at = created_at - interval '3 hours' where event_id='$EVA'" >/dev/null
+limits 3 30 100
+rm -f "$WORK"/c/rc2*
+barrier_hold 4
+for n in $(seq 1 12); do rega 500 "rc2$n" 192.0.2.99 & done
+wait; sleep 1
+okc=$(cat "$WORK"/c/rc2*.out | grep -c '^N' || true)
+dup=$(cat "$WORK"/c/rc2*.err | grep -c 'RACE_ALREADY_REGISTERED' || true)
+rows=$(q "select count(*) from race_registration_attempts where event_id='$EVA' and ip_hash='$(ahash 192.0.2.99)'")
+[ "$okc" = "1" ] && [ "$dup" = "11" ] && [ "$rows" = "1" ] || fail "registration-abuse concurrency: one person ×12 — accepted=$okc duplicates=$dup quota-used=$rows (want 1 / 11 / 1)"
+pass "registration-abuse concurrency: ONE person submitted 12× at once from one address → 1 registration, 11 clean RACE_ALREADY_REGISTERED, exactly 1 unit of quota used (a retry storm cannot lock a real user out)"
+q "delete from race_registration_limit_overrides where event_id='$EVA'" >/dev/null
+
 # ============================ Phase 9: rankings, publication, corrections under concurrency ============================
 EVR=$(setup_engine_event concurrency-rankings 6)
 q "select set_config('request.jwt.claim.sub','$FOUNDER',false); select race_start_event('$EVR')" >/dev/null

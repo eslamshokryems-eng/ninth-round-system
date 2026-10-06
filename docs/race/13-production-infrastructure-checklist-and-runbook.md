@@ -31,7 +31,7 @@ Every step below is gated: **I do not start step 0 of §3 until you say so expli
 | 2 | First staging event facts: slug, date, planned start, venue, fee | §12 seed |
 | 3 | Staff roster emails (1 Event Manager, 1 Master Control, 1–2 Reception, 9 Judges, up to 9 Station Screens, 1 Super Admin) | §12 seed |
 | 4 | SMTP sender for Auth emails | §3 B5 |
-| 5 | Registration protection option (§11): A only, or A + Turnstile | §11 |
+| 5 | ~~Registration protection option~~ — **decided: database-side only, no Turnstile** (implemented, §11) | — |
 | 6 | Which person holds the Supabase owner, Vercel owner and DNS accounts (2FA on) | §2 |
 
 ---
@@ -50,7 +50,6 @@ THE NINTH's browser code reads **exactly two** variables. Everything else is ope
 | `SUPABASE_ACCESS_TOKEN` | operator shell (CLI login) | same | same | shell only; **revoke after each deployment window** | never |
 | `SUPABASE_DB_PASSWORD` | — | operator shell (prompted by `supabase db push`) | operator shell | shell/vault only | never |
 | `SUPABASE_SERVICE_ROLE_KEY` | not set | not set | not set | **not defined anywhere** in Vercel or `.env*`; vault only, used only by an admin script if one is ever needed and approved | **never** (`turbo.json` `globalEnv` only hashes it; `check-isolation.sh` fails if browser code references it) |
-| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | — | Vercel Preview (site: public; secret: server-only) | Vercel Production | Vercel | site key yes; secret **never** — **only if option A+Turnstile is chosen in §11** |
 
 Rules: staging and production use **different projects, keys and Vercel environments** (a Preview deployment can never read production values; production values are scoped to the *Production* environment only); `NEXT_PUBLIC_*` values are inlined at **build** time, so any change needs a redeploy; a local `.env.local` never points at production; `.env.example` stays the only committed template.
 
@@ -58,7 +57,7 @@ Rules: staging and production use **different projects, keys and Vercel environm
 
 ```
 # in the Vercel project: only these names may exist
-vercel env ls          # expected: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (+ TURNSTILE_* if chosen) — nothing else
+vercel env ls          # expected: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY — nothing else
 bash supabase-race/tests/check-isolation.sh     # no .env, no JWT-shaped string, no service-role key in browser code
 ```
 Also confirm by eye that the URL's project ref in the Production environment is the **production** ref and the Preview one is the **staging** ref.
@@ -74,8 +73,8 @@ Also confirm by eye that the URL's project ref in the Production environment is 
 - [ ] Deployment ref chosen (branch/tag) — I do not open a PR unless asked.
 - [ ] `bash supabase-race/tests/check-isolation.sh` all PASS on that ref (gym files identical to `527f705`).
 - [ ] **Postgres compatibility gate (§3A) passed** on the exact version Supabase offers for the selected project/region.
-- [ ] Registration abuse protection (§11) implemented, harness-tested and approved.
-- [ ] Staging seed scripts (§12) written, dry-run against a throw-away database, approved.
+- [x] Registration abuse protection (§11) implemented and harness-tested (approved scope: database-side only). Still to do on staging: the IP-header probe in §11.
+- [x] Staging seed scripts (§12) written and dry-run against the throw-away database (not executed on any real project). Still needed from you: roster file and event facts.
 
 ---
 
@@ -115,7 +114,7 @@ After project creation, confirm the real version: `select version();` on the pro
 
 **C. Schema** (CLI, from `supabase-race/`)
 7. `supabase login` (uses `SUPABASE_ACCESS_TOKEN`) → `supabase link --project-ref <THE-NINTH-REF>` → confirm the printed ref.
-8. `supabase db push` — applies **all migrations in `supabase-race/supabase/migrations/`** (17 at the Phase 12 baseline, 18 if §11 adds one; `supabase migration list` is the authority) in order (`20260928000000_race_foundation` … `20260930000006_race_tally_deterministic_order`). They are forward-only and tracked in *this* project's migration history. *(The earlier checkpoint text said "11 migrations"; the current number is 17.)*
+8. `supabase db push` — applies **all migrations in `supabase-race/supabase/migrations/`** (**18** now — §11 added `20260930000007_race_registration_abuse_protection`; `supabase migration list` is the authority) in order (`20260928000000_race_foundation` … `20260930000006_race_tally_deterministic_order`). They are forward-only and tracked in *this* project's migration history. *(The earlier checkpoint text said "11 migrations"; the current number is 17.)*
 9. `supabase migration list` → every local migration applied, none pending; `select version();` equals the version that passed §3A.
 
 **D. Verify the database** (read-only)
@@ -160,6 +159,7 @@ After project creation, confirm the real version: `select version();` on the pro
 **B. API / RLS from outside** (anon key only, `curl`):
 - `GET /rest/v1/race_registrations?select=*` → empty/denied (anon cannot read personal data); same for `race_audit_log`, `race_performance_events`, `race_staff`.
 - `POST /rest/v1/rpc/race_register_athlete` works for a valid public registration; `race_leaderboard` is readable; `race_advance_core`, `race_write_snapshot` etc. → *permission denied*.
+- Rate limit (§11): from one network register 9 throw-away athletes in a row against a `-staging`/`-dryrun` event → the 9th is refused `RACE_RATE_LIMITED`; Reception door-registration is not limited; run the IP-header probe from §11 and record the result.
 - Storage: anonymous download of `race-evidence/...` refused; `race-event-assets` public read OK.
 
 **C. App smoke** (real browser, https):
@@ -265,34 +265,29 @@ It runs the **same pipeline as the phone** (Otsu binarisation → tesseract.js L
 - **Secrets exposure**: rotate the exposed key in the dashboard immediately (anon/service-role), update Vercel, redeploy.
 - **Never**: connect the gym project, reuse gym keys, share a Vercel project or an Auth user pool between the two systems.
 
-## 11. Registration abuse protection (L6) — focused and minimal
+## 11. Registration abuse protection (L6) — IMPLEMENTED (database-side only; no Turnstile)
 
-**Today:** the public form calls the registration RPC directly from the browser with the anon key; there is no rate limit or CAPTCHA (Phase 4 / checkpoint residual risk). **Scope rule:** protect that one entry point; do not change what registration collects, how race numbers/payment/duplicates work, or any race logic.
+Report with all tests: `docs/race/14-registration-abuse-protection-and-staging-seed.md`. Migration `20260930000007_race_registration_abuse_protection.sql`.
 
-**Layer A — required (database-side, cannot be bypassed by calling the API directly):**
-* A small `race_registration_attempts` table (append-only: `ip_hash`, `event_id`, `outcome`, `created_at`) and a check at the very top of the public registration RPC:
-  * per client IP (from PostgREST's `request.headers` → `x-forwarded-for`, stored **hashed with a per-project salt**, never raw): max **N** attempts per **10 min** (default 8) and **M** per hour (default 30);
-  * per event, a global ceiling per minute (default 60) as a flood brake;
-  * over the limit → refused with `RACE_RATE_LIMITED` (HTTP-friendly message in the form); successful and refused attempts are counted; old rows pruned by the next call.
-* Limits are **per-event settings with safe defaults** so race-day staff registering many athletes from the venue network are not blocked: staff registration (`race_staff_register_athlete`) is **not** limited by IP.
-* Honest limits: an attacker rotating IPs is slowed, not stopped; the existing duplicate-person check, the registration cap/closing, and payment-confirmation-before-heat rules remain the real integrity layer (an unpaid registration cannot take a start slot).
+* **What it does:** `race_register_athlete()` (the public form's RPC — same signature, result and grants) now calls a guard before the unchanged `race_register_core()`. Per client IP: **8 / 10 min** and **30 / hour**; per event: **120 / minute** (flood brake). Defaults live in a singleton settings row; the Event Manager can change them **per event** with `race_set_registration_limits(event, per_ip_10min, per_ip_hour, per_event_minute, enabled, reason)` (reason mandatory, audited as `race.registration.limits`).
+* **Exemptions:** `race_staff_register_athlete()` (door registration) never calls the guard; an authenticated member of the event's operations staff using the public form is skipped too. A signed-in non-staff account is limited like anyone.
+* **Privacy:** the IP is never stored — only `sha256(salt:ip)`; the salt is in a table no API role can read.
+* **Counting rule:** a registration that *completes* consumes one unit. A refused, duplicate or invalid call raises, PostgreSQL rolls the whole transaction back, and it consumes nothing — so retries/duplicates cannot lock a real user out, and a refusal never extends a lock-out. Limits are exact under concurrency (advisory locks per event and per IP, fixed order).
+* **Known limits:** probing with invalid/duplicate data is not counted (it creates no data); an attacker rotating IPs is slowed, not stopped; the duplicate-person check, closed-registration check and "unpaid cannot take a start slot" rule remain the integrity layer. Turnstile (Layer B) was **not** implemented, as decided.
+* **Must be confirmed on the real project (§5 B):** which request header carries the real client IP. Default = the **last** entry of `x-forwarded-for`. Staging probe: register once from your phone on mobile data and once from Wi-Fi, each with and without a spoofed `X-Forwarded-For: 1.2.3.4, 5.6.7.8` header; then (as the owner, SQL editor) `select count(*), count(distinct ip_hash) from race_registration_attempts;` — the spoofed request must hash the same as the unspoofed one from the same network, and the two networks must differ. If the platform puts the real IP elsewhere, change `race_registration_settings.ip_header` / `ip_from_right` (one UPDATE as owner, no migration).
+* **Event-day tuning:** venue Wi-Fi shares one public IP — athletes registering on their own phones on-site would share the per-IP limit. Either let Reception register them (exempt), or raise the limits for that event with `race_set_registration_limits` before doors open.
 
-**Layer B — optional, recommended before *advertising* the link (your choice, §0 item 5):** Cloudflare Turnstile (free, privacy-friendly). Because the browser talks to Supabase directly, a CAPTCHA only helps if verified server-side: a thin Next.js route handler verifies the Turnstile token with the secret, then calls the RPC. To keep it unbypassable the RPC would also have to require a short-lived server-signed pass — **that is a larger change**; recommendation: ship **Layer A now**, add Layer B only if abuse is actually observed or the link goes to a large public audience.
+## 12. Idempotent staging seed scripts (L7) — IMPLEMENTED, dry-run only, NOT executed on any real project
 
-**Delivery:** one new migration (table + check; RPC changes limited to the guard call), unit/harness tests (limit hit, limit reset, staff not limited, hashed IP only, no personal data stored, concurrency: 40 simultaneous submissions from one IP → exactly the allowed number accepted), full harness + Phase 12 simulation re-run (the simulation registers through the public RPC, so its limits must be configured for the test event), runbook §5 B gains a rate-limit probe. **Implementation starts only after the execution-step go-ahead.**
+`supabase-race/seed/staging/` — `00_preflight.sql` (read-only checks), `01_event.sql`, `02_staff.sql`, `03_verify_seed.sql` (read-only report + assertions), `README.md` (run order, inputs), `roster.example.csv` (fake `.invalid` addresses). The real `roster.csv` stays outside git (`.gitignore`d). They refuse any slug that does not end in `-staging`/`-dryrun` and `target_env` other than `staging`.
 
-## 12. Idempotent staging seed scripts (L7) — specification, NOT executed
+Behaviour (all proven by `tests/harness/seed_dryrun.sh`, step 5d of `run.sh`, against the throw-away database with fake accounts):
+* the event is created through the real RPC `race_create_event` as the Super Admin (so it is audited and the actor becomes its Event Manager), registration opened with `race_set_event_status`, venue/fee set as owner only when different;
+* staff are granted through real RLS (every grant audited); an exact (event, person, role, station) already active is left alone, an inactive one is re-activated, nothing is ever deleted;
+* **a second run changes nothing** (0 new events, 0 new staff rows, 0 new audit rows);
+* verification fails on drift (deactivated roster member, extra staff).
 
-Location (to be written after this document is approved): `supabase-race/seed/staging/` — **no secrets, no real emails** in git (emails come from a gitignored/off-repo roster file passed with `psql -v`).
-
-| File | Does | Idempotency |
-|---|---|---|
-| `00_preflight.sql` | read-only: asserts it is run on the **staging** project (a `race_events`-free or staging-flagged check + `select current_database()`/project marker you confirm), migrations present, `race_profiles` rows exist for every roster email; prints what is missing | pure SELECT |
-| `01_event.sql` | creates the first staging event via the real RPC `race_create_event(slug, date, name, tz, planned_start)` **only if the slug does not exist**; sets registration fee/status via the existing RPCs; assigns the event's rules default | `if not exists (slug)` guard; re-run prints `already exists` and changes nothing |
-| `02_staff.sql` | inserts `race_staff` rows for the roster (Event Manager, Master Control, Reception, 9 Judges with `station_id` 1–9, Station Screens) from `:roster_csv` | `insert … on conflict do nothing`/re-activate; never deletes; each grant is audited by the existing trigger |
-| `03_verify_seed.sql` | read-only report: event, status, one row per staff member with role/station, counts (must equal the roster), no extra privileges, no Super Admin flags besides the owner | pure SELECT |
-
-How they run (documented, not executed): `psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -v roster_csv=… -f …` after `select set_config('request.jwt.claim.sub', '<super-admin-profile-uuid>', true)` + `set local role authenticated` so the **real RPCs and RLS** apply and the audit log records the Super Admin, exactly as in production. A dry run against a throw-away database built by the harness (with fake roster emails) is part of the approval of the scripts; running them twice must produce identical state and **zero** new rows the second time.
+How they would be run (documented, not executed) is in the seed README and §13.
 
 ## 13. Deployment & rollback commands (exact; to be run only at the execution step)
 
