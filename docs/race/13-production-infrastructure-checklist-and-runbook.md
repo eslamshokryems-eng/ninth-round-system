@@ -78,7 +78,7 @@ Also confirm by eye that the URL's project ref in the Production environment is 
 
 ---
 
-## 3A. Postgres compatibility gate (must pass BEFORE the project is created)
+## 3A. Postgres compatibility gate — **PASSED on PostgreSQL 17.11** (see `docs/race/15-postgres-17-compatibility-validation.md`); the procedure below is kept as the template for any future version change
 
 **Why:** the Phase 12 proof ran on PostgreSQL **16** (the version installed in my sandbox). Supabase's current documentation describes **15 and 17** as the maintained versions (the changelog/docs I could see list 15.x and 17.x patch releases and 17 as the default for new/self-hosted stacks — to be confirmed on the creation screen); `supabase-race/supabase/config.toml` says `major_version = 15`. A proof on 16 is evidence, not proof for 15 or 17 (planner behaviour, `pg_trigger`/catalog details used by `verify_deployment.sql`, advisory-lock and `clock_timestamp` semantics, extension availability).
 
