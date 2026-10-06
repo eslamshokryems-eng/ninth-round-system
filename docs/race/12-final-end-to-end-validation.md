@@ -159,7 +159,7 @@ Harness defects found and fixed along the way (not product bugs, listed because 
 
 ## 12. Test results
 
-* Full harness: **1,247+ assertions** (suites 00–27) + all concurrency storms + the final end-to-end validation — `ALL RACE MIGRATION TESTS PASSED`.
+* Full harness: **1,246 assertions** (suites 00–27) + all concurrency storms + the final end-to-end validation — `ALL RACE MIGRATION TESTS PASSED`.
 * Final simulation: 6 consecutive runs with random slot orders, **0 mismatches** each (≈ 8,700 independent checks per run).
 * `pnpm lint` clean · `pnpm typecheck` and `pnpm test` pass (packages/apps unchanged in this phase; 264 package unit tests) · `supabase-race/tests/check-isolation.sh` passes (gym files identical to `527f705`, no secrets, no JWT-shaped strings, no `.env`).
 * Browser E2E (88/88 in Phase 10) was **not re-run**: no app code changed.
