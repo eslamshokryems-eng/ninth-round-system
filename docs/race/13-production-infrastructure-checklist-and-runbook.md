@@ -1,55 +1,101 @@
 # THE NINTH — production infrastructure checklist & deployment runbook
 
-**Status: PLAN ONLY. Nothing in this document has been run.** No Supabase project exists, nothing is connected, no credentials were requested, nothing is deployed. Race logic, scoring and timing are frozen at the state accepted in Phase 12 (`docs/race/12-final-end-to-end-validation.md`).
+**Status: PLAN ONLY (decisions L1–L10 locked). Nothing in this document has been run.** No Supabase project exists, nothing is connected, no credentials were requested, nothing is deployed. Race logic, scoring and timing are frozen at the state accepted in Phase 12 (`docs/race/12-final-end-to-end-validation.md`).
 
 Every step below is gated: **I do not start step 0 of §3 until you say so explicitly**, and I will stop again after staging (§3 → §6) and before production (§8).
 
 ---
 
-## 0. Decisions I need from you (before any infrastructure step)
+## 0. LOCKED DECISIONS (approved)
 
-| # | Decision | Why / default |
+| # | Decision | Consequence in this runbook |
 |---|---|---|
-| 1 | **Supabase organisation & owner account** for THE NINTH (must not be the gym's) | Separate project, keys, Auth users, billing. |
-| 2 | **Plan / tier** | Use a paid tier for production: the race needs a project that never auto-pauses, daily backups and ideally Point-in-Time Recovery (confirm current plan terms in the dashboard). Staging may be the smallest tier. |
-| 3 | **Region** | Closest to the venue (Cairo → pick the nearest EU/Middle-East region offered). Latency is not a correctness issue (server time is authoritative) but affects judge UX. |
-| 4 | **Postgres major version** | `config.toml` says 15; my test database ran PostgreSQL 16. Pick the project's version, and I re-run the full harness on that exact major version (§5, step D) before staging. |
-| 5 | **Vercel team/account** and the **domain** (e.g. `race.<your-domain>`), staging subdomain too | Own Vercel project, separate from the gym web app. |
-| 6 | **Event facts for the first staging event** | slug, date, planned start, venue name, fee. |
-| 7 | **Staff roster** (emails) for staging rehearsal: 1 Event Manager, 1 Master Control, 1–2 Reception, 9 Judges, up to 9 Station Screens | Accounts are created by invitation, no self-sign-up. |
-| 8 | **SMTP sender** for Auth emails | Supabase's default mailer is rate-limited; use your own sender for the event. |
-| 9 | **Abuse protection for public registration** (Turnstile/CAPTCHA or edge rate limiting) | The public form has none today (Phase 4 / checkpoint residual risk a). Required before the registration link is public. *(A code change — needs your explicit approval as it is not part of the frozen scope.)* |
+| L1 | THE NINTH gets a **completely separate Supabase organization / project / account** from the gym system | Own org, own owner login, own billing, own keys, own Auth user pool. The Supabase CLI is only ever linked to the race project; every `link`/`push` is preceded by a ref check (§3). |
+| L2 | **Supabase Pro** (unless the platform requires a different tier) | Production on Pro (no auto-pause, daily backups; PITR add-on enabled for the event). Staging may use a second Pro project or the smallest paid compute — never a project that can pause during a rehearsal. The tier is re-confirmed on the billing page at creation time; if the platform requires another tier for a needed feature (e.g. PITR) we stop and ask. |
+| L3 | **Frankfurt (eu-central-1) or the closest appropriate Supabase region to Egypt** | Chosen at project creation from the regions the dashboard actually offers; Frankfurt is the default. Latency affects judge UX only (server time is authoritative). **The same region for staging and production.** |
+| L4 | **Postgres version is decided by what Supabase actually offers for that project/region — then the full Phase 12 harness is run on that exact major version; no mismatch allowed** | §3A (the compatibility gate). Note: Supabase's current docs describe Postgres **15 and 17** as the maintained lines (the changelog/docs I could see list 15.x and 17.x patch releases and 17 as the default for new/self-hosted stacks — to be confirmed on the creation screen); **16 is not one of them**. So the 15-vs-16 question is expected to resolve to 15 or 17 — and my 1,246-assertion run so far was on **16**, i.e. it does **not** yet count for the target. |
+| L5 | **Vercel: a separate project for THE NINTH** | §4; own project, own env vars, own domains; never the gym web project. |
+| L6 | **Registration abuse protection / rate limiting before production — focused and minimal; no redesign of registration** | §11 (design; implementation awaits the execution-step go-ahead because it is a code + migration change). |
+| L7 | **Idempotent staging SQL seed scripts** (first staging event + staff roster), prepared, **not executed** | §12 (specification; script files are written after the doc is approved, run only on your explicit go-ahead). |
+| L8 | **Exact environment-variable matrix** for local / staging / production | §1. |
+| L9 | **Deployment and rollback commands / checklist** | §13 (with §4, §8, §9). |
+| L10 | **No production credentials in source control; none requested or exposed in chat** | §1 rules: values live in the vault/Vercel/Supabase only; scripts read them from the operator's shell; `check-isolation.sh` continues to fail on any committed secret or `.env`. |
+
+**Execution gate:** nothing in this document is run — no Supabase project is created, the CLI is not linked, no migration is pushed, no Vercel project is created, nothing is deployed — until you give an explicit **"approved: infrastructure execution"**. Each later gate (staging signed off → production) needs its own explicit approval.
+
+### Still needed from you (not blocking this document)
+
+| # | Item | Needed for |
+|---|---|---|
+| 1 | Domain names (production + staging) and who controls DNS | §4 |
+| 2 | First staging event facts: slug, date, planned start, venue, fee | §12 seed |
+| 3 | Staff roster emails (1 Event Manager, 1 Master Control, 1–2 Reception, 9 Judges, up to 9 Station Screens, 1 Super Admin) | §12 seed |
+| 4 | SMTP sender for Auth emails | §3 B5 |
+| 5 | Registration protection option (§11): A only, or A + Turnstile | §11 |
+| 6 | Which person holds the Supabase owner, Vercel owner and DNS accounts (2FA on) | §2 |
 
 ---
 
-## 1. Environment variables — the complete list
+## 1. Environment-variable matrix (exact)
 
-THE NINTH's browser code reads **exactly two** variables. Everything else is operator-side and never reaches Vercel or the browser.
+THE NINTH's browser code reads **exactly two** variables. Everything else is operator-side and never reaches Vercel or the browser. **No value below is ever committed or pasted in chat.**
 
-| Variable | Where it is set | Browser-visible | Value | Notes |
-|---|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Vercel project (Production **and** Preview, separate values per environment) + local `apps/race/.env.local` | yes (by design) | `https://<race-project-ref>.supabase.co` | Inlined at **build** time → changing it needs a redeploy. Never the gym project's URL. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same | yes (by design; RLS is the boundary) | the project's anon/public key | Inlined at build. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **nowhere in Vercel.** Operator password manager only; used only by one-off admin scripts if ever | **never** | service-role key | Bypasses RLS. `turbo.json` lists it in `globalEnv` (hashing only) — do **not** define it on the Vercel project. `check-isolation.sh` fails the build if it appears in browser code. |
-| `RACE_DATABASE_URL` | operator's shell only (never committed, never Vercel) | never | direct (non-pooled) Postgres connection string of the race project | Used for `psql` verification and the one-time bootstrap. |
-| `SUPABASE_ACCESS_TOKEN` | operator's shell only | never | personal access token for the Supabase CLI | Only for `supabase link/db push`. Revoke after the deployment window. |
-| `SUPABASE_DB_PASSWORD` | operator's shell only | never | the database password | Prompted by `supabase db push` (or exported for the session). |
+### 1.1 Matrix
 
-Rules: no `.env*` file other than `*.example` is committed (checked by `check-isolation.sh`); secrets are never pasted into chat, tickets or the repo; staging and production use **different** projects, keys and Vercel environments.
+| Variable | Local dev | Staging | Production | Stored in | Browser-visible |
+|---|---|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | `apps/race/.env.local` → **staging** project URL (or a local Supabase stack; never prod) | Vercel → *Preview* env (staging branch/domain) → staging project URL | Vercel → *Production* env → production project URL | `.env.local` (gitignored) / Vercel | yes (public by design) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | staging anon key | staging anon key | production anon key | same | yes (RLS is the boundary) |
+| `RACE_DATABASE_URL` | operator shell → staging direct connection string (for `psql` verify/seed) | operator shell → staging | operator shell → production | **shell only** (exported for the session, from the vault) | never |
+| `SUPABASE_ACCESS_TOKEN` | operator shell (CLI login) | same | same | shell only; **revoke after each deployment window** | never |
+| `SUPABASE_DB_PASSWORD` | — | operator shell (prompted by `supabase db push`) | operator shell | shell/vault only | never |
+| `SUPABASE_SERVICE_ROLE_KEY` | not set | not set | not set | **not defined anywhere** in Vercel or `.env*`; vault only, used only by an admin script if one is ever needed and approved | **never** (`turbo.json` `globalEnv` only hashes it; `check-isolation.sh` fails if browser code references it) |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | — | Vercel Preview (site: public; secret: server-only) | Vercel Production | Vercel | site key yes; secret **never** — **only if option A+Turnstile is chosen in §11** |
 
-Future (only if approved in §0 #9): the CAPTCHA/rate-limit provider's site key (public) and secret (server-only) — to be added to this table then.
+Rules: staging and production use **different projects, keys and Vercel environments** (a Preview deployment can never read production values; production values are scoped to the *Production* environment only); `NEXT_PUBLIC_*` values are inlined at **build** time, so any change needs a redeploy; a local `.env.local` never points at production; `.env.example` stays the only committed template.
+
+### 1.2 Pre-deployment variable check (run before every deploy)
+
+```
+# in the Vercel project: only these names may exist
+vercel env ls          # expected: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (+ TURNSTILE_* if chosen) — nothing else
+bash supabase-race/tests/check-isolation.sh     # no .env, no JWT-shaped string, no service-role key in browser code
+```
+Also confirm by eye that the URL's project ref in the Production environment is the **production** ref and the Preview one is the **staging** ref.
 
 ---
 
 ## 2. Pre-flight gate (nothing created yet)
 
-- [ ] Phase 12 accepted ✔ (this message).
-- [ ] `git` branch `claude/ninth-race-system-bo9jaj` merged / chosen as the deployment ref (your call; I do not open a PR unless asked).
-- [ ] §0 decisions answered.
-- [ ] Accounts exist and 2FA is on: Supabase owner, Vercel owner, DNS provider.
-- [ ] Password manager vault "THE NINTH" prepared (staging + production entries).
-- [ ] Gym isolation re-checked on the deployment ref: `bash supabase-race/tests/check-isolation.sh` all PASS (gym files identical to `527f705`).
-- [ ] Full local harness green on the **chosen Postgres major version**: `bash supabase-race/tests/harness/run.sh` (§5 D).
+- [x] Phase 12 accepted; Phase 13 plan approved; decisions L1–L10 locked.
+- [ ] Domain / DNS owner identified (§0 table).
+- [ ] Accounts exist with 2FA: Supabase owner (race org), Vercel owner (race team/project), DNS.
+- [ ] Password-manager vault "THE NINTH" prepared (staging + production entries).
+- [ ] Deployment ref chosen (branch/tag) — I do not open a PR unless asked.
+- [ ] `bash supabase-race/tests/check-isolation.sh` all PASS on that ref (gym files identical to `527f705`).
+- [ ] **Postgres compatibility gate (§3A) passed** on the exact version Supabase offers for the selected project/region.
+- [ ] Registration abuse protection (§11) implemented, harness-tested and approved.
+- [ ] Staging seed scripts (§12) written, dry-run against a throw-away database, approved.
+
+---
+
+## 3A. Postgres compatibility gate (must pass BEFORE the project is created)
+
+**Why:** the Phase 12 proof ran on PostgreSQL **16** (the version installed in my sandbox). Supabase's current documentation describes **15 and 17** as the maintained versions (the changelog/docs I could see list 15.x and 17.x patch releases and 17 as the default for new/self-hosted stacks — to be confirmed on the creation screen); `supabase-race/supabase/config.toml` says `major_version = 15`. A proof on 16 is evidence, not proof for 15 or 17 (planner behaviour, `pg_trigger`/catalog details used by `verify_deployment.sql`, advisory-lock and `clock_timestamp` semantics, extension availability).
+
+**Procedure (no infrastructure involved — local, throw-away):**
+1. **Verify what Supabase offers** — at project-creation time, in the dashboard: *New project → Region (Frankfurt, or the closest offered to Egypt) → Advanced / Postgres version*. Record the exact **major.minor** shown (and the Supabase image tag if shown). Cross-check the current Supabase docs/changelog on that day. *(I cannot see your dashboard; this is a one-minute check for you, or I do it with you at the execution step.)* The creation screen is the source of truth; the choice is "the newest major Supabase offers for that region unless it is flagged beta".
+2. **Get binaries for that exact major** on a throw-away machine: preferred = the Supabase Postgres image of the same tag (`docker run supabase/postgres:<tag>`); otherwise the PGDG packages of the same major (`postgresql-<major>`).
+3. **Pin the harness to that version.** `run.sh` currently picks the highest installed `/usr/lib/postgresql/*/bin`; I add a tiny, test-only `PGBIN=/path/to/bin` override (no race logic involved) so the version is explicit and printed in the first line of the run.
+4. **Run the full Phase 12 harness on it:** `PGBIN=… bash supabase-race/tests/harness/run.sh` → must print `ALL RACE MIGRATION TESTS PASSED`, the **same assertion count** (1,246 at the Phase 12 baseline, plus any added by §11), all concurrency storms, and `MODEL AGREES … 0 mismatches`. Repeat the final simulation **≥ 6 times** (`ONLY_FINAL=1`, random slot orders) — all 0 mismatches.
+5. Also run `verify/verify_deployment.sql` against that harness database (the harness does this in its step 3b).
+6. **Decision rule:**
+   * all green on the offered version → **proceed**; set `config.toml` `major_version` to that version in the same commit as the evidence;
+   * **any** failure, mismatch or count difference → **STOP**: do not create the project; send me the log; a fix is a separate, approved change (and is re-tested on both the old and new version).
+   * If Supabase offers both 15 and 17: choose the **newest GA** one; do not pick by convenience.
+7. **Evidence** (committed under `docs/race/evidence/` without secrets): `postgres --version`, harness summary, the six simulation summaries, date. The Postgres version of the project is then **frozen** until after the event (no major upgrade in the change-freeze window).
+
+After project creation, confirm the real version: `select version();` on the project must equal the version the gate passed on.
 
 ---
 
@@ -58,7 +104,7 @@ Future (only if approved in §0 #9): the CAPTCHA/rate-limit provider's site key 
 > Every command is run by the operator from `supabase-race/`. The CLI must print the *race* project ref before anything is pushed. If it prints any other ref → stop.
 
 **A. Create the project**
-1. Dashboard → New project in the **THE NINTH organisation** (named `the-ninth-staging`, later `the-ninth-prod`), chosen region and Postgres version, strong DB password (generate in the password manager).
+1. Dashboard → New project in the **THE NINTH organization (a separate Supabase account/org from the gym — L1)**, named `the-ninth-staging` / `the-ninth-prod`; **plan: Pro (L2)**; **region: Frankfurt or the closest offered to Egypt (L3), identical for staging and production**; **Postgres version = the one that passed §3A (L4)**; strong DB password generated in the password manager.
 2. Record in the vault: project ref, URL, anon key, service-role key, DB password, direct connection string. **Do not paste them in chat.**
 
 **B. Auth settings** (Dashboard → Authentication) — `config.toml` documents intent only; these must be set by hand:
@@ -69,8 +115,8 @@ Future (only if approved in §0 #9): the CAPTCHA/rate-limit provider's site key 
 
 **C. Schema** (CLI, from `supabase-race/`)
 7. `supabase login` (uses `SUPABASE_ACCESS_TOKEN`) → `supabase link --project-ref <THE-NINTH-REF>` → confirm the printed ref.
-8. `supabase db push` — applies **all 17 migrations** in order (`20260928000000_race_foundation` … `20260930000006_race_tally_deterministic_order`). They are forward-only and tracked in *this* project's migration history. *(The earlier checkpoint text said "11 migrations"; the current number is 17.)*
-9. `supabase migration list` → 17 applied, none pending.
+8. `supabase db push` — applies **all migrations in `supabase-race/supabase/migrations/`** (17 at the Phase 12 baseline, 18 if §11 adds one; `supabase migration list` is the authority) in order (`20260928000000_race_foundation` … `20260930000006_race_tally_deterministic_order`). They are forward-only and tracked in *this* project's migration history. *(The earlier checkpoint text said "11 migrations"; the current number is 17.)*
+9. `supabase migration list` → every local migration applied, none pending; `select version();` equals the version that passed §3A.
 
 **D. Verify the database** (read-only)
 10. `psql "$RACE_DATABASE_URL" -f supabase-race/verify/verify_deployment.sql` → only `OK …` lines, no `VERIFY FAIL`. Archive the output (screenshot/log) in the vault.
@@ -219,8 +265,78 @@ It runs the **same pipeline as the phone** (Otsu binarisation → tesseract.js L
 - **Secrets exposure**: rotate the exposed key in the dashboard immediately (anon/service-role), update Vercel, redeploy.
 - **Never**: connect the gym project, reuse gym keys, share a Vercel project or an Auth user pool between the two systems.
 
-## 10. What I will do / not do, and where I stop
+## 11. Registration abuse protection (L6) — focused and minimal
+
+**Today:** the public form calls the registration RPC directly from the browser with the anon key; there is no rate limit or CAPTCHA (Phase 4 / checkpoint residual risk). **Scope rule:** protect that one entry point; do not change what registration collects, how race numbers/payment/duplicates work, or any race logic.
+
+**Layer A — required (database-side, cannot be bypassed by calling the API directly):**
+* A small `race_registration_attempts` table (append-only: `ip_hash`, `event_id`, `outcome`, `created_at`) and a check at the very top of the public registration RPC:
+  * per client IP (from PostgREST's `request.headers` → `x-forwarded-for`, stored **hashed with a per-project salt**, never raw): max **N** attempts per **10 min** (default 8) and **M** per hour (default 30);
+  * per event, a global ceiling per minute (default 60) as a flood brake;
+  * over the limit → refused with `RACE_RATE_LIMITED` (HTTP-friendly message in the form); successful and refused attempts are counted; old rows pruned by the next call.
+* Limits are **per-event settings with safe defaults** so race-day staff registering many athletes from the venue network are not blocked: staff registration (`race_staff_register_athlete`) is **not** limited by IP.
+* Honest limits: an attacker rotating IPs is slowed, not stopped; the existing duplicate-person check, the registration cap/closing, and payment-confirmation-before-heat rules remain the real integrity layer (an unpaid registration cannot take a start slot).
+
+**Layer B — optional, recommended before *advertising* the link (your choice, §0 item 5):** Cloudflare Turnstile (free, privacy-friendly). Because the browser talks to Supabase directly, a CAPTCHA only helps if verified server-side: a thin Next.js route handler verifies the Turnstile token with the secret, then calls the RPC. To keep it unbypassable the RPC would also have to require a short-lived server-signed pass — **that is a larger change**; recommendation: ship **Layer A now**, add Layer B only if abuse is actually observed or the link goes to a large public audience.
+
+**Delivery:** one new migration (table + check; RPC changes limited to the guard call), unit/harness tests (limit hit, limit reset, staff not limited, hashed IP only, no personal data stored, concurrency: 40 simultaneous submissions from one IP → exactly the allowed number accepted), full harness + Phase 12 simulation re-run (the simulation registers through the public RPC, so its limits must be configured for the test event), runbook §5 B gains a rate-limit probe. **Implementation starts only after the execution-step go-ahead.**
+
+## 12. Idempotent staging seed scripts (L7) — specification, NOT executed
+
+Location (to be written after this document is approved): `supabase-race/seed/staging/` — **no secrets, no real emails** in git (emails come from a gitignored/off-repo roster file passed with `psql -v`).
+
+| File | Does | Idempotency |
+|---|---|---|
+| `00_preflight.sql` | read-only: asserts it is run on the **staging** project (a `race_events`-free or staging-flagged check + `select current_database()`/project marker you confirm), migrations present, `race_profiles` rows exist for every roster email; prints what is missing | pure SELECT |
+| `01_event.sql` | creates the first staging event via the real RPC `race_create_event(slug, date, name, tz, planned_start)` **only if the slug does not exist**; sets registration fee/status via the existing RPCs; assigns the event's rules default | `if not exists (slug)` guard; re-run prints `already exists` and changes nothing |
+| `02_staff.sql` | inserts `race_staff` rows for the roster (Event Manager, Master Control, Reception, 9 Judges with `station_id` 1–9, Station Screens) from `:roster_csv` | `insert … on conflict do nothing`/re-activate; never deletes; each grant is audited by the existing trigger |
+| `03_verify_seed.sql` | read-only report: event, status, one row per staff member with role/station, counts (must equal the roster), no extra privileges, no Super Admin flags besides the owner | pure SELECT |
+
+How they run (documented, not executed): `psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -v roster_csv=… -f …` after `select set_config('request.jwt.claim.sub', '<super-admin-profile-uuid>', true)` + `set local role authenticated` so the **real RPCs and RLS** apply and the audit log records the Super Admin, exactly as in production. A dry run against a throw-away database built by the harness (with fake roster emails) is part of the approval of the scripts; running them twice must produce identical state and **zero** new rows the second time.
+
+## 13. Deployment & rollback commands (exact; to be run only at the execution step)
+
+**Staging deployment (operator shell; values from the vault, never typed into chat):**
+```
+# 0. gate evidence is committed (§3A); isolation check is green
+bash supabase-race/tests/check-isolation.sh
+
+# 1. Supabase (race project only)
+export SUPABASE_ACCESS_TOKEN=…        # from vault; revoke after the window
+cd supabase-race
+supabase login
+supabase link --project-ref "$STAGING_REF"       # the CLI must echo the STAGING ref — if not, stop
+supabase migration list                           # remote empty, local = N migrations
+supabase db push                                  # applies N migrations
+supabase migration list                           # all applied
+export RACE_DATABASE_URL=…                        # staging direct connection string, from vault
+psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -c "select version()"            # equals the §3A version
+psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f verify/verify_deployment.sql  # only OK lines
+psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -v email="'<owner email>'" -f bootstrap/promote_super_admin.sql
+# seed (§12) — after approval:  00_preflight → 01_event → 02_staff → 03_verify_seed
+
+# 2. Vercel (race project only)
+vercel link --project the-ninth-race --yes
+vercel env ls                                     # only the §1 names
+vercel deploy                                     # preview/staging build (never --prod here)
+curl -sI https://<staging-domain>/race            # 200/307 as expected
+```
+**Production** repeats the same list with `$PROD_REF`, the production vault entries, `vercel deploy --prod` (only after the staging sign-off and the go-live checklist §8), and the manual backup first.
+
+**Rollback matrix**
+
+| Layer | Trigger | Command / action | Notes |
+|---|---|---|---|
+| App (Vercel) | bad deploy, wrong env, UI regression | `vercel rollback <previous-deployment-url>` (or dashboard → *Promote previous*) | seconds; no data impact; re-run §5 C |
+| App config | wrong `NEXT_PUBLIC_*` | fix in Vercel env → redeploy (values are inlined at build) | check the ref in the URL |
+| Database, *before* the event | defect in a migration | **fix forward**: new reviewed migration, harness on the §3A version, staging first | migrations are forward-only; never edit an applied one |
+| Database, *during* the event | wrong score/state | **no hot-patch**: pause, use corrections with reason / Master review, record; fix after | system tools are the audited path |
+| Database, corruption/loss | — | restore PITR/backup **into a new project**, run `verify_deployment.sql`, repoint (new URL/keys → Vercel env → redeploy) | never overwrite the live project |
+| Secrets | key exposed | rotate in the dashboard → update Vercel → redeploy → revoke CLI token | |
+| Whole cutover | production go-live fails checks | do not open registration; keep the production URL unpublished; fall back to staging only if it is a faithful copy | decided by the technical lead |
+
+## 14. What I will do / not do, and where I stop
 
 **Allowed after you approve each gate:** write helper scripts and reviewed SQL (staff/event bootstrap with placeholders), walk you through the CLI/Vercel steps, interpret verify/harness/OCR outputs, and prepare the rehearsal sheets. **I will not**: create or connect any Supabase/Vercel project, ask for or store any key/token/password, run anything against hosted infrastructure, apply migrations anywhere but the throw-away test database, change race logic/scoring/timing, or add features (including the CAPTCHA) without a separate explicit approval.
 
-**Stopped.** Waiting for your explicit approval and the §0 answers before touching any production (or staging) infrastructure.
+**Stopped.** Waiting for your explicit **"approved: infrastructure execution"** (and the 'still needed' items in §0) before touching any staging or production infrastructure, creating any project, linking the CLI, pushing migrations, deploying, or implementing §11/§12.
