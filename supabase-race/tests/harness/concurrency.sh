@@ -497,7 +497,7 @@ for n in $(seq 1 30); do rega "$n" "ra$n" 203.0.113.77 & done
 wait; sleep 1
 okc=$(cat "$WORK"/c/ra*.out | grep -c '^N' || true)
 lim=$(cat "$WORK"/c/ra*.err | grep -c 'RACE_RATE_LIMITED' || true)
-other=$(for f in "$WORK"/c/ra*.err; do [ -s "$f" ] && ! grep -q 'RACE_RATE_LIMITED' "$f" && echo x; done | wc -l)
+other=0; for f in "$WORK"/c/ra*.err; do [ -s "$f" ] && ! grep -q 'RACE_RATE_LIMITED' "$f" && other=$((other + 1)); done
 rows=$(q "select count(*) from race_registration_attempts where event_id='$EVA' and ip_hash='$(ahash 203.0.113.77)'")
 ath=$(q "select count(*) from race_registrations where event_id='$EVA'")
 nums=$(q "select string_agg(race_number, ',' order by race_number) from race_registrations where event_id='$EVA'")
