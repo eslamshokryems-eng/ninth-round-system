@@ -14,7 +14,8 @@ trap 'echo "FAIL  harness stopped unexpectedly at $(basename "${BASH_SOURCE[0]}"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
-PGBIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1 || true)"
+# PGBIN=/path/to/bin pins the PostgreSQL under test (test tooling only); otherwise the highest installed major is used
+PGBIN="${PGBIN:-$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1 || true)}"
 export PATH="${PGBIN:+$PGBIN:}$PATH"
 
 WORK="$(mktemp -d)"
@@ -35,6 +36,8 @@ fi
 "${RUN_AS[@]}" pg_ctl -D "$WORK/data" -o "-p $PORT -k $WORK -c timezone=UTC" -l "$WORK/log" start -w >/dev/null
 
 PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -q -X)
+echo "PostgreSQL under test: $("${PSQL[@]}" -d postgres -Atc "select version()")"
+if [ -n "${EXPECT_PG_VERSION:-}" ] && [ "$("${PSQL[@]}" -d postgres -Atc "show server_version" | cut -d' ' -f1)" != "$EXPECT_PG_VERSION" ]; then echo "FAIL  expected PostgreSQL $EXPECT_PG_VERSION"; exit 1; fi
 "${PSQL[@]}" -d postgres -c "create database $DB" >/dev/null
 [ "$("${PSQL[@]}" -d "$DB" -Atc "show server_encoding")" = "UTF8" ] || { echo "harness must run on a UTF8 database (production Supabase is UTF8)"; exit 1; }
 
