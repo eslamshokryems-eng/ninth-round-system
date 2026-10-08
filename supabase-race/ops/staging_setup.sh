@@ -27,10 +27,17 @@ LINKED=$(cat supabase/.temp/project-ref 2>/dev/null || true)
 [ "$LINKED" = "$REF" ] || die "linked ref is '$LINKED', expected '$REF'"
 echo "linked ref = $LINKED (matches)"
 
-step "3. migration state BEFORE (remote must be empty)"
-supabase migration list | tee /dev/stderr | grep -E '^\s*[0-9]{14}\s*\|' | awk -F'|' '{gsub(/ /,"",$2); if ($2 != "") exit 1}' || die "the staging project already has applied migrations — not a fresh project"
-step "4. push all $LOCAL migrations"
-supabase db push --linked
+step "3. connectivity + state BEFORE: the staging database must be reachable over the pooler (IPv4) and be a FRESH project"
+psql "$RACE_DATABASE_URL" -Atc "select 'connected to ' || current_database() || ' as ' || current_user || ' on PostgreSQL ' || current_setting('server_version')" || die "cannot connect with RACE_DATABASE_URL (check the Session pooler URI and password)"
+HAS_HIST=$(psql "$RACE_DATABASE_URL" -Atc "select to_regclass('supabase_migrations.schema_migrations') is not null")
+if [ "$HAS_HIST" = "t" ]; then
+  N0=$(psql "$RACE_DATABASE_URL" -Atc "select count(*) from supabase_migrations.schema_migrations"); [ "$N0" = "0" ] || die "the staging project already has $N0 applied migrations — not a fresh project"
+fi
+T0=$(psql "$RACE_DATABASE_URL" -Atc "select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'")
+[ "$T0" = "0" ] || die "the public schema already has $T0 tables — not a fresh project"
+echo "OK  fresh project: no migration history, no tables in public"
+step "4. push all $LOCAL migrations (over the pooler: --db-url, because this network has no IPv6)"
+supabase db push --db-url "$RACE_DATABASE_URL"
 step "5. migration state AFTER (all $LOCAL applied, none pending)"
 APPLIED=$(psql "$RACE_DATABASE_URL" -Atc "select count(*) from supabase_migrations.schema_migrations")
 [ "$APPLIED" = "$LOCAL" ] || die "applied migrations = $APPLIED, expected $LOCAL"
