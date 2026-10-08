@@ -1,0 +1,4 @@
+# keep shell scripts and SQL with LF endings on Windows checkouts (CRLF breaks bash and psql variable parsing)
+*.sh text eol=lf
+*.sql text eol=lf
+*.csv text eol=lf

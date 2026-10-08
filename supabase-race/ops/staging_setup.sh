@@ -44,7 +44,8 @@ psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f ops/staging_checks.sql
 
 step "8. Auth settings (Management API, read-only)"
 AUTH=$(curl -fsS -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF/config/auth")
-echo "$AUTH" | python3 -I -c '
+PY="$(command -v python3 || command -v python || true)"; [ -n "$PY" ] || die "python is needed for the Auth check (install Python 3)"
+echo "$AUTH" | "$PY" -I -c '
 import json,sys
 c=json.load(sys.stdin); bad=[]
 def chk(name,cond,detail): 
