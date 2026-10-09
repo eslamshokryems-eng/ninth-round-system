@@ -18,7 +18,8 @@ die() { echo "STOP: $*" >&2; exit 1; }
 for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RACE_DATABASE_URL; do [ -n "${!v:-}" ] || die "$v is not set (take it from the vault; never paste it into chat)"; done
 [[ "$REF" =~ ^[a-z]{20}$ ]] || die "the expected ref must be the 20-letter project ref"
 case "$RACE_DATABASE_URL" in *"$REF"*) ;; *) die "RACE_DATABASE_URL does not contain the expected ref $REF — wrong project?";; esac
-LOCAL=$(ls supabase/migrations/*.sql | wc -l); [ "$LOCAL" = "18" ] || die "expected 18 local migrations, found $LOCAL"
+EXPECTED_LOCAL=20
+LOCAL=$(ls supabase/migrations/*.sql | wc -l); [ "$LOCAL" = "$EXPECTED_LOCAL" ] || die "expected $EXPECTED_LOCAL local migrations, found $LOCAL"
 
 step "1. link the CLI to $REF"
 supabase link --project-ref "$REF"
@@ -40,8 +41,13 @@ if [ "$N0" = "0" ] && [ "$T0" = "0" ]; then
   supabase db push --db-url "$RACE_DATABASE_URL"
 elif [ "$N0" = "$LOCAL" ] && diff <(db_versions) <(repo_versions) >/dev/null; then
   echo "RESUME: all $LOCAL migrations are already applied and identical to the repository — skipping the push"
+elif [ "$N0" -gt 0 ] && [ "$N0" -lt "$LOCAL" ] && diff <(db_versions) <(repo_versions | head -n "$N0") >/dev/null; then
+  echo "UPGRADE: the database holds the first $N0 of the repository's $LOCAL migrations, identical; the remaining $((LOCAL - N0)) are pending:"
+  repo_versions | tail -n +"$((N0 + 1))" | sed 's/^/   pending /'
+  step "4. push ONLY the pending migrations (the CLI lists them and asks for confirmation - answer Y only if they are exactly the ones listed above)"
+  supabase db push --db-url "$RACE_DATABASE_URL"
 else
-  die "the staging project is neither fresh nor at the repository's $LOCAL migrations (history rows: $N0, tables in public: $T0)"
+  die "the staging project is neither fresh, nor a strict prefix of the repository's $LOCAL migrations, nor identical to them (history rows: $N0, tables in public: $T0)"
 fi
 step "5. migration state (all $LOCAL applied, history identical to the repository)"
 APPLIED=$(psql "$RACE_DATABASE_URL" -Atc "select count(*) from supabase_migrations.schema_migrations" | tr -d '\r')
