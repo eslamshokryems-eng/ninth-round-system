@@ -15,7 +15,7 @@ begin
   -- THE NINTH's own functions: race_* and not owned by an extension (extensions such as pg_trgm / pgcrypto may or may not live in public, depending on the platform)
   select count(*) into n from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and p.proname like 'race\_%'
      and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e');
-  if n <> 146 then raise exception 'CHECK FAIL: expected 146 race_* functions in public, found %', n; end if;
+  if n <> 147 then raise exception 'CHECK FAIL: expected 147 race_* functions in public, found %', n; end if;
   select string_agg(distinct e.extname, ', ') into bad from pg_depend d join pg_extension e on e.oid = d.refobjid join pg_proc p on p.oid = d.objid
    where d.deptype = 'e' and p.pronamespace = 'public'::regnamespace and e.extname not in ('pg_trgm', 'pgcrypto');
   if bad is not null then raise exception 'CHECK FAIL: unexpected extensions install functions into public: %', bad; end if;
@@ -27,7 +27,7 @@ begin
   if n <> 66 then raise exception 'CHECK FAIL: expected 66 triggers in public, found %', n; end if;
   select count(*) into n from pg_type where typnamespace = 'public'::regnamespace and typtype = 'e';
   if n <> 23 then raise exception 'CHECK FAIL: expected 23 enum types in public, found %', n; end if;
-  raise notice 'OK  35 tables, 146 race functions, 49 public + 13 storage policies, 66 triggers, 23 enums, no views';
+  raise notice 'OK  35 tables, 147 race functions, 49 public + 13 storage policies, 66 triggers, 23 enums, no views';
 
   -- RLS on every table; no gym/other objects
   select string_agg(relname, ', ') into bad from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r' and not relrowsecurity;
