@@ -12,7 +12,8 @@
 #        → 9 seed 00..03 (only with --through=seed, only after 1–8 pass).  Nothing here touches the gym project: every command is pinned to the expected ref.
 set -euo pipefail
 REF="${1:?usage: staging_setup.sh <expected-staging-project-ref> [--through=checks|seed]}"; THROUGH="${2:---through=checks}"
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT/supabase-race"
+OPS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$OPS/../.." && pwd)"; cd "$ROOT/supabase-race"
 step() { printf '\n== %s\n' "$*"; }
 die() { echo "STOP: $*" >&2; exit 1; }
 for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RACE_DATABASE_URL; do [ -n "${!v:-}" ] || die "$v is not set (take it from the vault; never paste it into chat)"; done
@@ -60,32 +61,10 @@ psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f verify/verify_deployment.sql
 step "7. ops/staging_checks.sql (tables, functions, RLS, policies, realtime, storage, no gym objects)"
 psql "$RACE_DATABASE_URL" -v ON_ERROR_STOP=1 -f ops/staging_checks.sql
 
-step "8. Auth settings (Management API, read-only; if the token cannot read them this becomes a MANUAL checklist and is reported as UNVERIFIED)"
-AUTH_BODY="$(mktemp)"; AUTH_CODE=$(curl -sS -o "$AUTH_BODY" -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF/config/auth" || true)
-if [ "$AUTH_CODE" = "200" ]; then
-  PY="$(command -v python3 || command -v python || true)"; [ -n "$PY" ] || die "python is needed for the Auth check (install Python 3)"
-  "$PY" -I -c '
-import json,sys
-c=json.load(open(sys.argv[1])); bad=[]
-def chk(name,cond,detail):
-    print(("OK   " if cond else "FAIL ")+name+" = "+str(detail))
-    if not cond: bad.append(name)
-chk("public sign-up disabled", c.get("disable_signup") is True, c.get("disable_signup"))
-chk("email confirmation required", c.get("mailer_autoconfirm") is False, c.get("mailer_autoconfirm"))
-chk("JWT expiry 3600 s", c.get("jwt_exp")==3600, c.get("jwt_exp"))
-chk("password min length >= 12", (c.get("password_min_length") or 0)>=12, c.get("password_min_length"))
-print("INFO site_url =", c.get("site_url"), "| uri_allow_list =", c.get("uri_allow_list"))
-sys.exit(1 if bad else 0)' "$AUTH_BODY" || die "Auth configuration differs from the expected settings (fix in the dashboard, then re-run)"
-  echo "AUTH: VERIFIED by API"
-else
-  echo "AUTH: UNVERIFIED — the Management API answered HTTP $AUTH_CODE for this token (it cannot read Auth settings)."
-  echo "      Check these by hand in the dashboard (Authentication) and confirm before seeding:"
-  echo "        [ ] Sign In / Providers → Email → 'Allow new users to sign up' is OFF"
-  echo "        [ ] Sign In / Providers → Email → 'Confirm email' is ON"
-  echo "        [ ] Sign In / Providers → Email → 'Minimum password length' is 12 or more"
-  echo "        [ ] Sessions → JWT expiry is 3600 seconds"
-fi
-rm -f "$AUTH_BODY"
+step "8. Auth settings (Management API, read-only). If the token cannot read them (HTTP 401/403) the result is AUTH UNVERIFIED and you must confirm the dashboard values by typing a phrase; every other check in this script stays mandatory"
+# shellcheck source=staging_auth_check.sh
+. "$OPS/staging_auth_check.sh"
+auth_check "$REF"
 echo "(SMTP is configured separately and is not checked here.)"
 [ "$THROUGH" = "--through=seed" ] || { echo; echo "DONE through step 8 (database verified). Re-run with --through=seed to seed."; exit 0; }
 
