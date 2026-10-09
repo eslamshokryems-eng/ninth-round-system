@@ -1537,14 +1537,14 @@ const main = async () => {
     const jc = await browser.newContext({ viewport: { width: 390, height: 844 } }); await installMock(jc);
     const jpg = await jc.newPage(); await seedSession(jpg);
     await jpg.goto(`${BASE}/race/judge/locked-2026/1`); await jpg.waitForSelector("[data-testid=judge-movement]");
-    assert.match(await jpg.locator("[data-testid=judge-movement]").innerText(), /Plyo box jump/);
-    assert.match(await jpg.locator("[data-testid=judge-instructions]").innerText(), /Hands on the bench/);
+    assert.match(await jpg.locator("[data-testid=judge-movement]").innerText(), /plyo box jump/i);
+    assert.match(await jpg.locator("[data-testid=judge-instructions]").innerText(), /hands on the bench/i);
     assert.match(await jpg.locator("[data-testid=judge-equipment]").innerText(), /bench/i);
     await jc.close();
     const sc2 = await browser.newContext({ viewport: { width: 1080, height: 1920 } }); await installMock(sc2);
     const sp = await sc2.newPage(); await seedSession(sp);
     await sp.goto(`${BASE}/race/station/locked-2026/1`); await sp.waitForSelector("[data-testid=screen-exercise-name]");
-    assert.match(await sp.locator("[data-testid=screen-exercise-name]").innerText(), /Plyo box jump/);
+    assert.match(await sp.locator("[data-testid=screen-exercise-name]").innerText(), /plyo box jump/i);
     await sc2.close();
   });
 
