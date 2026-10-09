@@ -53,6 +53,29 @@ const ROWS = [
   { registration_id: "a3", race_number: "N003", full_name: "Hassan Kamel", phone: "01221234567", email: null, gender: "male", category_code: "MASTERS", heat_id: null, heat_number: null, status: "CANCELLED", race_status: "REGISTERED", pushup_style: "KNEE", payment_id: "p3", payment_status: "CANCELLED", payment_amount: 750, payment_method: null, paid_at: null, created_at: "2026-09-29T10:10:00Z" },
 ];
 
+// private admin / station settings mock state
+const adm = { locked: false, signedOutCalls: 0, updates: [], previews: [], displayName: "Barbell Squat" };
+const ADM_EVENT = { id: "demo-ev-1", slug: "demo-abc123def456", name: "Private demo run", status: "DRAFT", is_demo: true, event_date: "2026-11-20", manager: true };
+function admStations() {
+  const cat = (scoring, movement, rule = {}) => ({ scoring_type: scoring, higher_is_better: true, movement, equipment: {}, rule });
+  return [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
+    number: n, code: "S" + n, name: n === 2 ? "Push-Up" : "Station " + n, exercise_name: n === 2 ? "Push-up" : "Exercise " + n, instructions: "Do it well.", equipment_note: "None", template_code: null,
+    has_technique: n === 4 || n === 7, requires_ocr: n === 9,
+    categories: { MEN: cat(n === 2 ? "CONVERTED_REPS" : "REPS", "Move", n === 2 ? { knee_ratio: 3 } : {}), WOMEN: cat(n === 2 ? "CONVERTED_REPS" : "REPS", "Move", n === 2 ? { knee_ratio: 3 } : {}), MASTERS: cat(n === 2 ? "CONVERTED_REPS" : "REPS", "Move", n === 2 ? { knee_ratio: 3 } : {}) },
+    template_options: n === 4 || n === 7 ? ["REPS_TECHNIQUE"] : n === 9 ? ["DISTANCE_OCR"] : ["REPS", "PUSHUP_STYLE", "LAPS", "HOLD"],
+    locked_rule: n === 4 || n === 7 || n === 9 ? "locked" : null,
+  }));
+}
+function admConfig() {
+  return { event: { id: ADM_EVENT.id, slug: ADM_EVENT.slug, name: ADM_EVENT.name, status: adm.locked ? "LIVE" : "DRAFT", is_demo: true }, locked: adm.locked,
+    lock_reason: adm.locked ? "The race has started: the station configuration is frozen for this event." : null, can_edit: !adm.locked, version: 1, frozen_version: adm.locked ? 2 : null,
+    stations: admStations(),
+    templates: [
+      { code: "REPS", label: "Counted repetitions", description: "d", supported: true, unsupported_reason: null, scoring_type: "REPS", judge_actions: ["REP", "NO_REP"], has_technique: false, requires_ocr: false, allowed_stations: [1, 2, 3, 5, 6, 8] },
+      { code: "TIME_FOR_DISTANCE", label: "Fastest time over a fixed distance", description: "d", supported: false, unsupported_reason: "Not implemented", scoring_type: null, judge_actions: [], has_technique: false, requires_ocr: false, allowed_stations: null },
+    ],
+    versions: [{ version: 1, created_at: "2026-11-01T10:00:00Z", reason: "baseline", frozen: false, created_by: "Owner" }] };
+}
 const calls = []; // every RPC the browser makes: {fn, body}
 const seenUrls = []; // every URL any page requested
 let registerMode = "ok"; // "ok" | "dup"
@@ -298,6 +321,20 @@ async function installMock(context) {
           if (body.p_registration_id === "r28") return json(400, { code: "P0001", message: "RACE_NOT_CONFIRMED: payment must be confirmed before check-in", details: null, hint: null });
           return json(200, { check_in_id: "c1", checked_in_at: "2026-11-20T06:00:00Z", kind: body.p_registration_id === "late1" ? "LATE" : "ON_TIME", queue_position: 4, heat_number: 2, already_checked_in: body.p_registration_id === "r30" });
         }
+        case "race_my_access": return json(200, { signed_in: true, is_super_admin: true, can_create_events: true, events: [ADM_EVENT] });
+        case "race_get_station_config": return json(200, admConfig());
+        case "race_preview_station_config": {
+          adm.previews.push(body);
+          const name = body.p_patch.name ?? "Push-Up";
+          return json(200, { valid: true, errors: [], conflicts: [], warnings: [], template_changed: false, scoring_changed: false, station: {}, preview: { judge: { header: `Judge · Station 02 · ${name}`, exercise_name: body.p_patch.exercise_name ?? "Push-up", instructions: "Do it well.", equipment_note: "None", has_technique: false, categories: { MEN: { movement: "Move", scoring_type: "CONVERTED_REPS", buttons: ["REP", "NO_REP", "UNDO"] } } }, screen: { station_label: "STATION 02", station_name: name, exercise_name: body.p_patch.exercise_name ?? "Push-up" } } });
+        }
+        case "race_update_station_config":
+          adm.updates.push(body);
+          if (adm.locked) return json(400, { code: "23514", message: "RACE_CONFIG_LOCKED: the race has started", details: null, hint: null });
+          return json(200, { version: 2, station: {}, changes: {} });
+        case "race_station_display": return json(200, { number: body.p_station_number, name: "Press-Up Wall", exercise_name: adm.displayName, instructions: "Hands on the bench.", equipment_note: "Bench", template_code: null, has_technique: false, requires_ocr: false, config_version: 2, categories: { MEN: { scoring_type: "REPS", movement: "Repetitions", equipment: {}, rule: {}, buttons: ["REP", "NO_REP", "UNDO"] }, WOMEN: { scoring_type: "REPS", movement: "Repetitions", equipment: {}, rule: {}, buttons: ["REP", "NO_REP", "UNDO"] }, MASTERS: { scoring_type: "REPS", movement: "Repetitions", equipment: {}, rule: {}, buttons: ["REP", "NO_REP", "UNDO"] } } });
+        case "race_demo_status": return json(200, { status: "DRAFT", is_demo: true, started: false, athletes: 0, heats: 0, checked_in: 0, config_version: 1, config_frozen: false });
+        case "race_create_demo_event": return json(200, { id: "demo-ev-2", slug: "demo-new000000000" });
         case "race_station_view": return json(200, stationView());
         case "race_leaderboard": return json(200, leaderboard(body.p_event_id));
         case "race_compute_rankings": return json(200, { official: rk.official, categories: [{ category_id: "cat-men", version: 1, official: rk.official, unchanged: true, ranked: 4, blockers: rkBlockers() }] });
@@ -1059,7 +1096,7 @@ const main = async () => {
 
   await step("screen SECURITY: it only reads (event lookup + race_station_screen) — no score, pause, skip or edit call exists", async () => {
     const fns = [...new Set(screenCalls())].sort();
-    assert.deepEqual(fns, ["race_get_public_event", "race_station_screen"]);
+    assert.deepEqual(fns, ["race_get_public_event", "race_station_display", "race_station_screen"]);
   });
 
   await step("screen signed out: only a sign-in prompt, no race data", async () => {
@@ -1409,7 +1446,7 @@ const main = async () => {
     await tvp.screenshot({ path: `${shots}/41-screen-rowing-confirmed.png` });
     const text = await tvp.locator("[data-testid=screen-stage]").innerText();
     assert.doesNotMatch(text, /photo|image|ocr|\.jpg|\.png|rowing\//i);
-    assert.deepEqual([...new Set(calls.slice(callsFrom).map((c) => c.fn))].sort(), ["race_get_public_event", "race_station_screen"]);
+    assert.deepEqual([...new Set(calls.slice(callsFrom).map((c) => c.fn))].sort(), ["race_get_public_event", "race_station_display", "race_station_screen"]);
     assert.deepEqual(seenUrls.slice(from).filter((u) => /storage\/v1/.test(u)), [], "the screen made no storage request");
   });
   await step("rowing security in the UI: a signed-out device gets a sign-in prompt; an account that is not the station's judge gets the refusal and NO capture control", async () => {
@@ -1427,6 +1464,88 @@ const main = async () => {
     const used = new Set(calls.slice(rwFrom, rwJudgeTo).map((c) => c.fn));
     assert.deepEqual([...used].sort(), ["race_get_public_event", "race_ocr_capture", "race_ocr_confirm", "race_ocr_retake", "race_ocr_submit", "race_rowing_view"]);
     assert.ok(!calls.some((c) => c.fn === "race_record_action" && c.body.p_station_result_id?.startsWith("row-")), "no tap-based score on the rowing results");
+  });
+
+  // ---------- private admin: sign-in gate, Station & Exercise Settings, logout ----------
+  await step("admin: a signed-out visitor to the private area sees a sign-in prompt and NO event data or admin call", async () => {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 800 } }); await installMock(c);
+    const p = await c.newPage(); const from = calls.length;
+    await p.goto(`${BASE}/race/admin`); await p.waitForSelector("text=Sign in required");
+    assert.match(await p.locator("a", { hasText: "Sign in" }).first().getAttribute("href"), /\/race\/login\?next=%2Frace%2Fadmin/);
+    assert.equal(calls.slice(from).filter((x) => /station_config|my_access|demo/.test(x.fn)).length, 0, "no admin RPC before signing in");
+    await p.goto(`${BASE}/race/admin/${ADM_EVENT.slug}/stations`); await p.waitForSelector("text=Sign in required");
+    await c.close();
+  });
+
+  const ap = await desk.newPage(); await seedSession(ap);
+  ap.on("pageerror", (e) => errors.push(`pageerror(admin): ${e.message}`));
+  await step("admin hub: lists the caller's events with the DEMO badge and offers the private demo form", async () => {
+    await ap.goto(`${BASE}/race/admin`); await ap.waitForSelector("[data-testid=event-list]");
+    const t = await ap.locator("main").innerText();
+    assert.match(t, /Private demo run/); assert.match(t, /DEMO/); assert.match(t, /SUPER ADMIN/);
+    await ap.screenshot({ path: `${shots}/50-admin-hub.png`, fullPage: true });
+  });
+  await step("admin: Station & Exercise Settings lists the nine stations; locked-rule stations cannot change type; unsupported types are marked", async () => {
+    await ap.goto(`${BASE}/race/admin/${ADM_EVENT.slug}/stations`); await ap.waitForSelector("[data-testid=station-form]");
+    assert.equal(await ap.locator("[role=tab]").count(), 9);
+    assert.ok(await ap.locator("[data-testid=admin-sidebar]").getByText("Station & Exercise Settings").count() >= 1);
+    await ap.locator("[data-testid=pick-4]").click();
+    assert.equal(await ap.locator("#tpl").isDisabled(), true, "S04 keeps its technique template");
+    await ap.locator("[data-testid=pick-2]").click();
+    assert.match(await ap.locator("#tpl").innerText(), /UNSUPPORTED/);
+    await ap.screenshot({ path: `${shots}/51-admin-stations.png`, fullPage: true });
+  });
+  await step("admin: renaming only the exercise sends ONLY that field (no scoring, no template) — after Preview and a mandatory reason", async () => {
+    await ap.locator("[data-testid=pick-2]").click();
+    const before = adm.updates.length;
+    await ap.locator("#ex").fill("Incline push-up");
+    assert.equal(await ap.locator("[data-testid=save]").isDisabled(), true, "no reason yet");
+    await ap.locator("[data-testid=preview]").click(); await ap.waitForSelector("[data-testid=preview-panel]");
+    assert.match(await ap.locator("[data-testid=preview-panel]").innerText(), /Incline push-up/);
+    assert.equal(await ap.locator("[data-testid=confirm-scoring]").count(), 0, "a name change needs no scoring confirmation");
+    await ap.locator("#reason").fill("demo wording");
+    await ap.locator("[data-testid=save]").click(); await ap.waitForSelector("[data-testid=saved]");
+    const sent = adm.updates.slice(before);
+    assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].p_patch, { exercise_name: "Incline push-up" });
+    assert.equal(sent[0].p_reason, "demo wording"); assert.equal(sent[0].p_station_number, 2);
+  });
+  await step("admin: Cancel discards edits; a frozen (started) race shows FROZEN, is read-only, and offers no Save", async () => {
+    await ap.locator("#name").fill("Something else");
+    await ap.locator("[data-testid=cancel]").click();
+    assert.equal(await ap.locator("#name").inputValue(), "Push-Up");
+    adm.locked = true;
+    await ap.reload(); await ap.waitForSelector("[data-testid=station-form]");
+    assert.match(await ap.locator("main").innerText(), /FROZEN/);
+    assert.equal(await ap.locator("[data-testid=save]").count(), 0);
+    assert.equal(await ap.locator("#name").isDisabled(), true);
+    await ap.screenshot({ path: `${shots}/52-admin-frozen.png`, fullPage: true });
+    adm.locked = false;
+  });
+  await step("admin: the guided demo page walks the workflow and links every judge / station screen", async () => {
+    await ap.goto(`${BASE}/race/admin/${ADM_EVENT.slug}`); await ap.waitForSelector("[data-testid=step-1]");
+    assert.equal(await ap.locator("[data-testid^=step-]").count(), 7);
+    assert.equal(await ap.locator(`a[href='/race/judge/${ADM_EVENT.slug}/9']`).count(), 1);
+    assert.equal(await ap.locator(`a[href='/race/station/${ADM_EVENT.slug}/1']`).count(), 1);
+    assert.match(await ap.locator("main").innerText(), /new run with this configuration/i);
+  });
+  await step("admin: Sign out ends the session and returns to the login page", async () => {
+    await ap.locator("[data-testid=logout]").first().click(); await ap.waitForURL(/\/race\/login/);
+  });
+  await step("judge + station screen show the CONFIGURED exercise name and instructions (from the station display RPC)", async () => {
+    adm.displayName = "Plyo box jump";
+    const jc = await browser.newContext({ viewport: { width: 390, height: 844 } }); await installMock(jc);
+    const jpg = await jc.newPage(); await seedSession(jpg);
+    await jpg.goto(`${BASE}/race/judge/locked-2026/1`); await jpg.waitForSelector("[data-testid=judge-movement]");
+    assert.match(await jpg.locator("[data-testid=judge-movement]").innerText(), /Plyo box jump/);
+    assert.match(await jpg.locator("[data-testid=judge-instructions]").innerText(), /Hands on the bench/);
+    assert.match(await jpg.locator("[data-testid=judge-equipment]").innerText(), /bench/i);
+    await jc.close();
+    const sc2 = await browser.newContext({ viewport: { width: 1080, height: 1920 } }); await installMock(sc2);
+    const sp = await sc2.newPage(); await seedSession(sp);
+    await sp.goto(`${BASE}/race/station/locked-2026/1`); await sp.waitForSelector("[data-testid=screen-exercise-name]");
+    assert.match(await sp.locator("[data-testid=screen-exercise-name]").innerText(), /Plyo box jump/);
+    await sc2.close();
   });
 
   // ---------- independence from the gym system ----------

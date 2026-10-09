@@ -16,7 +16,7 @@ export default function RaceHome() {
           Squat. Push. Punch. Jump. Carry. Kick. Burpee. Row. Thirty-one minutes, every athlete, nine stations — ranked station by station.
         </p>
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <a href="/race/login" className="race-btn race-btn--ghost">
+          <a href="/race/login?next=/race/admin" className="race-btn race-btn--ghost">
             Staff &amp; officials sign in
           </a>
         </div>

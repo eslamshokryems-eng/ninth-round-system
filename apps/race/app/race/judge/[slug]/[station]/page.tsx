@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
-import { ActionQueue, formatCountdown } from "@9thround/race";
-import type { ActionType, PublicRaceEvent, QueuedAction, QueueStorage, SendOutcome } from "@9thround/race";
+import { ActionQueue, formatCountdown, judgeKindFromScoring } from "@9thround/race";
+import type { ActionType, StationDisplay, PublicRaceEvent, QueuedAction, QueueStorage, SendOutcome } from "@9thround/race";
 import { getRaceModule } from "../../../../../src/lib/composition-root";
 import { useAuthStore } from "../../../../../src/features/auth/store";
 import { useStationView } from "../../../../../src/features/race/use-station-view";
@@ -75,9 +75,17 @@ function Console({ event, stationNumber }: { event: PublicRaceEvent; stationNumb
   const [notice, setNotice] = useState<string | null>(null);
   const [lastEvent, setLastEvent] = useState<{ id: string; resultId: string } | null>(null);
   const [technique, setTechnique] = useState(7);
+  const [display, setDisplay] = useState<StationDisplay | null>(null);
   const flushing = useRef(false);
   const raceMsRef = useRef<number | null>(null);
   raceMsRef.current = raceMs;
+
+  // the configuration this station is running with (exercise name, instructions, scoring type) — loaded once, it cannot change after the race starts
+  useEffect(() => {
+    let cancelled = false;
+    void getRaceModule().stationConfig.display(event.eventId, stationNumber).then((r) => { if (!cancelled && r.isOk) setDisplay(r.value); });
+    return () => { cancelled = true; };
+  }, [event.eventId, stationNumber]);
 
   const sync = useCallback(() => {
     setPending(queue.pending().length);
@@ -131,7 +139,10 @@ function Console({ event, stationNumber }: { event: PublicRaceEvent; stationNumb
   const remaining = cur && raceMs !== null ? (working ? cur.windowEndMs - raceMs : cur.scoringEndMs - raceMs) : null;
   const t = cur?.tally;
   const isMasters = cur?.categoryCode === "MASTERS";
-  const kind: "reps" | "laps" | "hold" = stationNumber === 3 || stationNumber === 6 ? "laps" : stationNumber === 1 && isMasters ? "hold" : "reps";
+  const legacyKind: "reps" | "laps" | "hold" = stationNumber === 3 || stationNumber === 6 ? "laps" : stationNumber === 1 && isMasters ? "hold" : "reps";
+  const kindRaw = judgeKindFromScoring(cur ? display?.categories[cur.categoryCode]?.scoring_type : undefined, legacyKind);
+  const kind: "reps" | "laps" | "hold" = kindRaw === "rowing" ? legacyKind : kindRaw;
+  const hasPenalty = display && cur ? (display.categories[cur.categoryCode]?.buttons ?? []).includes("PENALTY") : stationNumber === 6;
   const big = kind === "laps" ? (t?.laps ?? 0) : kind === "hold" ? Math.floor((t?.holdMs ?? 0) / 1000) : (t?.reps ?? 0);
 
   return (
@@ -157,7 +168,9 @@ function Console({ event, stationNumber }: { event: PublicRaceEvent; stationNumb
             <div className="race-card flex flex-col gap-2" data-testid="athlete">
               <div className="race-number-plate" style={{ fontSize: "clamp(3.5rem, 16vw, 6rem)" }}>{cur.raceNumber}</div>
               <p className="race-display text-3xl">{cur.fullName}</p>
-              <p style={{ color: "var(--race-muted)" }}>{cur.movement ?? ""}</p>
+              <p style={{ color: "var(--race-muted)" }} data-testid="judge-movement">{display?.exercise_name ?? cur.movement ?? ""}{cur.movement && display?.exercise_name && display.exercise_name !== cur.movement ? ` · ${cur.movement}` : ""}</p>
+              {display?.instructions ? <p className="text-sm" data-testid="judge-instructions">{display.instructions}</p> : null}
+              {display?.equipment_note ? <p className="race-label" data-testid="judge-equipment">Equipment: {display.equipment_note}</p> : null}
               <div className="race-display text-6xl" data-testid="countdown">{remaining !== null ? formatCountdown(remaining) : ""}</div>
               <RaceBadge tone={working ? "red" : "white"}>{working ? "WORK" : "0:30 — scoring only"}</RaceBadge>
             </div>
@@ -176,7 +189,7 @@ function Console({ event, stationNumber }: { event: PublicRaceEvent; stationNumb
                 {kind === "laps" ? (
                   <>
                     <RaceButton onClick={() => tap("LAP")} style={{ minHeight: 120, fontSize: "2rem" }}>+ LAP</RaceButton>
-                    {stationNumber === 6 ? <RaceButton variant="danger" onClick={() => tap("PENALTY")} style={{ minHeight: 120, fontSize: "1.6rem" }}>PENALTY</RaceButton> : <span />}
+                    {hasPenalty ? <RaceButton variant="danger" onClick={() => tap("PENALTY")} style={{ minHeight: 120, fontSize: "1.6rem" }}>PENALTY</RaceButton> : <span />}
                   </>
                 ) : null}
                 {kind === "hold" ? (

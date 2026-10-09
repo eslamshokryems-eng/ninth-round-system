@@ -3,7 +3,7 @@ reset role;
 
 select race_test.eq((select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
                      where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'race\_%')::int,
-                    33, 'structure: 33 race_* tables (30 + the 3 of registration abuse protection: settings, per-event overrides, hashed-IP attempts)');
+                    35, 'structure: 35 race_* tables (33 + the exercise-template and station-config-version tables)');
 
 select race_test.ok(not exists (
   select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -53,7 +53,7 @@ select race_test.ok(not has_column_privilege('authenticated', 'race_events', 'st
 
 select race_test.eq((select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid
                      where c.relname like 'race\_%' and t.tgname like '%append_only')::int,
-                    7, 'structure: fully append-only triggers on 7 ledger tables (race_check_ins has the narrower guard instead; Phase 6 added race_check_in_corrections)');
+                    8, 'structure: fully append-only triggers on 8 ledger tables (race_check_ins has the narrower guard instead; the station-config versions are the 8th)');
 
 select race_test.ok(not has_any_column_privilege('authenticated', 'race_check_in_corrections', 'INSERT') and not has_any_column_privilege('authenticated', 'race_check_in_corrections', 'UPDATE')
                     and not has_table_privilege('authenticated', 'race_check_in_corrections', 'DELETE'),

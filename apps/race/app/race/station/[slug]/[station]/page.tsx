@@ -76,6 +76,12 @@ export default function StationScreenPage() {
 
 function Screen({ eventId, stationNumber }: { eventId: string; stationNumber: number }) {
   const { data, state, connectionLost, error } = useStationScreen(eventId, stationNumber);
+  const [exercise, setExercise] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void getRaceModule().stationConfig.display(eventId, stationNumber).then((r) => { if (!cancelled && r.isOk && r.value) setExercise(r.value.exercise_name); });
+    return () => { cancelled = true; };
+  }, [eventId, stationNumber]);
   if (!data || !state) {
     return (
       <Stage state="LOADING">
@@ -88,7 +94,7 @@ function Screen({ eventId, stationNumber }: { eventId: string; stationNumber: nu
   }
   return (
     <Stage state={state.kind}>
-      <Head data={data} />
+      <Head data={data} exercise={exercise} />
       <div className="screen-body" data-testid="screen-state" data-state={state.kind}>
         <Body state={state} data={data} />
       </div>
@@ -97,12 +103,13 @@ function Screen({ eventId, stationNumber }: { eventId: string; stationNumber: nu
   );
 }
 
-function Head({ data }: { data: StationScreenData }) {
+function Head({ data, exercise }: { data: StationScreenData; exercise: string | null }) {
   return (
     <div className="screen-head">
       <div className="screen-brand">THE <span>NINTH</span></div>
       <div className="screen-station-no">STATION {String(data.station.number).padStart(2, "0")}</div>
       <div className="screen-station-name" data-testid="screen-station-name">{data.station.name}</div>
+      {exercise && exercise !== data.station.name ? <div className="screen-cat" data-testid="screen-exercise-name">{exercise}</div> : null}
     </div>
   );
 }

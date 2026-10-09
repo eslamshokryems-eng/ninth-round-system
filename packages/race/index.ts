@@ -35,6 +35,8 @@ import { SupabaseRaceRowingRepository } from "./infrastructure/supabase-race-row
 import { SupabaseRaceScreenRepository } from "./infrastructure/supabase-race-screen-repository";
 import { SupabaseRaceRegistrationRepository } from "./infrastructure/supabase-race-registration-repository";
 import { SupabaseRaceEngineRepository } from "./infrastructure/supabase-race-engine-repository";
+import { SupabaseRaceStationConfigRepository } from "./infrastructure/supabase-race-station-config-repository";
+import { DemoWorkflowUseCases, StationConfigUseCases } from "./application/station-config-use-cases";
 
 export type { Result, DomainError, UseCase } from "./kernel";
 export { createRaceSupabaseClient } from "./infrastructure/race-client";
@@ -58,6 +60,8 @@ export { SupabaseRaceResultsRepository } from "./infrastructure/supabase-race-re
 export type { RaceScreenRepository } from "./domain/race-screen-repository";
 export * from "./application/station-screen-use-case";
 export { SupabaseRaceScreenRepository } from "./infrastructure/supabase-race-screen-repository";
+export * from "./domain/station-config";
+export { DemoWorkflowUseCases, StationConfigUseCases } from "./application/station-config-use-cases";
 export * from "./domain/judge";
 export * from "./domain/action-queue";
 export type { RaceJudgeRepository } from "./domain/race-judge-repository";
@@ -94,7 +98,10 @@ export function createRaceModule(client: RaceSupabaseClient) {
   const judge = new SupabaseRaceJudgeRepository(client);
   const results = new SupabaseRaceResultsRepository(client);
   const rowing = new SupabaseRaceRowingRepository(client);
+  const stationConfigRepo = new SupabaseRaceStationConfigRepository(client);
   return {
+    stationConfig: new StationConfigUseCases(stationConfigRepo),
+    demo: new DemoWorkflowUseCases(stationConfigRepo),
     rowingRepository: rowing,
     getRowingView: new GetRowingViewUseCase(rowing),
     getEvidenceHistory: new GetEvidenceHistoryUseCase(rowing),
