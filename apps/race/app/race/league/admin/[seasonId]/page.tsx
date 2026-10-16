@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { METRIC_UNITS, PROVISIONAL_SEASON_RULES, SEASON_TRANSITIONS, weekWindow, type AdminOverview, type AuditLine, type Challenge, type ChallengeInput, type ChallengeStatus, type MetricKind, type SeasonRules } from "@9thround/league";
+import { DEFAULT_ATTEMPT_POLICY, METRIC_UNITS, PROVISIONAL_SEASON_RULES, SEASON_TRANSITIONS, appealDeadline, resultPublishedAt, weekWindow, type AdminOverview, type AuditLine, type Challenge, type ChallengeInput, type ChallengeStatus, type EligibilityDecisionCategory, type MetricKind, type SeasonRules } from "@9thround/league";
 import { useAction, useCurrentUserId, useOverview } from "../../../../../src/features/league/admin";
-import { DemoBanner, fmtPoints } from "../../../../../src/components/league/league-ui";
+import { DemoBanner, fmtPoints, fmtRank } from "../../../../../src/components/league/league-ui";
 import { RaceBadge, RaceButton, RaceHeader, RaceInput, RaceNotice, RacePage, RaceSelect, RaceSpinner, RaceTextArea } from "../../../../../src/components/race/race-ui";
 
-const TABS = ["Overview", "Challenges", "Participants", "Attempts", "Points rules", "Standings", "Audit"] as const;
+const TABS = ["Overview", "Challenges", "Participants", "Attempts", "Appeals", "Points rules", "Standings", "Audit"] as const;
 type Tab = (typeof TABS)[number];
 const NEXT_CHALLENGE: Record<ChallengeStatus, ChallengeStatus[]> = { draft: ["published"], published: ["open", "draft"], open: ["closed", "published"], closed: [] };
 
@@ -41,6 +41,7 @@ export default function SeasonAdminPage() {
             {tab === "Challenges" ? <Challenges d={data} act={act} /> : null}
             {tab === "Participants" ? <Participants d={data} act={act} /> : null}
             {tab === "Attempts" ? <Attempts d={data} act={act} me={me} /> : null}
+            {tab === "Appeals" ? <Appeals d={data} act={act} me={me} /> : null}
             {tab === "Points rules" ? <Rules d={data} act={act} /> : null}
             {tab === "Standings" ? <Standings d={data} /> : null}
             {tab === "Audit" ? <Audit d={data} /> : null}
@@ -103,7 +104,7 @@ function Challenges({ d, act }: { d: AdminOverview; act: Act }) {
 function ChallengeForm({ d, week, ch, locked, act }: { d: AdminOverview; week: number; ch: Challenge | undefined; locked: boolean; act: Act }) {
   const [f, setF] = useState({
     name: ch?.name ?? "", description: ch?.description ?? "", instructions: ch?.instructions ?? "", safetyNotes: ch?.safetyNotes ?? "", kind: (ch?.metric.kind ?? "REPS") as MetricKind, unit: ch?.metric.unit ?? "reps",
-    direction: ch?.metric.direction ?? "HIGHER_WINS", maxAttempts: ch?.attemptPolicy.maxAttempts ?? 1, counting: ch?.attemptPolicy.counting ?? "BEST", requiresVerification: ch?.requiresVerification ?? true,
+    direction: ch?.metric.direction ?? "HIGHER_WINS", maxAttempts: ch?.attemptPolicy.maxAttempts ?? DEFAULT_ATTEMPT_POLICY.maxAttempts, counting: ch?.attemptPolicy.counting ?? DEFAULT_ATTEMPT_POLICY.counting, requiresVerification: ch?.requiresVerification ?? true,
     referenceUrl: ch?.referenceUrl ?? "", opensAt: ch?.opensAt?.slice(0, 16) ?? "", closesAt: ch?.closesAt?.slice(0, 16) ?? "",
   });
   const w = weekWindow(d.season.startsOn, week);
@@ -124,14 +125,14 @@ function ChallengeForm({ d, week, ch, locked, act }: { d: AdminOverview; week: n
       <div className="grid gap-3 md:grid-cols-2">
         <RaceInput id="c-name" label="Name" value={f.name} disabled={locked} onChange={(e) => set({ name: e.target.value })} />
         <RaceSelect id="c-kind" label="Challenge type" value={f.kind} disabled={locked} onChange={(e) => onKind(e.target.value as MetricKind)}>
-          {(["TIME", "REPS", "DISTANCE", "LOAD", "NUMERIC"] as const).map((k) => <option key={k} value={k}>{k === "TIME" ? "Time (lower wins)" : k === "REPS" ? "Repetitions (higher wins)" : k === "DISTANCE" ? "Distance (higher wins)" : k === "LOAD" ? "Load (higher wins)" : "Other number"}</option>)}
+          {(["TIME", "REPS", "DISTANCE", "LOAD", "NUMERIC"] as const).map((k) => <option key={k} value={k}>{k === "TIME" ? "Time" : k === "REPS" ? "Repetitions" : k === "DISTANCE" ? "Distance" : k === "LOAD" ? "Load" : "Other number"}</option>)}
         </RaceSelect>
         <RaceSelect id="c-unit" label="Unit" value={f.unit} disabled={locked} onChange={(e) => set({ unit: e.target.value })}>{METRIC_UNITS[f.kind].map((u) => <option key={u}>{u}</option>)}</RaceSelect>
-        <RaceSelect id="c-dir" label="Ranking direction" value={f.direction} disabled={locked || f.kind !== "NUMERIC"} onChange={(e) => set({ direction: e.target.value as typeof f.direction })} hint={f.kind === "NUMERIC" ? "Only an “other number” challenge can choose." : "Fixed by the challenge type."}>
+        <RaceSelect id="c-dir" label="Ranking direction" value={f.direction} disabled={locked} onChange={(e) => set({ direction: e.target.value as typeof f.direction })} hint="A sprint ranks the lower time first; a plank hold the longer one.">
           <option value="HIGHER_WINS">Higher wins</option><option value="LOWER_WINS">Lower wins</option>
         </RaceSelect>
-        <RaceInput id="c-max" type="number" min={1} max={10} label="Attempts allowed" value={f.maxAttempts} disabled={locked} onChange={(e) => set({ maxAttempts: Number(e.target.value) })} hint="PROVISIONAL default: 1" />
-        <RaceSelect id="c-count" label="Which attempt counts" value={f.counting} disabled={locked} onChange={(e) => set({ counting: e.target.value as typeof f.counting })} hint="PROVISIONAL default: best">
+        <RaceInput id="c-max" type="number" min={1} max={10} label="Attempts allowed" value={f.maxAttempts} disabled={locked} onChange={(e) => set({ maxAttempts: Number(e.target.value) })} hint="PROVISIONAL default: 3" />
+        <RaceSelect id="c-count" label="Which attempt counts" value={f.counting} disabled={locked} onChange={(e) => set({ counting: e.target.value as typeof f.counting })} hint="PROVISIONAL default: the best approved attempt">
           <option value="BEST">Best approved attempt</option><option value="LATEST">Latest approved attempt</option><option value="FIRST_APPROVED">First approved attempt</option>
         </RaceSelect>
         <RaceInput id="c-open" type="datetime-local" label="Opens (optional)" value={f.opensAt} disabled={locked} onChange={(e) => set({ opensAt: e.target.value })} />
@@ -153,37 +154,53 @@ function ChallengeForm({ d, week, ch, locked, act }: { d: AdminOverview; week: n
 function Participants({ d, act }: { d: AdminOverview; act: Act }) {
   const [name, setName] = useState("");
   const [ref, setRef] = useState("");
-  const [csv, setCsv] = useState("display_name,external_member_ref,eligible\n");
+  const [verified, setVerified] = useState(false);
+  const [csv, setCsv] = useState("display_name,external_member_ref,membership_verified\n");
   const [reason, setReason] = useState("");
+  const [category, setCategory] = useState<Exclude<EligibilityDecisionCategory, "REINSTATEMENT">>("DISCIPLINARY");
   const [report, setReport] = useState<string | null>(null);
+  const byId = useMemo(() => new Map(d.participants.map((p) => [p.id, p.displayName])), [d.participants]);
   return (
     <div className="grid gap-4 md:grid-cols-[1fr_22rem]" data-testid="tab-participants">
       <div className="flex flex-col gap-2">
-        {d.isAdmin ? <RaceInput id="p-reason" label="Reason (required to change an athlete)" value={reason} onChange={(e) => setReason(e.target.value)} /> : null}
+        {d.isAdmin ? <RaceInput id="p-reason" label="Reason / documented decision (required to change an athlete)" value={reason} onChange={(e) => setReason(e.target.value)} /> : null}
+        {d.isAdmin ? (
+          <RaceSelect id="p-cat" label="Type of eligibility decision" value={category} onChange={(e) => setCategory(e.target.value as typeof category)} hint="An expired membership is NOT a ground: eligibility is kept for the season.">
+            <option value="DISCIPLINARY">Disciplinary decision</option><option value="FRAUD">Fraud-related decision</option>
+          </RaceSelect>
+        ) : null}
         {d.participants.map((p) => (
           <div key={p.id} className="race-card race-card--flat flex flex-wrap items-center justify-between gap-2" data-testid="participant-row" style={{ padding: "0.6rem 0.9rem" }}>
-            <span><strong>{p.displayName}</strong> <span className="lg-sub">· {p.publicId}{p.externalRef ? ` · ${p.externalRef}` : ""}</span></span>
+            <span><strong>{p.displayName}</strong> <span className="lg-sub">· {p.publicId}{p.externalRef ? ` · ${p.externalRef}` : ""} · membership verified {p.membershipVerifiedOn}</span></span>
             <span className="flex flex-wrap gap-2">
               <RaceBadge tone={p.active ? "white" : "line"}>{p.active ? "ACTIVE" : "INACTIVE"}</RaceBadge><RaceBadge tone={p.eligible ? "white" : "red"}>{p.eligible ? "ELIGIBLE" : "NOT ELIGIBLE"}</RaceBadge>
               {d.isAdmin ? <>
                 <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Participant updated", async () => (await gw()).setParticipant(p.id, { active: !p.active }, reason))}>{p.active ? "Deactivate" : "Reactivate"}</RaceButton>
-                <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Participant updated", async () => (await gw()).setParticipant(p.id, { eligible: !p.eligible }, reason))}>{p.eligible ? "Mark ineligible" : "Mark eligible"}</RaceButton>
+                <RaceButton size="sm" variant={p.eligible ? "danger" : "ghost"} disabled={act.busy || reason.trim() === ""} data-testid="eligibility"
+                  onClick={() => void act.run(p.eligible ? "Eligibility removed" : "Eligibility restored", async () => (await gw()).setEligibility(p.id, !p.eligible, p.eligible ? category : "REINSTATEMENT", reason))}>{p.eligible ? "Record restriction" : "Reinstate"}</RaceButton>
               </> : null}
             </span>
           </div>
         ))}
+        {d.isAdmin && d.eligibilityDecisions.length > 0 ? (
+          <div className="race-card flex flex-col gap-1" data-testid="eligibility-decisions">
+            <p className="race-label">Documented eligibility decisions</p>
+            {d.eligibilityDecisions.map((x) => <p key={x.id} className="lg-sub">{new Date(x.decidedAt).toLocaleString()} · {byId.get(x.participantId)} · <strong>{x.category}</strong> → {x.newEligible ? "eligible" : "not eligible"} · {x.reason}</p>)}
+          </div>
+        ) : null}
       </div>
       {d.isAdmin ? (
         <div className="flex flex-col gap-4">
           <div className="race-card flex flex-col gap-2">
-            <h2 className="race-display text-xl">Add an athlete</h2>
+            <h2 className="race-display text-xl">Register an athlete</h2>
             <RaceInput id="a-name" label="Public display name" value={name} onChange={(e) => setName(e.target.value)} hint="e.g. “Ahmed K.” — shown on the TV and phone pages" />
             <RaceInput id="a-ref" label="Gym member reference (private, optional)" value={ref} onChange={(e) => setRef(e.target.value)} />
-            <RaceButton disabled={act.busy || name.trim() === ""} onClick={() => void act.run("Athlete added", async () => { await (await gw()).addParticipant(d.season.id, name, ref.trim() === "" ? null : ref, true); setName(""); setRef(""); })}>Add</RaceButton>
+            <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={verified} onChange={(e) => setVerified(e.target.checked)} data-testid="membership-verified" /> <span>I have confirmed this person has an <strong>active, verified</strong> gym membership today. (Nothing is read from the gym system.)</span></label>
+            <RaceButton disabled={act.busy || name.trim() === "" || !verified} onClick={() => void act.run("Athlete registered", async () => { await (await gw()).addParticipant(d.season.id, name, ref.trim() === "" ? null : ref, true); setName(""); setRef(""); setVerified(false); })}>Register</RaceButton>
           </div>
           <div className="race-card flex flex-col gap-2">
             <h2 className="race-display text-xl">Import from CSV</h2>
-            <p className="lg-sub">Columns: display_name (or full_name), external_member_ref, eligible. Cells starting with = + - @ are refused. Duplicates are reported, never merged.</p>
+            <p className="lg-sub">Columns: display_name (or full_name), external_member_ref, <strong>membership_verified</strong> (yes/no — required). Only rows marked yes are registered; anything else is refused. Cells starting with = + - @ are refused. Duplicates are reported, never merged.</p>
             <RaceTextArea id="a-csv" label="CSV" value={csv} onChange={(e) => setCsv(e.target.value)} style={{ minHeight: 140, fontFamily: "monospace" }} />
             <RaceButton disabled={act.busy} data-testid="import" onClick={() => void act.run("Import", async () => { const r = await (await gw()).importParticipants(d.season.id, csv); setReport(`${r.added} added, ${r.issues.length} issue(s)${r.issues.length ? ": " + r.issues.slice(0, 8).map((i) => `row ${i.row} ${i.message}`).join("; ") : ""}`); })}>Validate & import</RaceButton>
             {report ? <p data-testid="import-report" className="lg-sub">{report}</p> : null}
@@ -218,7 +235,7 @@ function Attempts({ d, act, me }: { d: AdminOverview; act: Act; me: string | nul
         <p className="lg-sub">A retry of the same press is safe: it is recorded once.</p>
       </div>
       <div className="flex flex-col gap-3">
-        <RaceInput id="r-reason" label="Reason (required to reject or correct)" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <RaceInput id="r-reason" label="Reason (required to reject, correct, request or decide)" value={reason} onChange={(e) => setReason(e.target.value)} />
         <h2 className="race-display text-xl">Waiting for review ({pending.length})</h2>
         {pending.length === 0 ? <p className="lg-sub">Nothing waiting.</p> : null}
         {pending.map((a) => (
@@ -230,17 +247,101 @@ function Attempts({ d, act, me }: { d: AdminOverview; act: Act; me: string | nul
             </span>
           </div>
         ))}
+        <CorrectionRequests d={d} act={act} reason={reason} names={names} />
         <h2 className="race-display mt-2 text-xl">All attempts</h2>
         {d.attempts.filter((a) => a.status !== "pending").slice(0, 60).map((a) => (
           <div key={a.id} className="race-card race-card--flat flex flex-wrap items-center justify-between gap-2" style={{ padding: "0.5rem 0.9rem" }} data-testid="attempt-row">
             <span>{names.get(a.participantId)} · {a.value} {a.unit} <span className="lg-sub">· {chName.get(a.challengeId)} · attempt {a.attemptNo}{a.correctedFrom ? " · correction" : ""}{a.reason ? ` · ${a.reason}` : ""}</span></span>
             <span className="flex items-center gap-2"><RaceBadge tone={a.status === "approved" ? "white" : a.status === "rejected" ? "red" : "line"}>{a.status}</RaceBadge>
-              {d.isAdmin && a.status === "approved" ? <><input aria-label="Corrected value" className="race-input" style={{ width: "6rem", minHeight: 0, padding: "0.3rem" }} placeholder="new value" value={fix} onChange={(e) => setFix(e.target.value)} />
-                <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === "" || fix.trim() === ""} onClick={() => void act.run("Corrected", async () => (await gw()).correctAttempt(a.id, Number(fix), reason))}>Correct</RaceButton>
-                <RaceButton size="sm" variant="danger" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Voided", async () => (await gw()).correctAttempt(a.id, null, reason))}>Void</RaceButton></> : null}
+              {a.status === "approved" ? <><input aria-label="Corrected value" className="race-input" style={{ width: "6rem", minHeight: 0, padding: "0.3rem" }} placeholder="new value" value={fix} onChange={(e) => setFix(e.target.value)} />
+                {d.isAdmin ? <>
+                  <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === "" || fix.trim() === ""} data-testid="correct" onClick={() => void act.run("Corrected", async () => (await gw()).correctAttempt(a.id, Number(fix), reason))}>Correct</RaceButton>
+                  <RaceButton size="sm" variant="danger" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Voided", async () => (await gw()).correctAttempt(a.id, null, reason))}>Void</RaceButton></> : null}
+                <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === "" || fix.trim() === ""} data-testid="request-correction" onClick={() => void act.run("Correction requested", async () => (await gw()).requestCorrection(a.id, Number(fix), reason))}>Request correction</RaceButton></> : null}
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function CorrectionRequests({ d, act, reason, names }: { d: AdminOverview; act: Act; reason: string; names: Map<string, string> }) {
+  const value = useMemo(() => new Map(d.attempts.map((a) => [a.id, a.value])), [d.attempts]);
+  const pending = d.correctionRequests.filter((r) => r.status === "pending");
+  const decided = d.correctionRequests.filter((r) => r.status !== "pending");
+  return (
+    <div className="flex flex-col gap-2" data-testid="correction-requests">
+      <h2 className="race-display mt-2 text-xl">Correction requests ({pending.length} waiting)</h2>
+      <p className="lg-sub">A judge can ask for a result to change; only a league administrator can change an approved result.</p>
+      {pending.map((r) => (
+        <div key={r.id} className="race-card race-card--flat flex flex-wrap items-center justify-between gap-2" data-testid="correction-request" style={{ padding: "0.6rem 0.9rem" }}>
+          <span>{names.get(r.participantId)} · {value.get(r.attemptId)} → <strong>{r.proposedValue ?? "remove"}</strong> <span className="lg-sub">· {r.reason}</span></span>
+          {d.isAdmin ? (
+            <span className="flex gap-2">
+              <RaceButton size="sm" disabled={act.busy || reason.trim() === ""} data-testid="apply-request" onClick={() => void act.run("Request applied", async () => (await gw()).decideCorrectionRequest(r.id, "apply", reason))}>Apply</RaceButton>
+              <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Request declined", async () => (await gw()).decideCorrectionRequest(r.id, "decline", reason))}>Decline</RaceButton>
+            </span>
+          ) : <RaceBadge>WAITING FOR AN ADMINISTRATOR</RaceBadge>}
+        </div>
+      ))}
+      {decided.slice(0, 20).map((r) => <p key={r.id} className="lg-sub">{names.get(r.participantId)} → {r.proposedValue ?? "remove"}: <strong>{r.status}</strong>{r.decisionReason ? ` · ${r.decisionReason}` : ""}</p>)}
+      {d.isAdmin && d.corrections.length > 0 ? (
+        <div className="race-card flex flex-col gap-1" data-testid="corrections">
+          <p className="race-label">Applied corrections</p>
+          {d.corrections.slice(0, 30).map((c) => <p key={c.id} className="lg-sub">{new Date(c.at).toLocaleString()} · {names.get(c.participantId)} · {c.previousValue} → <strong>{c.newValue ?? "removed"}</strong> · {c.reason}</p>)}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Appeals({ d, act, me }: { d: AdminOverview; act: Act; me: string | null }) {
+  const closed = d.challenges.filter((c) => c.status === "closed");
+  const [challengeId, setChallengeId] = useState("");
+  const [participantId, setParticipantId] = useState("");
+  const [text, setText] = useState("");
+  const [reason, setReason] = useState("");
+  const names = useMemo(() => new Map(d.participants.map((p) => [p.id, p.displayName])), [d.participants]);
+  const chName = useMemo(() => new Map(d.challenges.map((c) => [c.id, `Week ${c.weekNumber} — ${c.name}`])), [d.challenges]);
+  const hours = d.season.rules.appealWindowHours;
+  const windows = closed.map((c) => ({ c, published: resultPublishedAt(c, d.season) })).map((x) => ({ ...x, until: x.published ? appealDeadline(x.published, hours) : null }));
+  useEffect(() => { if (!challengeId && closed[0]) setChallengeId(closed[0].id); }, [closed, challengeId]);
+  const selected = windows.find((w) => w.c.id === challengeId);
+  const open = selected?.until ? Date.now() <= Date.parse(selected.until) : false;
+  return (
+    <div className="grid gap-4 md:grid-cols-[22rem_1fr]" data-testid="tab-appeals">
+      <div className="race-card flex flex-col gap-2">
+        <h2 className="race-display text-xl">Lodge an appeal</h2>
+        <p className="lg-sub">A participant may appeal a published result within {hours} hours of publication. Staff enter it for them. An appeal never changes a score by itself.</p>
+        {closed.length === 0 ? <p className="lg-sub">No result has been published yet.</p> : null}
+        <RaceSelect id="ap-ch" label="Result" value={challengeId} onChange={(e) => setChallengeId(e.target.value)}>{closed.map((c) => <option key={c.id} value={c.id}>Week {c.weekNumber} — {c.name}</option>)}</RaceSelect>
+        {selected ? <p className="lg-sub" data-testid="appeal-window">{selected.until ? `${open ? "Open until" : "Closed since"} ${new Date(selected.until).toLocaleString()}` : "Not published — no appeal possible yet."}</p> : null}
+        <RaceSelect id="ap-p" label="Athlete" value={participantId} onChange={(e) => setParticipantId(e.target.value)}><option value="">Choose…</option>{d.participants.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}</RaceSelect>
+        <RaceTextArea id="ap-text" label="What the athlete is appealing" value={text} onChange={(e) => setText(e.target.value)} />
+        <RaceButton disabled={act.busy || !challengeId || !participantId || text.trim() === ""} data-testid="lodge-appeal" onClick={() => void act.run("Appeal lodged", async () => { await (await gw()).lodgeAppeal({ challengeId, participantId, reason: text }); setText(""); })}>Lodge appeal</RaceButton>
+      </div>
+      <div className="flex flex-col gap-3">
+        {d.isAdmin ? <>
+          <RaceInput id="ap-reason" label="Decision reason (required)" value={reason} onChange={(e) => setReason(e.target.value)} hint="You cannot decide an appeal against a result you recorded or corrected." />
+          <h2 className="race-display text-xl">Appeals ({d.appeals.filter((a) => a.status === "submitted").length} waiting)</h2>
+          {d.appeals.length === 0 ? <p className="lg-sub">No appeals.</p> : null}
+          {d.appeals.map((a) => (
+            <div key={a.id} className="race-card race-card--flat flex flex-col gap-1" data-testid="appeal" style={{ padding: "0.6rem 0.9rem" }}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span><strong>{names.get(a.participantId)}</strong> · {chName.get(a.challengeId)} <span className="lg-sub">· lodged {new Date(a.lodgedAt).toLocaleString()}{a.lodgedBy === me ? " · by you" : ""}</span></span>
+                <RaceBadge tone={a.status === "submitted" ? "red" : "white"}>{a.status.toUpperCase()}</RaceBadge>
+              </div>
+              <p className="text-sm">{a.reason}</p>
+              {a.status === "submitted" ? (
+                <div className="flex gap-2">
+                  <RaceButton size="sm" disabled={act.busy || reason.trim() === ""} data-testid="uphold" onClick={() => void act.run("Appeal upheld", async () => (await gw()).decideAppeal(a.id, "upheld", reason))}>Uphold</RaceButton>
+                  <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Appeal dismissed", async () => (await gw()).decideAppeal(a.id, "dismissed", reason))}>Dismiss</RaceButton>
+                </div>
+              ) : <p className="lg-sub">{a.decisionReason} — {new Date(a.decidedAt as string).toLocaleString()}. Scores unchanged unless an administrator applied a separate correction.</p>}
+            </div>
+          ))}
+        </> : <RaceNotice>Appeals are decided by a league administrator who did not record the result.</RaceNotice>}
       </div>
     </div>
   );
@@ -255,13 +356,14 @@ function Rules({ d, act }: { d: AdminOverview; act: Act }) {
   const [tie, setTie] = useState(r.tiePolicy);
   const [abs, setAbs] = useState(r.absencePolicy);
   const [elig, setElig] = useState(r.eligibility);
+  const [appealHours, setAppealHours] = useState(String(r.appealWindowHours));
   const [reason, setReason] = useState("");
-  const rules: SeasonRules = { points: { byRank: table.split(",").map((x) => Number(x.trim())), beyond: Number(beyond), participation: Number(part), absent: Number(absent) }, tiePolicy: tie, absencePolicy: abs, eligibility: elig };
+  const rules: SeasonRules = { points: { byRank: table.split(",").map((x) => Number(x.trim())), beyond: Number(beyond), participation: Number(part), absent: Number(absent) }, tiePolicy: tie, absencePolicy: abs, eligibility: elig, appealWindowHours: Number(appealHours) };
   const isDefault = JSON.stringify(r) === JSON.stringify(PROVISIONAL_SEASON_RULES);
   return (
     <div className="race-card flex flex-col gap-3" data-testid="tab-rules">
-      <div className="flex items-center gap-3"><h2 className="race-display text-2xl">Points rules</h2><RaceBadge tone="red">PROVISIONAL — NOT APPROVED</RaceBadge></div>
-      <RaceNotice>{isDefault ? "These are the development defaults. " : ""}The real points table, tie handling, absence and eligibility rules have not been decided. Changing a rule re-scores closed challenges by appending corrections; it never rewrites history.</RaceNotice>
+      <div className="flex items-center gap-3"><h2 className="race-display text-2xl">Points rules</h2><RaceBadge tone="red">PROVISIONAL — OWNER-SUPPLIED, NOT FINAL</RaceBadge></div>
+      <RaceNotice>{isDefault ? "These are the provisional defaults (100/90/80/75/70/65/60/55/50, then 40; absence 0; ties share rank and points; 48-hour appeals). " : ""}They are not final business rules. Changing a rule re-scores closed challenges by appending corrections; it never rewrites history.</RaceNotice>
       <RaceInput id="pt" label="Points for rank 1, 2, 3 … (comma separated, never increasing)" value={table} disabled={!d.isAdmin} onChange={(e) => setTable(e.target.value)} />
       <div className="grid gap-3 md:grid-cols-3">
         <RaceInput id="pb" label="Points beyond the table" value={beyond} disabled={!d.isAdmin} onChange={(e) => setBeyond(e.target.value)} />
@@ -269,6 +371,7 @@ function Rules({ d, act }: { d: AdminOverview; act: Act }) {
         <RaceInput id="pa" label="Points for an absent athlete" value={absent} disabled={!d.isAdmin} onChange={(e) => setAbsent(e.target.value)} />
         <RaceSelect id="tie" label="Equal results" value={tie} disabled={!d.isAdmin} onChange={(e) => setTie(e.target.value as typeof tie)}><option value="SHARE">All get the points of the shared rank</option><option value="SPLIT">Split the points of the places they occupy</option></RaceSelect>
         <RaceSelect id="abs" label="Absence" value={abs} disabled={!d.isAdmin} onChange={(e) => setAbs(e.target.value as typeof abs)}><option value="ZERO">Absent = the “absent” points</option><option value="PARTICIPATION">Absent = the participation floor</option></RaceSelect>
+        <RaceInput id="apw" type="number" min={1} max={720} label="Appeal window (hours after publication)" value={appealHours} disabled={!d.isAdmin} onChange={(e) => setAppealHours(e.target.value)} hint="PROVISIONAL default: 48" />
         <RaceSelect id="elig" label="Eligibility" value={elig} disabled={!d.isAdmin} onChange={(e) => setElig(e.target.value as typeof elig)}><option value="AT_REGISTRATION">Checked when the athlete is added</option><option value="ENTIRE_SEASON">Must be in from the first day</option></RaceSelect>
       </div>
       {d.isAdmin ? <>
@@ -284,7 +387,7 @@ function Standings({ d }: { d: AdminOverview }) {
     <div className="flex flex-col gap-2" data-testid="tab-standings">
       {d.standings.map((s) => (
         <div key={s.id} className="race-card race-card--flat flex items-center justify-between gap-3" style={{ padding: "0.5rem 0.9rem" }}>
-          <span><strong>{s.rank}.</strong> {s.displayName} <span className="lg-sub">· {s.challengesCompleted} challenges · {s.firstPlaces} wins · weekly {Object.entries(s.weeklyPoints).map(([w, p]) => `W${w}:${fmtPoints(p)}`).join(" ") || "—"}</span></span>
+          <span><strong>{fmtRank(s.rank, s.tied)}.</strong> {s.displayName} <span className="lg-sub">· {s.challengesCompleted} challenges · {s.firstPlaces} wins · weekly {Object.entries(s.weeklyPoints).map(([w, p]) => `W${w}:${fmtPoints(p)}`).join(" ") || "—"}</span></span>
           <strong>{fmtPoints(s.totalPoints)} pts</strong>
         </div>
       ))}

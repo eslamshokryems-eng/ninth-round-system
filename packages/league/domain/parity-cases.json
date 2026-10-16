@@ -1908,6 +1908,509 @@
      "rank": 1
     }
    ]
+  },
+  {
+   "name": "owner table: ranks 1-9 earn 100..50, every other approved result earns 40",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      100,
+      90,
+      80,
+      75,
+      70,
+      65,
+      60,
+      55,
+      50
+     ],
+     "beyond": 40,
+     "participation": 40,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "p01",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p02",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p03",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p04",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p05",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p06",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p07",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p08",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p09",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p10",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p11",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "p12",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "p01",
+     "value": 100,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p02",
+     "value": 97,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p03",
+     "value": 94,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p04",
+     "value": 91,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p05",
+     "value": 88,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p06",
+     "value": 85,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p07",
+     "value": 82,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p08",
+     "value": 79,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p09",
+     "value": 76,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p10",
+     "value": 73,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p11",
+     "value": 70,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "p12",
+     "value": 67,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "p01",
+     "cents": 10000,
+     "rank": 1
+    },
+    {
+     "p": "p02",
+     "cents": 9000,
+     "rank": 2
+    },
+    {
+     "p": "p03",
+     "cents": 8000,
+     "rank": 3
+    },
+    {
+     "p": "p04",
+     "cents": 7500,
+     "rank": 4
+    },
+    {
+     "p": "p05",
+     "cents": 7000,
+     "rank": 5
+    },
+    {
+     "p": "p06",
+     "cents": 6500,
+     "rank": 6
+    },
+    {
+     "p": "p07",
+     "cents": 6000,
+     "rank": 7
+    },
+    {
+     "p": "p08",
+     "cents": 5500,
+     "rank": 8
+    },
+    {
+     "p": "p09",
+     "cents": 5000,
+     "rank": 9
+    },
+    {
+     "p": "p10",
+     "cents": 4000,
+     "rank": 10
+    },
+    {
+     "p": "p11",
+     "cents": 4000,
+     "rank": 11
+    },
+    {
+     "p": "p12",
+     "cents": 4000,
+     "rank": 12
+    }
+   ]
+  },
+  {
+   "name": "owner table: equal performance shares rank and points (1, 2, 2, 4)",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      100,
+      90,
+      80,
+      75,
+      70,
+      65,
+      60,
+      55,
+      50
+     ],
+     "beyond": 40,
+     "participation": 40,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "c",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "d",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 60,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "c",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "d",
+     "value": 40,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 10000,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 9000,
+     "rank": 2
+    },
+    {
+     "p": "c",
+     "cents": 9000,
+     "rank": 2
+    },
+    {
+     "p": "d",
+     "cents": 7500,
+     "rank": 4
+    }
+   ]
+  },
+  {
+   "name": "owner rules: a plank hold (TIME, higher wins), best of three approved attempts, an unapproved better attempt is ignored",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      100,
+      90,
+      80,
+      75,
+      70,
+      65,
+      60,
+      55,
+      50
+     ],
+     "beyond": 40,
+     "participation": 40,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 60,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 95,
+     "no": 2,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 120,
+     "no": 3,
+     "status": "pending",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 90,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 10000,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 9000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "owner rules: an absent participant earns 0 and takes no rank",
+   "metric": {
+    "kind": "DISTANCE",
+    "unit": "m",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      100,
+      90,
+      80,
+      75,
+      70,
+      65,
+      60,
+      55,
+      50
+     ],
+     "beyond": 40,
+     "participation": 40,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "gone",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 12,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 15,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 10000,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 9000,
+     "rank": 2
+    }
+   ]
   }
  ]
 }

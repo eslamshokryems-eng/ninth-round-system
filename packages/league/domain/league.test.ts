@@ -6,13 +6,13 @@ import { defaultDirection, requireChallengeTransition, requireSeasonTransition, 
 import { LeagueError, parseLeagueError } from "./errors";
 import { PROVISIONAL_SEASON_RULES, type Challenge, type LedgerEntry, type Participant, type Season } from "./types";
 
-const P = (id: string, name: string, extra: Partial<Participant> = {}): Participant => ({ id, seasonId: "s", publicId: `pub-${id}`, displayName: name, externalRef: `secret-${id}`, active: true, eligible: true, joinedOn: "2026-10-01", ...extra });
+const P = (id: string, name: string, extra: Partial<Participant> = {}): Participant => ({ id, seasonId: "s", publicId: `pub-${id}`, displayName: name, externalRef: `secret-${id}`, active: true, eligible: true, joinedOn: "2026-10-01", membershipVerifiedOn: "2026-10-01", ...extra });
 const C = (id: string, week: number, status: Challenge["status"] = "closed"): Challenge => ({
   id, seasonId: "s", weekNumber: week, name: `Week ${week}`, description: "", instructions: "", safetyNotes: "", metric: { kind: "REPS", unit: "reps", direction: "HIGHER_WINS" },
-  attemptPolicy: { maxAttempts: 1, counting: "BEST" }, opensAt: null, closesAt: null, referenceUrl: null, requiresVerification: true, status,
+  attemptPolicy: { maxAttempts: 1, counting: "BEST" }, opensAt: null, closesAt: null, closedAt: null, referenceUrl: null, requiresVerification: true, status,
 });
 const L = (challengeId: string, participantId: string, pointsCents: number, rank: number | null = 1): LedgerEntry => ({ seasonId: "s", challengeId, participantId, pointsCents, rank, reason: "AWARD" });
-const season: Season = { id: "s", publicSlug: "season-1", name: "Season 1", status: "active", startsOn: "2026-11-02", endsOn: "2026-12-27", rules: PROVISIONAL_SEASON_RULES, published: true };
+const season: Season = { id: "s", publicSlug: "season-1", name: "Season 1", status: "active", startsOn: "2026-11-02", endsOn: "2026-12-27", rules: PROVISIONAL_SEASON_RULES, published: true, firstPublishedAt: "2026-11-01T00:00:00Z" };
 
 describe("season and challenge validation", () => {
   it("a season runs exactly eight weeks", () => {
@@ -33,11 +33,12 @@ describe("season and challenge validation", () => {
     expect(() => requireChallengeTransition("closed", "open")).toThrow();
     expect(() => requireChallengeTransition("open", "closed")).not.toThrow();
   });
-  it("metrics: explicit kinds, closed unit lists, and a ranking direction that matches the kind", () => {
+  it("metrics: explicit kinds, closed unit lists, and a ranking direction chosen per challenge", () => {
     expect(() => validateMetric({ kind: "TIME", unit: "s", direction: "LOWER_WINS" })).not.toThrow();
-    expect(() => validateMetric({ kind: "TIME", unit: "s", direction: "HIGHER_WINS" })).toThrow();
+    expect(() => validateMetric({ kind: "TIME", unit: "s", direction: "HIGHER_WINS" })).not.toThrow(); // a plank hold ranks the LONGER time first
     expect(() => validateMetric({ kind: "REPS", unit: "kg", direction: "HIGHER_WINS" })).toThrow(/not allowed/);
-    expect(() => validateMetric({ kind: "DISTANCE", unit: "m", direction: "LOWER_WINS" })).toThrow();
+    expect(() => validateMetric({ kind: "DISTANCE", unit: "m", direction: "LOWER_WINS" })).not.toThrow(); // e.g. fewest metres off a target line
+    expect(() => validateMetric({ kind: "TIME", unit: "kg", direction: "LOWER_WINS" })).toThrow(/not allowed/); // units stay a closed list per kind
     expect(() => validateMetric({ kind: "NUMERIC", unit: "watts", direction: "LOWER_WINS" })).not.toThrow(); // a numeric metric may rank either way
     expect(() => validateMetric({ kind: "EVAL" as never, unit: "s", direction: "LOWER_WINS" })).toThrow();
     expect(defaultDirection("TIME")).toBe("LOWER_WINS");
@@ -148,14 +149,17 @@ describe("public projection", () => {
 describe("participant CSV import", () => {
   const csv = (s: string) => s.trim().replace(/^ +/gm, "");
   it("accepts a clean file and reduces full names to a public name", () => {
-    const r = validateParticipantCsv(csv(`full_name,external_member_ref,eligible
+    const r = validateParticipantCsv(csv(`full_name,external_member_ref,membership_verified
       Ahmed Khaled Mostafa,M-100,yes
       Sara Nabil,M-101,no`));
-    expect(r.issues).toEqual([]);
-    expect(r.rows).toEqual([
-      { line: 2, displayName: "Ahmed M.", externalRef: "M-100", eligible: true },
-      { line: 3, displayName: "Sara N.", externalRef: "M-101", eligible: false },
-    ]);
+    expect(r.rows).toEqual([{ line: 2, displayName: "Ahmed M.", externalRef: "M-100", membershipVerified: true }]);
+    expect(r.issues).toEqual([{ line: 3, message: expect.stringMatching(/not verified/) }]); // a registration needs an active, verified membership
+  });
+  it("requires the membership_verified column: nobody is registered on a guess", () => {
+    expect(() => validateParticipantCsv("display_name,external_member_ref\nA B,M1")).toThrow(/membership_verified/);
+    const r = validateParticipantCsv("display_name,membership_verified\nBlank One,\nTrue One,true");
+    expect(r.rows.map((x) => x.displayName)).toEqual(["True One"]);
+    expect(r.issues).toHaveLength(1);
   });
   it("rejects unknown columns, duplicate columns and files without a name column", () => {
     expect(() => validateParticipantCsv("display_name,phone\nA B,0100")).toThrow(/Unknown column/);
@@ -164,7 +168,7 @@ describe("participant CSV import", () => {
     expect(() => validateParticipantCsv("")).toThrow(/empty/);
   });
   it("reports bad rows without stopping: formulas, bad eligibility, bad refs, wrong column count", () => {
-    const r = validateParticipantCsv(csv(`display_name,external_member_ref,eligible
+    const r = validateParticipantCsv(csv(`display_name,external_member_ref,membership_verified
       =HYPERLINK("http://x"),M1,yes
       Good One,M2,maybe
       Another,bad ref!,yes
@@ -176,11 +180,11 @@ describe("participant CSV import", () => {
   });
   it("detects duplicates inside the file and against existing participants — never merging", () => {
     const existing = new Set([participantIdentityKey("Old Member", "M9")]);
-    const r = validateParticipantCsv(csv(`display_name,external_member_ref
-      Ahmed K.,M1
-      Ahmed K.,M1
-      Old Member,M9
-      Other Person,`), existing);
+    const r = validateParticipantCsv(csv(`display_name,external_member_ref,membership_verified
+      Ahmed K.,M1,yes
+      Ahmed K.,M1,yes
+      Old Member,M9,yes
+      Other Person,,yes`), existing);
     expect(r.rows.map((x) => x.line)).toEqual([2, 5]);
     expect(r.issues.map((i) => i.message)).toEqual(["Duplicate of line 2.", "Already a participant in this season."]);
   });

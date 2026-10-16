@@ -8,6 +8,11 @@ export function fmtPoints(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
 }
 
+/** "T1" for a shared rank: equal season totals are shown as a tie (no final tie-break is defined). */
+export function fmtRank(rank: number, tied: boolean): string {
+  return `${tied ? "T" : ""}${rank}`;
+}
+
 export function DemoBanner() {
   return (
     <div className="lg-demo" role="note" data-testid="demo-banner">
@@ -34,7 +39,7 @@ export function WeekBar({ statuses }: { statuses: readonly string[] }) {
 export function StandingRow({ row, href, children }: { row: PublicStandingRow; href?: string; children?: ReactNode }) {
   const inner = (
     <>
-      <div className="lg-rank">{row.rank}</div>
+      <div className="lg-rank" title={row.tied ? "Tied on total points" : undefined} data-tied={row.tied ? "1" : "0"}>{fmtRank(row.rank, row.tied)}</div>
       <div style={{ minWidth: 0 }}>
         <div className="lg-name">{row.displayName}</div>
         <div className="lg-sub">{row.challengesCompleted} challenge{row.challengesCompleted === 1 ? "" : "s"} · <Movement value={row.movement} />{row.gapToNext !== null ? ` · ${fmtPoints(row.gapToNext)} to next` : ""}</div>

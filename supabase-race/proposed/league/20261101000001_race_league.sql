@@ -8,13 +8,17 @@
 -- any gym object; there is no cross-database foreign key. Members are linked by an OPTIONAL opaque external reference (text) only.
 -- It does not touch, alter or call the race engine: no race_events / race_clock / race_station_* reference, no race timing, slots or scoring.
 --
--- Security model: all six tables have RLS enabled and NO client privileges at all. Clients reach data only through the SECURITY DEFINER functions
+-- Security model: all ten tables have RLS enabled and NO client privileges at all. Clients reach data only through the SECURITY DEFINER functions
 -- below, each of which re-checks the caller (season staff role, or Super Admin). Public pages use the three race_league_public_* functions, which
 -- return an explicit allow-list of fields for a PUBLISHED season only.
 --
--- Business rules still PROVISIONAL (stored per season in `rules`, never hard-wired): points table, tie handling, eligibility timing, absence handling,
--- attempts per challenge and which attempt counts (per challenge). Corrections: allowed to the league admin, with a mandatory reason, until the season is
--- completed. Appeals: not modelled (undecided).
+-- PROVISIONAL business rules (owner-supplied, stored per season in `rules` / per challenge, never hard-wired, all changeable with a reason and an audit entry):
+--   points 100/90/80/75/70/65/60/55/50, 40 for every other approved valid result, 0 for absence; equal results share a rank (1,2,2,4) and its points;
+--   equal season totals stay a tie (no tie-break); up to 3 attempts per challenge, the best judge-approved attempt counts; eligibility is a verified active
+--   membership AT REGISTRATION and is kept for the season unless an administrator records a documented DISCIPLINARY / FRAUD decision;
+--   only league administrators correct a result (reason + previous/new value + actor + time + audit); judges may REQUEST a correction;
+--   a participant's appeal (lodged by staff, 48 h after the result is published) is decided by an administrator who did not record the result and never changes a score.
+-- No gym database is read: membership is a staff attestation (manual entry or the validated CSV adapter).
 
 -- ---------------------------------------------------------------------------
 -- tables
@@ -29,6 +33,7 @@ create table race_league_seasons (
   weeks smallint not null default 8 check (weeks = 8),
   rules jsonb not null check (jsonb_typeof(rules) = 'object'),
   published boolean not null default false,
+  first_published_at timestamptz,   -- first moment the season was public: starts the appeal window for results that were already closed
   created_by uuid references race_profiles (id),
   created_at timestamptz not null default clock_timestamp(),
   completed_at timestamptz,
@@ -47,21 +52,24 @@ create table race_league_challenges (
   metric_kind text not null check (metric_kind in ('TIME', 'REPS', 'DISTANCE', 'LOAD', 'NUMERIC')),
   unit text not null,
   direction text not null check (direction in ('LOWER_WINS', 'HIGHER_WINS')),
-  max_attempts smallint not null default 1 check (max_attempts between 1 and 10),
+  max_attempts smallint not null default 3 check (max_attempts between 1 and 10),
   counting text not null default 'BEST' check (counting in ('BEST', 'LATEST', 'FIRST_APPROVED')),
   opens_at timestamptz,
   closes_at timestamptz,
   reference_url text check (reference_url is null or reference_url ~ '^https://[^[:space:]]+$'),
   requires_verification boolean not null default true,
   status text not null default 'draft' check (status in ('draft', 'published', 'open', 'closed')),
+  closed_at timestamptz,
   created_at timestamptz not null default clock_timestamp(),
   unique (season_id, week_number),
+  -- the unit list is closed per metric kind; the ranking direction is a per-challenge choice (a sprint: lower wins, a plank hold: higher wins)
   constraint race_league_challenges_metric check (
-       (metric_kind = 'TIME' and unit in ('s', 'ms') and direction = 'LOWER_WINS')
-    or (metric_kind = 'REPS' and unit = 'reps' and direction = 'HIGHER_WINS')
-    or (metric_kind = 'DISTANCE' and unit in ('m', 'km') and direction = 'HIGHER_WINS')
-    or (metric_kind = 'LOAD' and unit = 'kg' and direction = 'HIGHER_WINS')
+       (metric_kind = 'TIME' and unit in ('s', 'ms'))
+    or (metric_kind = 'REPS' and unit = 'reps')
+    or (metric_kind = 'DISTANCE' and unit in ('m', 'km'))
+    or (metric_kind = 'LOAD' and unit = 'kg')
     or (metric_kind = 'NUMERIC' and unit in ('count', 'points', 'kcal', 'watts', '%'))),
+  constraint race_league_challenges_closed_at check ((status = 'closed') = (closed_at is not null)),
   constraint race_league_challenges_window check ((opens_at is null) = (closes_at is null) and (opens_at is null or closes_at > opens_at))
 );
 
@@ -75,6 +83,8 @@ create table race_league_participants (
   active boolean not null default true,
   eligible boolean not null default true,
   joined_on date not null default current_date,
+  membership_verified_on date not null default current_date,   -- staff attested an ACTIVE, verified gym membership on this day (registration requirement); never re-checked
+
   created_by uuid references race_profiles (id),
   created_at timestamptz not null default clock_timestamp(),
   unique (season_id, identity_key)
@@ -129,30 +139,110 @@ create table race_league_staff (
   unique (season_id, profile_id, role)
 );
 
+-- documented eligibility decisions (append-only): a restriction is DISCIPLINARY or FRAUD, a reversal is REINSTATEMENT
+create table race_league_eligibility_decisions (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references race_league_seasons (id),
+  participant_id uuid not null references race_league_participants (id),
+  category text not null check (category in ('DISCIPLINARY', 'FRAUD', 'REINSTATEMENT')),
+  previous_eligible boolean not null,
+  new_eligible boolean not null,
+  reason text not null check (length(trim(reason)) between 1 and 1000),
+  decided_by uuid not null references race_profiles (id),
+  decided_at timestamptz not null default clock_timestamp(),
+  constraint race_league_eligibility_flip check (previous_eligible <> new_eligible),
+  constraint race_league_eligibility_category check ((category = 'REINSTATEMENT') = new_eligible)
+);
+create index idx_race_league_eligibility_participant on race_league_eligibility_decisions (participant_id);
+
+-- a judge's REQUEST to change a result (changes nothing by itself)
+create table race_league_correction_requests (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references race_league_seasons (id),
+  challenge_id uuid not null references race_league_challenges (id),
+  attempt_id uuid not null references race_league_attempts (id),
+  participant_id uuid not null references race_league_participants (id),
+  proposed_value numeric(14, 3) check (proposed_value is null or (proposed_value >= 0 and proposed_value <= 1000000)),   -- null = remove the result
+  reason text not null check (length(trim(reason)) between 1 and 1000),
+  requested_by uuid not null references race_profiles (id),
+  requested_at timestamptz not null default clock_timestamp(),
+  status text not null default 'pending' check (status in ('pending', 'applied', 'declined')),
+  decided_by uuid references race_profiles (id),
+  decided_at timestamptz,
+  decision_reason text,
+  constraint race_league_correction_requests_decided check ((status = 'pending') = (decided_by is null) and (status = 'pending') = (decided_at is null)),
+  constraint race_league_correction_requests_reason check (status = 'pending' or length(trim(coalesce(decision_reason, ''))) > 0)
+);
+create unique index uq_race_league_correction_request_pending on race_league_correction_requests (attempt_id) where status = 'pending';
+
+-- the permanent record of every APPLIED correction (append-only)
+create table race_league_corrections (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references race_league_seasons (id),
+  challenge_id uuid not null references race_league_challenges (id),
+  participant_id uuid not null references race_league_participants (id),
+  attempt_id uuid not null references race_league_attempts (id),
+  replacement_attempt_id uuid references race_league_attempts (id),
+  previous_value numeric(14, 3) not null,
+  new_value numeric(14, 3),   -- null = the result was removed
+  reason text not null check (length(trim(reason)) between 1 and 1000),
+  actor uuid not null references race_profiles (id),
+  at timestamptz not null default clock_timestamp(),
+  request_id uuid references race_league_correction_requests (id)
+);
+create index idx_race_league_corrections_season on race_league_corrections (season_id, at);
+
+-- a participant's appeal against a published result. An appeal never changes a score; an upheld one is followed (if warranted) by a normal audited correction.
+create table race_league_appeals (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references race_league_seasons (id),
+  challenge_id uuid not null references race_league_challenges (id),
+  participant_id uuid not null references race_league_participants (id),
+  reason text not null check (length(trim(reason)) between 1 and 1000),
+  lodged_by uuid not null references race_profiles (id),
+  lodged_at timestamptz not null default clock_timestamp(),
+  status text not null default 'submitted' check (status in ('submitted', 'upheld', 'dismissed')),
+  decided_by uuid references race_profiles (id),
+  decided_at timestamptz,
+  decision_reason text,
+  unique (challenge_id, participant_id),
+  constraint race_league_appeals_decided check ((status = 'submitted') = (decided_by is null) and (status = 'submitted') = (decided_at is null)),
+  constraint race_league_appeals_reason check (status = 'submitted' or length(trim(coalesce(decision_reason, ''))) > 0)
+);
+
 alter table race_league_seasons enable row level security;
 alter table race_league_challenges enable row level security;
 alter table race_league_participants enable row level security;
 alter table race_league_attempts enable row level security;
 alter table race_league_points_ledger enable row level security;
 alter table race_league_staff enable row level security;
-revoke all on race_league_seasons, race_league_challenges, race_league_participants, race_league_attempts, race_league_points_ledger, race_league_staff
+alter table race_league_eligibility_decisions enable row level security;
+alter table race_league_correction_requests enable row level security;
+alter table race_league_corrections enable row level security;
+alter table race_league_appeals enable row level security;
+revoke all on race_league_seasons, race_league_challenges, race_league_participants, race_league_attempts, race_league_points_ledger, race_league_staff,
+  race_league_eligibility_decisions, race_league_correction_requests, race_league_corrections, race_league_appeals
   from public, anon, authenticated;
 -- (no policies: a table without a policy returns nothing to any client role; every access goes through the functions below)
 
 select race_make_append_only('race_league_points_ledger');
+select race_make_append_only('race_league_eligibility_decisions');
+select race_make_append_only('race_league_corrections');
+create trigger trg_race_league_correction_requests_no_delete before delete on race_league_correction_requests for each row execute function race_forbid_delete();
+create trigger trg_race_league_appeals_no_delete before delete on race_league_appeals for each row execute function race_forbid_delete();
 create trigger trg_race_league_seasons_no_delete before delete on race_league_seasons for each row execute function race_forbid_delete();
 create trigger trg_race_league_challenges_no_delete before delete on race_league_challenges for each row execute function race_forbid_delete();
 create trigger trg_race_league_participants_no_delete before delete on race_league_participants for each row execute function race_forbid_delete();
 create trigger trg_race_league_attempts_no_delete before delete on race_league_attempts for each row execute function race_forbid_delete();
 
--- a completed season is final: nothing under it changes any more (and the season row itself never leaves 'completed')
+-- a completed season is final: nothing under it changes any more (and the season row itself never leaves 'completed'); only the visibility of its final table may still change
 create or replace function race_league_guard_completed()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare v_season uuid; v_status text;
 begin
   if TG_TABLE_NAME = 'race_league_seasons' then
     -- a completed season is final; the only thing that may still change is whether its final table is published
-    if OLD.status = 'completed' and (to_jsonb(NEW) - 'published') is distinct from (to_jsonb(OLD) - 'published') then
+    if OLD.status = 'completed' and (to_jsonb(NEW) - 'published' - 'first_published_at') is distinct from (to_jsonb(OLD) - 'published' - 'first_published_at') then
       raise exception 'LEAGUE_SEASON_LOCKED: a completed season is final' using errcode = 'check_violation';
     end if;
     return NEW;
@@ -169,16 +259,20 @@ create trigger trg_race_league_participants_final before insert or update on rac
 create trigger trg_race_league_attempts_final before insert or update on race_league_attempts for each row execute function race_league_guard_completed();
 create trigger trg_race_league_ledger_final before insert on race_league_points_ledger for each row execute function race_league_guard_completed();
 create trigger trg_race_league_staff_final before insert or update on race_league_staff for each row execute function race_league_guard_completed();
+create trigger trg_race_league_eligibility_final before insert on race_league_eligibility_decisions for each row execute function race_league_guard_completed();
+create trigger trg_race_league_corrections_final before insert on race_league_corrections for each row execute function race_league_guard_completed();
+create trigger trg_race_league_correction_requests_final before insert or update on race_league_correction_requests for each row execute function race_league_guard_completed();
+create trigger trg_race_league_appeals_final before insert or update on race_league_appeals for each row execute function race_league_guard_completed();
 
 -- ---------------------------------------------------------------------------
 -- helpers (internal: no client execute)
 -- ---------------------------------------------------------------------------
 create or replace function race_league_default_rules()
 returns jsonb language sql immutable set search_path = '' as $$
-  -- DEVELOPMENT DEFAULT ONLY. The real points table is an undecided business rule.
+  -- PROVISIONAL (owner-supplied): 1st 100 ... 9th 50, every other approved valid result 40, absence 0; ties share rank and points; appeals within 48 hours.
   select jsonb_build_object(
-    'points', jsonb_build_object('by_rank', jsonb_build_array(25, 20, 16, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1), 'beyond', 1, 'participation', 1, 'absent', 0),
-    'tie_policy', 'SHARE', 'absence_policy', 'ZERO', 'eligibility', 'AT_REGISTRATION')
+    'points', jsonb_build_object('by_rank', jsonb_build_array(100, 90, 80, 75, 70, 65, 60, 55, 50), 'beyond', 40, 'participation', 40, 'absent', 0),
+    'tie_policy', 'SHARE', 'absence_policy', 'ZERO', 'eligibility', 'AT_REGISTRATION', 'appeal_window_hours', 48)
 $$;
 
 create or replace function race_league_validate_rules(p jsonb)
@@ -187,7 +281,7 @@ declare t jsonb; v numeric; prev numeric := null; el jsonb; k text;
 begin
   if p is null or jsonb_typeof(p) <> 'object' then raise exception 'LEAGUE_INVALID: the rules must be an object' using errcode = 'check_violation'; end if;
   for k in select jsonb_object_keys(p) loop
-    if k not in ('points', 'tie_policy', 'absence_policy', 'eligibility') then raise exception 'LEAGUE_INVALID: unknown rule %', k using errcode = 'check_violation'; end if;
+    if k not in ('points', 'tie_policy', 'absence_policy', 'eligibility', 'appeal_window_hours') then raise exception 'LEAGUE_INVALID: unknown rule %', k using errcode = 'check_violation'; end if;
   end loop;
   t := p -> 'points';
   if t is null or jsonb_typeof(t) <> 'object' or jsonb_typeof(t -> 'by_rank') <> 'array' or jsonb_array_length(t -> 'by_rank') not between 1 and 100 then
@@ -211,7 +305,11 @@ begin
   if (p ->> 'tie_policy') is null or (p ->> 'tie_policy') not in ('SHARE', 'SPLIT') then raise exception 'LEAGUE_INVALID: unknown tie policy' using errcode = 'check_violation'; end if;
   if (p ->> 'absence_policy') is null or (p ->> 'absence_policy') not in ('ZERO', 'PARTICIPATION') then raise exception 'LEAGUE_INVALID: unknown absence policy' using errcode = 'check_violation'; end if;
   if (p ->> 'eligibility') is null or (p ->> 'eligibility') not in ('AT_REGISTRATION', 'ENTIRE_SEASON') then raise exception 'LEAGUE_INVALID: unknown eligibility policy' using errcode = 'check_violation'; end if;
-  return p;
+  if p ? 'appeal_window_hours' and (jsonb_typeof(p -> 'appeal_window_hours') <> 'number' or (p ->> 'appeal_window_hours')::numeric <> trunc((p ->> 'appeal_window_hours')::numeric)
+     or (p ->> 'appeal_window_hours')::numeric not between 1 and 720) then
+    raise exception 'LEAGUE_INVALID: the appeal window is a whole number of hours from 1 to 720' using errcode = 'check_violation';
+  end if;
+  return p || jsonb_build_object('appeal_window_hours', coalesce((p ->> 'appeal_window_hours')::int, 48));
 end $$;
 
 create or replace function race_league_has_role(p_season uuid, p_roles text[])
@@ -376,6 +474,7 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', c.participant_id, 'publicId', c.public_id, 'displayName', c.display_name, 'rank', c.rnk, 'totalPoints', c.total_cents / 100.0,
       'weeklyPoints', coalesce((select jsonb_object_agg(w.week_number::text, w.cents / 100.0) from weekly w where w.participant_id = c.participant_id), '{}'::jsonb),
+      'tied', (select count(*) from cur o where o.total_cents = c.total_cents) > 1,
       'challengesCompleted', c.completed, 'firstPlaces', c.firsts,
       'movement', (select pv.rnk - c.rnk from prev pv where pv.participant_id = c.participant_id),
       'gapToNext', (select min(o.total_cents) - c.total_cents from cur o where o.total_cents > c.total_cents) / 100.0
@@ -486,6 +585,12 @@ begin
     if exists (select 1 from public.race_league_attempts where season_id = p_season and status = 'pending') then
       raise exception 'LEAGUE_INVALID: some attempts are still waiting for review' using errcode = 'check_violation';
     end if;
+    if exists (select 1 from public.race_league_appeals where season_id = p_season and status = 'submitted') then
+      raise exception 'LEAGUE_INVALID: some appeals have not been decided yet' using errcode = 'check_violation';
+    end if;
+    if exists (select 1 from public.race_league_correction_requests where season_id = p_season and status = 'pending') then
+      raise exception 'LEAGUE_INVALID: some correction requests have not been decided yet' using errcode = 'check_violation';
+    end if;
   end if;
   update public.race_league_seasons set status = p_status, completed_at = case when p_status = 'completed' then clock_timestamp() end where id = p_season;
   perform public.race_league_audit_log('league.season.status', p_season, 'race_league_seasons', p_season, jsonb_build_object('status', se.status), jsonb_build_object('status', p_status),
@@ -501,7 +606,7 @@ begin
   select * into se from public.race_league_seasons where id = p_season for update;
   if se.id is null then raise exception 'LEAGUE_NOT_FOUND: season' using errcode = 'no_data_found'; end if;
   if p_published and se.status = 'draft' then raise exception 'LEAGUE_INVALID: schedule the season before publishing it' using errcode = 'check_violation'; end if;
-  update public.race_league_seasons set published = p_published where id = p_season;
+  update public.race_league_seasons set published = p_published, first_published_at = case when p_published then coalesce(first_published_at, clock_timestamp()) else first_published_at end where id = p_season;
   perform public.race_league_audit_log('league.season.publish', p_season, 'race_league_seasons', p_season, jsonb_build_object('published', se.published), jsonb_build_object('published', p_published),
     jsonb_build_object('reason', trim(p_reason)));
 end $$;
@@ -547,7 +652,7 @@ begin
   v_kind := coalesce(p_cfg ->> 'metric_kind', ex.metric_kind);
   v_unit := coalesce(p_cfg ->> 'unit', ex.unit);
   v_dir := coalesce(p_cfg ->> 'direction', ex.direction, case when v_kind = 'TIME' then 'LOWER_WINS' else 'HIGHER_WINS' end);
-  v_max := coalesce((p_cfg ->> 'max_attempts')::int, ex.max_attempts, 1);
+  v_max := coalesce((p_cfg ->> 'max_attempts')::int, ex.max_attempts, 3);
   v_count := coalesce(p_cfg ->> 'counting', ex.counting, 'BEST');
   v_open := case when p_cfg ? 'opens_at' then (p_cfg ->> 'opens_at')::timestamptz else ex.opens_at end;
   v_close := case when p_cfg ? 'closes_at' then (p_cfg ->> 'closes_at')::timestamptz else ex.closes_at end;
@@ -590,7 +695,7 @@ begin
   if p_status = 'closed' and exists (select 1 from public.race_league_attempts where challenge_id = ch.id and status = 'pending') then
     raise exception 'LEAGUE_INVALID: some attempts are still waiting for review' using errcode = 'check_violation';
   end if;
-  update public.race_league_challenges set status = p_status where id = ch.id;
+  update public.race_league_challenges set status = p_status, closed_at = case when p_status = 'closed' then clock_timestamp() else closed_at end where id = ch.id;
   if p_status = 'closed' then v_lines := public.race_league_apply_scores(ch.id); end if;
   perform public.race_league_audit_log('league.challenge.status', ch.season_id, 'race_league_challenges', ch.id, jsonb_build_object('status', ch.status), jsonb_build_object('status', p_status),
     jsonb_build_object('ledger_lines', v_lines));
@@ -605,27 +710,33 @@ returns text language sql immutable set search_path = '' as $$
   select case when p_ref is not null and p_ref <> '' then 'ref:' || lower(p_ref) else 'name:' || lower(trim(p_name)) end
 $$;
 
-create or replace function race_league_add_participant(p_season uuid, p_display_name text, p_external_ref text default null, p_eligible boolean default true)
+-- Registration needs staff to attest an ACTIVE, verified gym membership (no gym database is read). The attestation is kept; a later expiry changes nothing.
+create or replace function race_league_add_participant(p_season uuid, p_display_name text, p_external_ref text default null, p_membership_verified boolean default false)
 returns text language plpgsql volatile security definer set search_path = '' as $$
 declare v_name text := regexp_replace(trim(coalesce(p_display_name, '')), '\s+', ' ', 'g'); v_ref text := nullif(trim(coalesce(p_external_ref, '')), ''); v_public text;
 begin
   perform public.race_league_require_admin(p_season);
   if not exists (select 1 from public.race_league_seasons where id = p_season) then raise exception 'LEAGUE_NOT_FOUND: season' using errcode = 'no_data_found'; end if;
+  if p_membership_verified is not true then
+    raise exception 'LEAGUE_NOT_ELIGIBLE: an active, verified gym membership is required to register for a season' using errcode = 'check_violation';
+  end if;
   if length(v_name) not between 2 and 40 or v_name ~ '^[=+@-]' or v_name ~ '[<>]' then
     raise exception 'LEAGUE_INVALID: a display name must be 2-40 characters and cannot start with = + - @' using errcode = 'check_violation';
   end if;
-  insert into public.race_league_participants (season_id, display_name, external_ref, identity_key, eligible, created_by)
-  values (p_season, v_name, v_ref, public.race_league_identity_key(v_name, v_ref), coalesce(p_eligible, true), auth.uid()) returning public_id into v_public;
-  perform public.race_league_audit_log('league.participant.add', p_season, 'race_league_participants', null, null, jsonb_build_object('display_name', v_name, 'eligible', coalesce(p_eligible, true)));
+  if v_ref is not null and v_ref !~ '^[A-Za-z0-9._:/#-]{1,60}$' then raise exception 'LEAGUE_INVALID: bad member reference' using errcode = 'check_violation'; end if;
+  insert into public.race_league_participants (season_id, display_name, external_ref, identity_key, created_by)
+  values (p_season, v_name, v_ref, public.race_league_identity_key(v_name, v_ref), auth.uid()) returning public_id into v_public;
+  perform public.race_league_audit_log('league.participant.add', p_season, 'race_league_participants', null, null, jsonb_build_object('display_name', v_name, 'membership_verified', true));
   return v_public;
 exception when unique_violation then
   raise exception 'LEAGUE_DUPLICATE: already a participant in this season' using errcode = 'unique_violation';
 end $$;
 
--- p_rows: [{"display_name":"Ahmed K.","external_ref":"M-100","eligible":true}, ...] — re-validated here; duplicates are reported, never merged
+-- p_rows: [{"display_name":"Ahmed K.","external_ref":"M-100","membership_verified":true}, ...] — re-validated here; a row that is not an explicit true is refused;
+-- duplicates are reported, never merged
 create or replace function race_league_import_participants(p_season uuid, p_rows jsonb)
 returns jsonb language plpgsql volatile security definer set search_path = '' as $$
-declare r jsonb; i int := 0; v_added int := 0; v_issues jsonb := '[]'::jsonb; v_name text; v_ref text; v_key text; v_elig boolean;
+declare r jsonb; i int := 0; v_added int := 0; v_issues jsonb := '[]'::jsonb; v_name text; v_ref text; v_key text;
 begin
   perform public.race_league_require_admin(p_season);
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) > 5000 then raise exception 'LEAGUE_INVALID: send an array of at most 5000 rows' using errcode = 'check_violation'; end if;
@@ -635,11 +746,11 @@ begin
       if jsonb_typeof(r) <> 'object' then raise exception 'LEAGUE_INVALID: row must be an object'; end if;
       v_name := regexp_replace(trim(coalesce(r ->> 'display_name', '')), '\s+', ' ', 'g');
       v_ref := nullif(trim(coalesce(r ->> 'external_ref', '')), '');
-      v_elig := coalesce((r ->> 'eligible')::boolean, true);
+      if (r ->> 'membership_verified') is distinct from 'true' then raise exception 'LEAGUE_NOT_ELIGIBLE: membership is not verified as active, so this member cannot be registered'; end if;
       if length(v_name) not between 2 and 40 or v_name ~ '^[=+@-]' or v_name ~ '[<>]' then raise exception 'LEAGUE_INVALID: bad display name'; end if;
       if v_ref is not null and v_ref !~ '^[A-Za-z0-9._:/#-]{1,60}$' then raise exception 'LEAGUE_INVALID: bad member reference'; end if;
       v_key := public.race_league_identity_key(v_name, v_ref);
-      insert into public.race_league_participants (season_id, display_name, external_ref, identity_key, eligible, created_by) values (p_season, v_name, v_ref, v_key, v_elig, auth.uid());
+      insert into public.race_league_participants (season_id, display_name, external_ref, identity_key, created_by) values (p_season, v_name, v_ref, v_key, auth.uid());
       v_added := v_added + 1;
     exception
       when unique_violation then v_issues := v_issues || jsonb_build_object('row', i, 'message', 'already a participant');
@@ -650,9 +761,9 @@ begin
   return jsonb_build_object('added', v_added, 'issues', v_issues);
 end $$;
 
-create or replace function race_league_set_participant(p_participant uuid, p_display_name text, p_active boolean, p_eligible boolean, p_reason text)
+create or replace function race_league_set_participant(p_participant uuid, p_display_name text, p_active boolean, p_reason text)
 returns void language plpgsql volatile security definer set search_path = '' as $$
-declare p public.race_league_participants; v_name text; v_lines int := 0; ch record;
+declare p public.race_league_participants; v_name text;
 begin
   select * into p from public.race_league_participants where id = p_participant for update;
   if p.id is null then raise exception 'LEAGUE_NOT_FOUND: participant' using errcode = 'no_data_found'; end if;
@@ -660,16 +771,37 @@ begin
   perform public.race_league_reason(p_reason);
   v_name := coalesce(nullif(regexp_replace(trim(coalesce(p_display_name, '')), '\s+', ' ', 'g'), ''), p.display_name);
   if length(v_name) not between 2 and 40 or v_name ~ '^[=+@-]' or v_name ~ '[<>]' then raise exception 'LEAGUE_INVALID: bad display name' using errcode = 'check_violation'; end if;
-  update public.race_league_participants set display_name = v_name, active = coalesce(p_active, active), eligible = coalesce(p_eligible, eligible), identity_key = case when external_ref is null then 'name:' || lower(v_name) else identity_key end
+  -- going inactive keeps every historical result; eligibility is NOT changed here (see race_league_set_eligibility)
+  update public.race_league_participants set display_name = v_name, active = coalesce(p_active, active), identity_key = case when external_ref is null then 'name:' || lower(v_name) else identity_key end
    where id = p.id;
-  -- losing eligibility removes the points (an append-only reversal); going inactive keeps every historical result
-  if p_eligible is not null and p_eligible <> p.eligible then
-    for ch in select id from public.race_league_challenges where season_id = p.season_id and status = 'closed' order by week_number loop v_lines := v_lines + public.race_league_apply_scores(ch.id); end loop;
-  end if;
-  perform public.race_league_audit_log('league.participant.update', p.season_id, 'race_league_participants', p.id, jsonb_build_object('display_name', p.display_name, 'active', p.active, 'eligible', p.eligible),
-    jsonb_build_object('display_name', v_name, 'active', coalesce(p_active, p.active), 'eligible', coalesce(p_eligible, p.eligible)), jsonb_build_object('reason', trim(p_reason), 'ledger_lines', v_lines));
+  perform public.race_league_audit_log('league.participant.update', p.season_id, 'race_league_participants', p.id, jsonb_build_object('display_name', p.display_name, 'active', p.active),
+    jsonb_build_object('display_name', v_name, 'active', coalesce(p_active, p.active)), jsonb_build_object('reason', trim(p_reason)));
 exception when unique_violation then
   raise exception 'LEAGUE_DUPLICATE: another participant already has that name' using errcode = 'unique_violation';
+end $$;
+
+-- A participant's eligibility is fixed at registration and preserved for the season (membership expiry is never an input). It changes only by a documented
+-- administrator decision: DISCIPLINARY or FRAUD restricts, REINSTATEMENT reverses. Losing eligibility removes the points by an append-only reversal.
+create or replace function race_league_set_eligibility(p_participant uuid, p_eligible boolean, p_category text, p_reason text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare p public.race_league_participants; v_reason text; v_lines int := 0; ch record;
+begin
+  select * into p from public.race_league_participants where id = p_participant for update;
+  if p.id is null then raise exception 'LEAGUE_NOT_FOUND: participant' using errcode = 'no_data_found'; end if;
+  perform public.race_league_require_admin(p.season_id);
+  v_reason := public.race_league_reason(p_reason);
+  if p_eligible is null or p_category not in ('DISCIPLINARY', 'FRAUD', 'REINSTATEMENT') then raise exception 'LEAGUE_INVALID: unknown decision type' using errcode = 'check_violation'; end if;
+  if p_eligible <> (p_category = 'REINSTATEMENT') then
+    raise exception 'LEAGUE_INVALID: a restriction must be a DISCIPLINARY or FRAUD decision; a reinstatement is recorded as REINSTATEMENT' using errcode = 'check_violation';
+  end if;
+  if p.eligible = p_eligible then raise exception 'LEAGUE_INVALID: the participant already has that eligibility' using errcode = 'check_violation'; end if;
+  update public.race_league_participants set eligible = p_eligible where id = p.id;
+  insert into public.race_league_eligibility_decisions (season_id, participant_id, category, previous_eligible, new_eligible, reason, decided_by)
+  values (p.season_id, p.id, p_category, p.eligible, p_eligible, v_reason, auth.uid());
+  for ch in select id from public.race_league_challenges where season_id = p.season_id and status = 'closed' order by week_number loop v_lines := v_lines + public.race_league_apply_scores(ch.id); end loop;
+  perform public.race_league_audit_log('league.participant.eligibility', p.season_id, 'race_league_participants', p.id, jsonb_build_object('eligible', p.eligible), jsonb_build_object('eligible', p_eligible),
+    jsonb_build_object('category', p_category, 'reason', v_reason, 'ledger_lines', v_lines));
+  return jsonb_build_object('ledgerLines', v_lines);
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -749,29 +881,136 @@ begin
   return public.race_league_attempt_json(a) || jsonb_build_object('replay', false);
 end $$;
 
--- administrator correction: the old attempt is voided, a new approved one replaces it, a closed challenge is re-scored by appending the difference. Reason mandatory; audited.
-create or replace function race_league_correct_attempt(p_attempt uuid, p_new_value numeric, p_reason text)
+-- THE one correction path (a direct administrator correction and an applied judge request both end here; callers have already checked the role): the old attempt is
+-- voided, a new approved one replaces it, a permanent record keeps previous/new value + actor + time + reason, a closed challenge is re-scored by appending the
+-- difference, and the audit log gets an entry.
+create or replace function race_league_apply_correction(p_attempt uuid, p_new_value numeric, p_reason text, p_request uuid)
 returns jsonb language plpgsql volatile security definer set search_path = '' as $$
-declare a public.race_league_attempts; ch public.race_league_challenges; n public.race_league_attempts; v_lines int := 0; v_reason text;
+declare a public.race_league_attempts; ch public.race_league_challenges; n public.race_league_attempts; v_lines int := 0;
 begin
   select * into a from public.race_league_attempts where id = p_attempt for update;
   if a.id is null then raise exception 'LEAGUE_NOT_FOUND: attempt' using errcode = 'no_data_found'; end if;
-  perform public.race_league_require_admin(a.season_id);
-  v_reason := public.race_league_reason(p_reason);
   if a.status not in ('pending', 'approved') then raise exception 'LEAGUE_INVALID: only a pending or approved attempt can be corrected' using errcode = 'check_violation'; end if;
   select * into ch from public.race_league_challenges where id = a.challenge_id for update;
   if ch.status in ('draft', 'published') then raise exception 'LEAGUE_CHALLENGE_NOT_OPEN: the challenge has not opened' using errcode = 'check_violation'; end if;
   if p_new_value is not null then perform public.race_league_check_value(p_new_value, ch.metric_kind); end if;
-  update public.race_league_attempts set status = 'void', reason = v_reason where id = a.id;
+  update public.race_league_attempts set status = 'void', reason = p_reason where id = a.id;
   if p_new_value is not null then
     insert into public.race_league_attempts (season_id, challenge_id, participant_id, value, unit, attempt_no, attempted_at, recorded_by, reviewed_by, reviewed_at, status, reason, corrected_from, client_request_id)
-    values (a.season_id, a.challenge_id, a.participant_id, p_new_value, a.unit, a.attempt_no, a.attempted_at, auth.uid(), auth.uid(), clock_timestamp(), 'approved', v_reason, a.id, gen_random_uuid())
+    values (a.season_id, a.challenge_id, a.participant_id, p_new_value, a.unit, a.attempt_no, a.attempted_at, auth.uid(), auth.uid(), clock_timestamp(), 'approved', p_reason, a.id, gen_random_uuid())
     returning * into n;
   end if;
+  insert into public.race_league_corrections (season_id, challenge_id, participant_id, attempt_id, replacement_attempt_id, previous_value, new_value, reason, actor, request_id)
+  values (a.season_id, a.challenge_id, a.participant_id, a.id, n.id, a.value, p_new_value, p_reason, auth.uid(), p_request);
   if ch.status = 'closed' then v_lines := public.race_league_apply_scores(ch.id); end if;
   perform public.race_league_audit_log('league.attempt.correct', a.season_id, 'race_league_attempts', a.id, public.race_league_attempt_json(a),
-    case when n.id is null then jsonb_build_object('voided', true) else public.race_league_attempt_json(n) end, jsonb_build_object('reason', v_reason, 'ledger_lines', v_lines));
+    case when n.id is null then jsonb_build_object('voided', true) else public.race_league_attempt_json(n) end,
+    jsonb_build_object('reason', p_reason, 'previous_value', a.value, 'new_value', p_new_value, 'request_id', p_request, 'ledger_lines', v_lines));
   return jsonb_build_object('voided', a.id, 'replacement', n.id, 'ledgerLines', v_lines);
+end $$;
+
+-- administrator-only direct correction. A judge cannot call this; a judge asks through race_league_request_correction.
+create or replace function race_league_correct_attempt(p_attempt uuid, p_new_value numeric, p_reason text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare a public.race_league_attempts;
+begin
+  select * into a from public.race_league_attempts where id = p_attempt;
+  if a.id is null then raise exception 'LEAGUE_NOT_FOUND: attempt' using errcode = 'no_data_found'; end if;
+  perform public.race_league_require_admin(a.season_id);
+  return public.race_league_apply_correction(p_attempt, p_new_value, public.race_league_reason(p_reason), null);
+end $$;
+
+-- judge (or administrator): ask for a result to change. Nothing changes until an administrator decides.
+create or replace function race_league_request_correction(p_attempt uuid, p_proposed_value numeric, p_reason text)
+returns uuid language plpgsql volatile security definer set search_path = '' as $$
+declare a public.race_league_attempts; ch public.race_league_challenges; v_reason text; v_id uuid;
+begin
+  select * into a from public.race_league_attempts where id = p_attempt;
+  if a.id is null then raise exception 'LEAGUE_NOT_FOUND: attempt' using errcode = 'no_data_found'; end if;
+  if auth.uid() is null or public.race_league_has_role(a.season_id, array['LEAGUE_ADMIN', 'JUDGE']) is not true then
+    raise exception 'LEAGUE_FORBIDDEN: only a league judge or administrator can request a correction' using errcode = 'insufficient_privilege';
+  end if;
+  v_reason := public.race_league_reason(p_reason);
+  if a.status not in ('pending', 'approved') then raise exception 'LEAGUE_INVALID: only a pending or approved attempt can be corrected' using errcode = 'check_violation'; end if;
+  select * into ch from public.race_league_challenges where id = a.challenge_id;
+  if ch.status in ('draft', 'published') then raise exception 'LEAGUE_CHALLENGE_NOT_OPEN: the challenge has not opened' using errcode = 'check_violation'; end if;
+  if p_proposed_value is not null then perform public.race_league_check_value(p_proposed_value, ch.metric_kind); end if;
+  insert into public.race_league_correction_requests (season_id, challenge_id, attempt_id, participant_id, proposed_value, reason, requested_by)
+  values (a.season_id, a.challenge_id, a.id, a.participant_id, p_proposed_value, v_reason, auth.uid()) returning id into v_id;
+  perform public.race_league_audit_log('league.correction.request', a.season_id, 'race_league_correction_requests', v_id, null,
+    jsonb_build_object('attempt_id', a.id, 'previous_value', a.value, 'proposed_value', p_proposed_value), jsonb_build_object('reason', v_reason));
+  return v_id;
+exception when unique_violation then
+  raise exception 'LEAGUE_DUPLICATE: a correction request for this result is already waiting' using errcode = 'unique_violation';
+end $$;
+
+create or replace function race_league_decide_correction_request(p_request uuid, p_decision text, p_reason text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare r public.race_league_correction_requests; v_reason text; v_out jsonb := jsonb_build_object('ledgerLines', 0);
+begin
+  select * into r from public.race_league_correction_requests where id = p_request for update;
+  if r.id is null then raise exception 'LEAGUE_NOT_FOUND: correction request' using errcode = 'no_data_found'; end if;
+  perform public.race_league_require_admin(r.season_id);
+  v_reason := public.race_league_reason(p_reason);
+  if p_decision not in ('apply', 'decline') then raise exception 'LEAGUE_INVALID: decision must be apply or decline' using errcode = 'check_violation'; end if;
+  if r.status <> 'pending' then raise exception 'LEAGUE_INVALID: this request has already been decided' using errcode = 'check_violation'; end if;
+  if p_decision = 'apply' then v_out := public.race_league_apply_correction(r.attempt_id, r.proposed_value, v_reason, r.id); end if;
+  update public.race_league_correction_requests set status = case when p_decision = 'apply' then 'applied' else 'declined' end, decided_by = auth.uid(), decided_at = clock_timestamp(), decision_reason = v_reason
+   where id = r.id;
+  perform public.race_league_audit_log('league.correction.' || p_decision, r.season_id, 'race_league_correction_requests', r.id, jsonb_build_object('status', 'pending'),
+    jsonb_build_object('status', case when p_decision = 'apply' then 'applied' else 'declined' end), jsonb_build_object('reason', v_reason));
+  return v_out;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- appeals (staff intake on the participant's behalf — participants have no account in this module)
+-- ---------------------------------------------------------------------------
+create or replace function race_league_lodge_appeal(p_challenge uuid, p_participant uuid, p_reason text)
+returns uuid language plpgsql volatile security definer set search_path = '' as $$
+declare ch public.race_league_challenges; se public.race_league_seasons; v_reason text; v_published timestamptz; v_hours int; v_id uuid;
+begin
+  select * into ch from public.race_league_challenges where id = p_challenge;
+  if ch.id is null then raise exception 'LEAGUE_NOT_FOUND: challenge' using errcode = 'no_data_found'; end if;
+  if auth.uid() is null or public.race_league_has_role(ch.season_id, array['LEAGUE_ADMIN', 'JUDGE', 'REVIEWER']) is not true then
+    raise exception 'LEAGUE_FORBIDDEN: only league staff can lodge an appeal on a participant''s behalf' using errcode = 'insufficient_privilege';
+  end if;
+  v_reason := public.race_league_reason(p_reason);
+  select * into se from public.race_league_seasons where id = ch.season_id;
+  if se.status = 'completed' then raise exception 'LEAGUE_SEASON_LOCKED: a completed season is final' using errcode = 'check_violation'; end if;
+  if not exists (select 1 from public.race_league_participants where id = p_participant and season_id = ch.season_id) then raise exception 'LEAGUE_NOT_FOUND: participant' using errcode = 'no_data_found'; end if;
+  -- a result is public when its challenge is closed AND its season is published: the window starts at whichever happened last
+  if ch.status <> 'closed' or not se.published or ch.closed_at is null or se.first_published_at is null then
+    raise exception 'LEAGUE_APPEAL_CLOSED: this result has not been published, so there is nothing to appeal yet' using errcode = 'check_violation';
+  end if;
+  v_published := greatest(ch.closed_at, se.first_published_at);
+  v_hours := coalesce((se.rules ->> 'appeal_window_hours')::int, 48);
+  if clock_timestamp() > v_published + make_interval(hours => v_hours) then
+    raise exception 'LEAGUE_APPEAL_CLOSED: the % hour appeal window for this result has ended', v_hours using errcode = 'check_violation';
+  end if;
+  insert into public.race_league_appeals (season_id, challenge_id, participant_id, reason, lodged_by) values (ch.season_id, ch.id, p_participant, v_reason, auth.uid()) returning id into v_id;
+  perform public.race_league_audit_log('league.appeal.lodge', ch.season_id, 'race_league_appeals', v_id, null, jsonb_build_object('challenge_id', ch.id, 'week', ch.week_number));
+  return v_id;
+exception when unique_violation then
+  raise exception 'LEAGUE_DUPLICATE: this participant has already appealed this result' using errcode = 'unique_violation';
+end $$;
+
+-- decided by an administrator who did NOT record (or correct) any attempt in this participant's result. Never touches the ledger.
+create or replace function race_league_decide_appeal(p_appeal uuid, p_decision text, p_reason text)
+returns void language plpgsql volatile security definer set search_path = '' as $$
+declare ap public.race_league_appeals; v_reason text;
+begin
+  select * into ap from public.race_league_appeals where id = p_appeal for update;
+  if ap.id is null then raise exception 'LEAGUE_NOT_FOUND: appeal' using errcode = 'no_data_found'; end if;
+  perform public.race_league_require_admin(ap.season_id);
+  v_reason := public.race_league_reason(p_reason);
+  if p_decision not in ('upheld', 'dismissed') then raise exception 'LEAGUE_INVALID: decision must be upheld or dismissed' using errcode = 'check_violation'; end if;
+  if ap.status <> 'submitted' then raise exception 'LEAGUE_INVALID: this appeal has already been decided' using errcode = 'check_violation'; end if;
+  if exists (select 1 from public.race_league_attempts a where a.challenge_id = ap.challenge_id and a.participant_id = ap.participant_id and a.recorded_by = auth.uid()) then
+    raise exception 'LEAGUE_CONFLICT_OF_INTEREST: the administrator who recorded this result cannot review its appeal' using errcode = 'insufficient_privilege';
+  end if;
+  update public.race_league_appeals set status = p_decision, decided_by = auth.uid(), decided_at = clock_timestamp(), decision_reason = v_reason where id = ap.id;
+  perform public.race_league_audit_log('league.appeal.' || p_decision, ap.season_id, 'race_league_appeals', ap.id, jsonb_build_object('status', 'submitted'), jsonb_build_object('status', p_decision),
+    jsonb_build_object('reason', v_reason));
 end $$;
 
 create or replace function race_league_recompute(p_challenge uuid)
@@ -814,6 +1053,14 @@ returns jsonb language sql stable security definer set search_path = '' as $$
    where auth.uid() is not null and public.race_league_has_role(s.id, array['LEAGUE_ADMIN', 'JUDGE', 'REVIEWER']);
 $$;
 
+-- the rules in the camelCase shape the screens use (storage stays snake_case)
+create or replace function race_league_rules_json(p jsonb)
+returns jsonb language sql immutable set search_path = '' as $$
+  select jsonb_build_object(
+    'points', jsonb_build_object('byRank', p -> 'points' -> 'by_rank', 'beyond', p -> 'points' -> 'beyond', 'participation', p -> 'points' -> 'participation', 'absent', p -> 'points' -> 'absent'),
+    'tiePolicy', p ->> 'tie_policy', 'absencePolicy', p ->> 'absence_policy', 'eligibility', p ->> 'eligibility', 'appealWindowHours', coalesce((p ->> 'appeal_window_hours')::int, 48))
+$$;
+
 create or replace function race_league_admin_overview(p_season uuid)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare se public.race_league_seasons; v_admin boolean;
@@ -825,18 +1072,34 @@ begin
   select * into se from public.race_league_seasons where id = p_season;
   if se.id is null then raise exception 'LEAGUE_NOT_FOUND: season' using errcode = 'no_data_found'; end if;
   return jsonb_build_object(
-    'season', jsonb_build_object('id', se.id, 'slug', se.public_slug, 'name', se.name, 'status', se.status, 'published', se.published, 'startsOn', se.starts_on, 'endsOn', se.ends_on, 'rules', se.rules),
+    'season', jsonb_build_object('id', se.id, 'slug', se.public_slug, 'name', se.name, 'status', se.status, 'published', se.published, 'startsOn', se.starts_on, 'endsOn', se.ends_on, 'rules', public.race_league_rules_json(se.rules), 'firstPublishedAt', se.first_published_at),
     'isAdmin', v_admin,
     'challenges', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'weekNumber', c.week_number, 'name', c.name, 'description', c.description, 'instructions', c.instructions,
                     'safetyNotes', c.safety_notes, 'metricKind', c.metric_kind, 'unit', c.unit, 'direction', c.direction, 'maxAttempts', c.max_attempts, 'counting', c.counting,
-                    'opensAt', c.opens_at, 'closesAt', c.closes_at, 'referenceUrl', c.reference_url, 'requiresVerification', c.requires_verification, 'status', c.status)
+                    'opensAt', c.opens_at, 'closesAt', c.closes_at, 'closedAt', c.closed_at, 'referenceUrl', c.reference_url, 'requiresVerification', c.requires_verification, 'status', c.status)
                     order by c.week_number) from public.race_league_challenges c where c.season_id = p_season), '[]'::jsonb),
     'participants', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'publicId', p.public_id, 'displayName', p.display_name, 'active', p.active, 'eligible', p.eligible,
-                    'externalRef', case when v_admin then p.external_ref end) order by lower(p.display_name) collate "C", p.public_id)
+                    'externalRef', case when v_admin then p.external_ref end, 'membershipVerifiedOn', p.membership_verified_on) order by lower(p.display_name) collate "C", p.public_id)
                     from (select * from public.race_league_participants where season_id = p_season limit 5000) p), '[]'::jsonb),
     'attempts', coalesce((select jsonb_agg(public.race_league_attempt_json(a) order by a.created_at desc)
                     from (select * from public.race_league_attempts where season_id = p_season order by created_at desc limit 500) a), '[]'::jsonb),
     'standings', public.race_league_standings_rows(p_season),
+    -- requests are visible to all staff (a judge follows up on their own); everything below is administrators-only: appeals carry a participant's own words
+    'correctionRequests', coalesce((select jsonb_agg(jsonb_build_object('id', r.id, 'seasonId', r.season_id, 'challengeId', r.challenge_id, 'attemptId', r.attempt_id, 'participantId', r.participant_id,
+                    'proposedValue', r.proposed_value, 'reason', r.reason, 'requestedBy', r.requested_by, 'requestedAt', r.requested_at, 'status', r.status, 'decidedBy', r.decided_by,
+                    'decidedAt', r.decided_at, 'decisionReason', r.decision_reason) order by r.requested_at desc)
+                    from (select * from public.race_league_correction_requests where season_id = p_season order by requested_at desc limit 500) r), '[]'::jsonb),
+    'corrections', case when v_admin then coalesce((select jsonb_agg(jsonb_build_object('id', k.id, 'seasonId', k.season_id, 'challengeId', k.challenge_id, 'participantId', k.participant_id,
+                    'attemptId', k.attempt_id, 'replacementAttemptId', k.replacement_attempt_id, 'previousValue', k.previous_value, 'newValue', k.new_value, 'reason', k.reason,
+                    'actor', k.actor, 'at', k.at, 'requestId', k.request_id) order by k.at desc)
+                    from (select * from public.race_league_corrections where season_id = p_season order by at desc limit 500) k), '[]'::jsonb) else '[]'::jsonb end,
+    'appeals', case when v_admin then coalesce((select jsonb_agg(jsonb_build_object('id', x.id, 'seasonId', x.season_id, 'challengeId', x.challenge_id, 'participantId', x.participant_id,
+                    'reason', x.reason, 'lodgedBy', x.lodged_by, 'lodgedAt', x.lodged_at, 'status', x.status, 'decidedBy', x.decided_by, 'decidedAt', x.decided_at,
+                    'decisionReason', x.decision_reason) order by x.lodged_at desc)
+                    from (select * from public.race_league_appeals where season_id = p_season order by lodged_at desc limit 500) x), '[]'::jsonb) else '[]'::jsonb end,
+    'eligibilityDecisions', case when v_admin then coalesce((select jsonb_agg(jsonb_build_object('id', d.id, 'seasonId', d.season_id, 'participantId', d.participant_id, 'category', d.category,
+                    'previousEligible', d.previous_eligible, 'newEligible', d.new_eligible, 'reason', d.reason, 'decidedBy', d.decided_by, 'decidedAt', d.decided_at) order by d.decided_at)
+                    from (select * from public.race_league_eligibility_decisions where season_id = p_season order by decided_at limit 500) d), '[]'::jsonb) else '[]'::jsonb end,
     'staff', case when v_admin then coalesce((select jsonb_agg(jsonb_build_object('profileId', f.profile_id, 'role', f.role, 'active', f.active)) from public.race_league_staff f where f.season_id = p_season), '[]'::jsonb) end);
 end $$;
 
@@ -864,7 +1127,8 @@ begin
   for f in select p.oid::regprocedure as sig from pg_proc p where p.pronamespace = 'public'::regnamespace
             and p.proname in ('race_league_create_season', 'race_league_set_season_status', 'race_league_set_published', 'race_league_update_rules', 'race_league_upsert_challenge',
               'race_league_set_challenge_status', 'race_league_add_participant', 'race_league_import_participants', 'race_league_set_participant', 'race_league_record_attempt',
-              'race_league_review_attempt', 'race_league_correct_attempt', 'race_league_recompute', 'race_league_set_staff', 'race_league_my_seasons', 'race_league_admin_overview',
+              'race_league_review_attempt', 'race_league_correct_attempt', 'race_league_recompute', 'race_league_set_eligibility', 'race_league_request_correction',
+              'race_league_decide_correction_request', 'race_league_lodge_appeal', 'race_league_decide_appeal', 'race_league_set_staff', 'race_league_my_seasons', 'race_league_admin_overview',
               'race_league_audit') loop
     execute format('grant execute on function %s to authenticated', f.sig);
   end loop;

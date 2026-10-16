@@ -7,7 +7,8 @@ export interface ImportRow {
   readonly line: number;
   readonly displayName: string;
   readonly externalRef: string | null;
-  readonly eligible: boolean;
+  /** Always true for an accepted row: a registration without a verified, active membership is refused. */
+  readonly membershipVerified: true;
 }
 export interface ImportIssue {
   readonly line: number;
@@ -46,13 +47,12 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
-const HEADERS = ["display_name", "full_name", "external_member_ref", "eligible"] as const;
+const HEADERS = ["display_name", "full_name", "external_member_ref", "membership_verified"] as const;
 
 const identityKey = (displayName: string, externalRef: string | null): string => (externalRef ? `ref:${externalRef.toLowerCase()}` : `name:${displayName.toLowerCase()}`);
 
 function parseBool(v: string): boolean | null {
   const t = v.trim().toLowerCase();
-  if (t === "") return true;
   if (["yes", "y", "true", "1"].includes(t)) return true;
   if (["no", "n", "false", "0"].includes(t)) return false;
   return null;
@@ -62,7 +62,9 @@ function parseBool(v: string): boolean | null {
 const FORMULA_START = /^[=+\-@\t\r]/;
 
 /**
- * Validate a participant CSV. Header: `display_name` OR `full_name` (reduced to "First L."), optional `external_member_ref`, optional `eligible`.
+ * Validate a participant CSV. Header: `display_name` OR `full_name` (reduced to "First L."), optional `external_member_ref`, and a REQUIRED `membership_verified` column:
+ * staff attest (yes/no) that the member's gym membership was active and verified at registration. A row that is not an explicit yes is refused — nobody is registered on a guess.
+ * This is a plain file adapter: nothing here reads the gym database.
  * `existingKeys` are identity keys already in the season (see `participantIdentityKey`) — duplicates against them are reported, never merged.
  */
 export function validateParticipantCsv(text: string, existingKeys: ReadonlySet<string> = new Set()): ImportResult {
@@ -76,6 +78,7 @@ export function validateParticipantCsv(text: string, existingKeys: ReadonlySet<s
   if (unknown.length) throw new LeagueError("LEAGUE_INVALID", `Unknown column(s): ${unknown.join(", ")}. Allowed: ${HEADERS.join(", ")}.`);
   if (new Set(names).size !== names.length) throw new LeagueError("LEAGUE_INVALID", "A column appears twice.");
   if (!names.includes("display_name") && !names.includes("full_name")) throw new LeagueError("LEAGUE_INVALID", "The file needs a display_name or full_name column.");
+  if (!names.includes("membership_verified")) throw new LeagueError("LEAGUE_INVALID", "The file needs a membership_verified column (yes/no): staff must confirm each member's active membership.");
   if (table.length > IMPORT_LIMITS.maxRows) throw new LeagueError("LEAGUE_INVALID", `Too many rows (limit ${IMPORT_LIMITS.maxRows}).`);
 
   const col = (r: string[], name: string): string => (r[names.indexOf(name)] ?? "").trim();
@@ -93,14 +96,15 @@ export function validateParticipantCsv(text: string, existingKeys: ReadonlySet<s
       const display = names.includes("display_name") && col(r, "display_name") !== "" ? validateDisplayName(col(r, "display_name")) : toPublicDisplayName(col(r, "full_name"));
       const ref = names.includes("external_member_ref") && col(r, "external_member_ref") !== "" ? col(r, "external_member_ref") : null;
       if (ref !== null && !/^[A-Za-z0-9._:/#-]{1,60}$/.test(ref)) throw new LeagueError("LEAGUE_INVALID", "The member reference may only contain letters, numbers and . _ : / # -");
-      const eligible = names.includes("eligible") ? parseBool(col(r, "eligible")) : true;
-      if (eligible === null) throw new LeagueError("LEAGUE_INVALID", "eligible must be yes or no.");
+      const verified = parseBool(col(r, "membership_verified"));
+      if (verified === null) throw new LeagueError("LEAGUE_INVALID", "membership_verified must be yes or no.");
+      if (!verified) throw new LeagueError("LEAGUE_NOT_ELIGIBLE", "Membership is not verified as active, so this member cannot be registered.");
       const key = identityKey(display, ref);
       if (existingKeys.has(key)) throw new LeagueError("LEAGUE_DUPLICATE", "Already a participant in this season.");
       const firstLine = seen.get(key);
       if (firstLine !== undefined) throw new LeagueError("LEAGUE_DUPLICATE", `Duplicate of line ${firstLine}.`);
       seen.set(key, line);
-      rows.push({ line, displayName: display, externalRef: ref, eligible });
+      rows.push({ line, displayName: display, externalRef: ref, membershipVerified: true });
     } catch (e) {
       issues.push({ line, message: e instanceof LeagueError ? e.message : "Invalid row." });
     }

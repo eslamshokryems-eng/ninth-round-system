@@ -25,7 +25,7 @@ select race_test.eq(race_league_public_challenge_results('season-two', 2), '{"av
 select race_test.ok((race_league_public_season('SEASON-ONE') ->> 'available')::boolean, 'public: a published season is available (slug is case-insensitive)');
 select race_test.eq(jsonb_array_length(race_league_public_season('season-one') -> 'standings'), 6, 'public: standings list every participant');
 select race_test.eq((select array_agg(k order by k) from jsonb_object_keys(race_league_public_season('season-one') -> 'standings' -> 0) k),
-                    array['challengesCompleted', 'displayName', 'gapToNext', 'movement', 'publicId', 'rank', 'totalPoints', 'weeklyPoints'], 'public: a standing row carries exactly the allow-listed fields');
+                    array['challengesCompleted', 'displayName', 'gapToNext', 'movement', 'publicId', 'rank', 'tied', 'totalPoints', 'weeklyPoints'], 'public: a standing row carries exactly the allow-listed fields');
 select race_test.eq((select array_agg(k order by k) from jsonb_object_keys(race_league_public_season('season-one') -> 'season') k),
                     array['currentWeek', 'endsOn', 'name', 'slug', 'startsOn', 'status', 'throughWeek', 'totalWeeks'], 'public: the season block carries exactly the allow-listed fields');
 select race_test.eq((select array_agg(k order by k) from jsonb_object_keys(race_league_public_season('season-one') -> 'challenges' -> 0) k),

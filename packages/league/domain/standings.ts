@@ -6,6 +6,8 @@ export interface StandingRow {
   readonly displayName: string;
   /** Competition rank on total points: equal totals share a rank (1, 2, 2, 4). PROVISIONAL tie handling. */
   readonly rank: number;
+  /** true when at least one other participant has exactly the same total. No final tie-break is defined: a tie is shown as a tie, also after week 8. */
+  readonly tied: boolean;
   readonly totalCents: number;
   /** Points per week number (only weeks with a ledger line). */
   readonly weeklyCents: Readonly<Record<number, number>>;
@@ -91,6 +93,7 @@ export function buildStandings(participants: readonly Participant[], ledger: rea
       publicId: a.p.publicId,
       displayName: a.p.displayName,
       rank,
+      tied: sorted.some((o) => o.p.id !== a.p.id && o.total === a.total),
       totalCents: a.total,
       weeklyCents: Object.fromEntries([...a.weekly.entries()].sort((x, y) => x[0] - y[0])),
       challengesCompleted: a.completed.size,

@@ -21,11 +21,11 @@ fi
 hits=$(grep -rIl --exclude-dir=node_modules --exclude-dir=.next --exclude='*.tsbuildinfo' -E "@9thround/race|race_events|race_profiles|race_audit_log|THE NINTH" "${GYM_PATHS[@]}" 2>/dev/null | grep -v "^apps/web/.next" || true)
 [ -z "$hits" ] && pass "no gym file mentions the race system" || { echo "$hits"; fail "gym files mention the race system"; }
 
-RACE_PATHS=(supabase-race apps/race packages/race)
+RACE_PATHS=(supabase-race apps/race packages/race packages/league)
 hits=$(grep -rIn --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=harness --exclude='*.tsbuildinfo' --exclude=README.md --exclude=check-isolation.sh -E "admin_audit_log|(^|[^_a-z])log_audit_event|is_branch_staff|public\.profiles|references profiles|from profiles|branches \(|@9thround/(database-types|supabase-client|identity|reception|sales|hr|audit|billing|training|nutrition|tracking|notifications|ui|i18n)" "${RACE_PATHS[@]}" 2>/dev/null || true)
 [ -z "$hits" ] && pass "no race source file references a gym object or a gym package" || { echo "$hits"; fail "race sources reference gym objects/packages"; }
 
-deps=$(node -e 'for (const p of ["apps/race","packages/race"]) { const j=require("./"+p+"/package.json"); for (const d of Object.keys({...j.dependencies,...j.devDependencies})) if (/^@9thround\//.test(d) && !["@9thround/race","@9thround/config","@9thround/race-web"].includes(d)) console.log(p+" -> "+d); }')
+deps=$(node -e 'for (const p of ["apps/race","packages/race","packages/league"]) { const j=require("./"+p+"/package.json"); for (const d of Object.keys({...j.dependencies,...j.devDependencies})) if (/^@9thround\//.test(d) && !["@9thround/race","@9thround/league","@9thround/config","@9thround/race-web"].includes(d)) console.log(p+" -> "+d); }')
 [ -z "$deps" ] && pass "THE NINTH depends on no other workspace package than its own (and the shared tsconfig)" || { echo "$deps"; fail "unexpected workspace dependency"; }
 
 grep -rIn --exclude-dir=node_modules --exclude-dir=.next -E "SUPABASE_URL|SUPABASE_ANON_KEY|SERVICE_ROLE" apps/race/src apps/race/app packages/race 2>/dev/null | grep -vE "NEXT_PUBLIC_SUPABASE_(URL|ANON_KEY)|env\.ts|composition-root|race-client|\.md" | grep -q . && fail "unexpected Supabase credential usage" || pass "the only credentials THE NINTH reads are its own NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY"

@@ -179,18 +179,19 @@ await stepA("admin (as the administrator): records an attempt, cannot approve th
 });
 await stepA("admin: the points rules are marked PROVISIONAL, need a reason, and refuse a worse rank earning more", async () => {
   await a.getByRole("tab", { name: "Points rules" }).click();
-  assert.match(await a.locator("[data-testid=tab-rules]").innerText(), /PROVISIONAL — NOT APPROVED/);
+  assert.match(await a.locator("[data-testid=tab-rules]").innerText(), /PROVISIONAL — OWNER-SUPPLIED, NOT FINAL/);
   assert.equal(await a.locator("[data-testid=save-rules]").isDisabled(), true);
   await a.locator("#rr").fill("pilot table"); await a.locator("#pt").fill("10, 20, 5");
   await a.locator("[data-testid=save-rules]").click(); await a.waitForSelector("text=fewer points");
   await a.locator("#pt").fill("30, 20, 12, 8, 5, 3, 2, 1");
   await a.locator("[data-testid=save-rules]").click(); await a.waitForSelector("[data-testid=ok]");
 });
-await stepA("admin: a CSV with a formula row and a duplicate is reported, the clean row is added", async () => {
+await stepA("admin: a CSV is validated: formula, duplicate, expired and unattested rows are refused, the clean verified row is added", async () => {
   await a.getByRole("tab", { name: "Participants" }).click();
-  await a.locator("#a-csv").fill("display_name,external_member_ref\nNew Person,M-900\n=cmd(),M-901\nDemo Athlete 01,DEMO-1\n");
+  await a.locator("#a-csv").fill("display_name,external_member_ref,membership_verified\nNew Person,M-900,yes\n=cmd(),M-901,yes\nDemo Athlete 01,DEMO-1,yes\nExpired Person,M-902,no\nUnattested Person,M-903,\n");
   await a.locator("[data-testid=import]").click(); await a.waitForSelector("[data-testid=import-report]");
-  assert.match(await a.locator("[data-testid=import-report]").innerText(), /1 added, 2 issue/);
+  assert.match(await a.locator("[data-testid=import-report]").innerText(), /1 added, 4 issue/);
+  assert.match(await a.locator("[data-testid=import-report]").innerText(), /not verified/);
 });
 await stepA("admin: a challenge is saved, a bad one is refused, publishing needs a reason", async () => {
   await a.getByRole("tab", { name: "Challenges" }).click(); await a.locator("[data-testid=week-5]").click();
@@ -202,10 +203,57 @@ await stepA("admin: a challenge is saved, a bad one is refused, publishing needs
   assert.equal(await a.locator("[data-testid=toggle-publish]").isDisabled(), true);
   await a.screenshot({ path: `${shots}/32-admin-overview.png` });
 });
+await stepA("admin: registering an athlete needs the membership confirmation; an eligibility restriction needs a documented decision and is listed", async () => {
+  await a.getByRole("tab", { name: "Participants" }).click();
+  await a.locator("#a-name").fill("Walk In W.");
+  const reg = a.getByRole("button", { name: "Register", exact: true });
+  assert.equal(await reg.isDisabled(), true, "no confirmation, no registration");
+  await a.locator("[data-testid=membership-verified]").check(); await reg.click(); await a.waitForSelector("[data-testid=ok]");
+  assert.match(await a.locator("[data-testid=tab-participants]").innerText(), /Walk In W\./);
+  const first = a.locator("[data-testid=eligibility]").first();
+  assert.equal(await first.isDisabled(), true, "a restriction needs a reason");
+  await a.locator("#p-reason").fill("documented disciplinary decision DC-1"); await a.locator("#p-cat").selectOption("FRAUD");
+  await first.click(); await a.waitForSelector("[data-testid=eligibility-decisions]");
+  assert.match(await a.locator("[data-testid=eligibility-decisions]").innerText(), /FRAUD → not eligible/);
+});
+await stepA("admin: a judge asks for a correction, an administrator applies it; previous and new value are kept; no score moves from an appeal", async () => {
+  await a.goto(`${DEV}/race/league/admin`); await a.locator("[data-testid=as-judge]").click(); await a.waitForSelector("[data-testid=season-list] a");
+  await a.locator("[data-testid=season-list] a").first().click(); await a.waitForSelector("[data-testid=season-admin]");
+  await a.getByRole("tab", { name: "Attempts" }).click();
+  assert.equal(await a.locator("[data-testid=correct]").count(), 0, "a judge has no Correct button");
+  await a.locator("#r-reason").fill("tally sheet shows another number");
+  const row = a.locator("[data-testid=attempt-row]").filter({ hasText: "approved" }).first();
+  await row.locator("input[aria-label='Corrected value']").fill("77"); await row.locator("[data-testid=request-correction]").click(); await a.waitForSelector("[data-testid=ok]");
+  assert.match(await a.locator("[data-testid=correction-requests]").innerText(), /WAITING FOR AN ADMINISTRATOR/);
+  // as the administrator (a fresh page load rebuilds the fixtures): request, apply, check the record
+  await a.goto(`${DEV}/race/league/admin`); await a.locator("[data-testid=as-admin]").click(); await a.waitForSelector("[data-testid=season-list] a");
+  await a.locator("[data-testid=season-list] a").first().click(); await a.waitForSelector("[data-testid=season-admin]");
+  await a.getByRole("tab", { name: "Attempts" }).click();
+  await a.locator("#r-reason").fill("tally sheet confirms the new value");
+  const row2 = a.locator("[data-testid=attempt-row]").filter({ hasText: "approved" }).first();
+  await row2.locator("input[aria-label='Corrected value']").fill("77"); await row2.locator("[data-testid=request-correction]").click(); await a.waitForSelector("[data-testid=correction-request]");
+  await a.locator("[data-testid=apply-request]").click(); await a.waitForSelector("[data-testid=corrections]");
+  assert.match(await a.locator("[data-testid=corrections]").innerText(), /→ 77/);
+});
+await stepA("admin: an appeal is lodged inside the window, decided with a reason, and changes no score", async () => {
+  await a.getByRole("tab", { name: "Standings" }).click();
+  const before = await a.locator("[data-testid=tab-standings]").innerText();
+  await a.getByRole("tab", { name: "Appeals" }).click();
+  assert.match(await a.locator("[data-testid=appeal-window]").innerText(), /Open until/);
+  await a.locator("#ap-p").selectOption({ label: "Demo Athlete 05" }); await a.locator("#ap-text").fill("I counted more repetitions than were recorded");
+  await a.locator("[data-testid=lodge-appeal]").click(); await a.waitForSelector("[data-testid=appeal]");
+  assert.equal(await a.locator("[data-testid=uphold]").isDisabled(), true, "a decision needs a reason");
+  await a.locator("#ap-reason").fill("video supports a recount"); await a.locator("[data-testid=uphold]").click();
+  await a.waitForSelector("text=UPHELD");
+  assert.match(await a.locator("[data-testid=appeal]").innerText(), /Scores unchanged unless an administrator applied a separate correction/);
+  await a.getByRole("tab", { name: "Standings" }).click();
+  assert.equal(await a.locator("[data-testid=tab-standings]").innerText(), before, "deciding an appeal never moves a score");
+  await a.screenshot({ path: `${shots}/33-admin-appeals.png` });
+});
 await stepA("admin: the audit trail records what was done", async () => {
   await a.getByRole("tab", { name: "Audit" }).click(); await a.waitForSelector("[data-testid=tab-audit]");
   const t = await a.locator("[data-testid=tab-audit]").innerText();
-  assert.match(t, /league\.attempt\.record/); assert.match(t, /league\.rules\.update/);
+  assert.match(t, /league\.appeal\.lodge/); assert.match(t, /league\.appeal\.upheld/); assert.match(t, /league\.correction\.apply/); assert.match(t, /previousValue":\d+,"newValue":77/);
 });
 
 // ---------------------------------------------------------------- B) production build: fixtures are unreachable

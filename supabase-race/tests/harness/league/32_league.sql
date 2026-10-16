@@ -17,7 +17,7 @@ grant execute on function race_test.q(text) to public;
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 -- structure + lock-down
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
-select race_test.eq((select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relname like 'race\_league\_%')::int, 6, 'structure: 6 league tables');
+select race_test.eq((select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relname like 'race\_league\_%')::int, 10, 'structure: 10 league tables');
 select race_test.ok(not exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relname like 'race\_league\_%' and not c.relrowsecurity), 'lock-down: RLS is enabled on every league table');
 select race_test.ok(not exists (select 1 from information_schema.table_privileges where table_schema = 'public' and table_name like 'race\_league\_%' and grantee in ('anon', 'authenticated', 'PUBLIC')), 'lock-down: no client role holds any privilege on a league table');
 select race_test.ok(not exists (select 1 from pg_policies where schemaname = 'public' and tablename like 'race\_league\_%'), 'lock-down: no RLS policy exists on a league table (everything goes through the checked functions)');
@@ -27,9 +27,9 @@ select race_test.ok(not exists (select 1 from pg_proc p where p.pronamespace = '
    'lock-down: every SECURITY DEFINER league function pins search_path');
 select race_test.eq((select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'race\_league\_%' and has_function_privilege('anon', p.oid, 'execute'))::int, 3,
    'lock-down: anon can execute exactly the three public read functions');
-select race_test.ok(not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'race\_league\_%' and p.proname !~ '^race_league_(public_|create_season|set_|update_rules|upsert_|add_|import_|record_|review_|correct_|recompute|my_seasons|admin_overview|audit$)'
+select race_test.ok(not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'race\_league\_%' and p.proname !~ '^race_league_(public_|create_season|set_|update_rules|upsert_|add_|import_|record_|review_|correct_|request_|decide_|lodge_|recompute|my_seasons|admin_overview|audit$)'
    and has_function_privilege('authenticated', p.oid, 'execute')), 'lock-down: no internal helper is executable by a client role');
-select race_test.ok(not exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relname like 'race\_league\_%' and c.relkind = 'r' and c.relname !~ '^race_league_(seasons|challenges|participants|attempts|points_ledger|staff)$'), 'isolation: only the six expected league tables exist');
+select race_test.ok(not exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relname like 'race\_league\_%' and c.relkind = 'r' and c.relname !~ '^race_league_(seasons|challenges|participants|attempts|points_ledger|staff|eligibility_decisions|correction_requests|corrections|appeals)$'), 'isolation: only the ten expected league tables exist');
 
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 -- season lifecycle + authorization
@@ -72,11 +72,12 @@ select race_test.throws($$select race_league_upsert_challenge(race_test.id('s1')
 select race_test.throws($$select race_league_upsert_challenge(race_test.id('s1'), 1, '{"name":"Hack","metric_kind":"REPS","unit":"reps","status":"closed"}')$$, 'unknown field', 'mass assignment of status is refused');
 select race_test.throws($$select race_league_upsert_challenge(race_test.id('s1'), 1, '{"name":"Hack","metric_kind":"REPS","unit":"reps","season_id":"00000000-0000-0000-0000-000000000000"}')$$, 'unknown field', 'mass assignment of season_id is refused');
 select race_test.throws($$select race_league_upsert_challenge(race_test.id('s1'), 1, '{"name":"Bad unit","metric_kind":"REPS","unit":"kg"}')$$, 'race_league_challenges_metric', 'a unit that does not match the challenge type is refused');
-select race_test.throws($$select race_league_upsert_challenge(race_test.id('s1'), 1, '{"name":"Bad dir","metric_kind":"TIME","unit":"s","direction":"HIGHER_WINS"}')$$, 'race_league_challenges_metric', 'a time challenge cannot rank the slower time first');
+select race_test.throws($$select race_league_upsert_challenge(race_test.id('s1'), 1, '{"name":"Bad dir","metric_kind":"TIME","unit":"s","direction":"SIDEWAYS"}')$$, 'direction', 'an unknown ranking direction is refused');
 select race_test.throws($$select race_league_upsert_challenge(race_test.id('s1'), 1, '{"name":"Bad link","metric_kind":"REPS","unit":"reps","reference_url":"javascript:alert(1)"}')$$, 'reference_url', 'a non-https reference link is refused');
 select race_test.put('c1', race_league_upsert_challenge(race_test.id('s1'), 1, '{"name":"Max push-ups","metric_kind":"REPS","unit":"reps","max_attempts":2,"counting":"BEST","requires_verification":true,"instructions":"Chest to the floor."}'));
 select race_test.put('c2', race_league_upsert_challenge(race_test.id('s1'), 2, '{"name":"Plank","metric_kind":"TIME","unit":"s","max_attempts":1,"requires_verification":false}'));
 select race_test.eq(race_test.q('select direction from race_league_challenges where id = ''' || race_test.id('c2') || ''''), 'LOWER_WINS', 'a time challenge defaults to the lower time winning');
+select race_test.eq(race_test.q('select max_attempts from race_league_challenges where id = ''' || race_test.id('c2') || ''''), '1', 'an explicit attempt limit is kept');
 select race_test.eq(race_test.q('select count(*) from race_league_challenges where season_id = ''' || race_test.id('s1') || '''')::int, 2, 'two challenges exist');
 select race_league_upsert_challenge(race_test.id('s1'), 1, '{"instructions":"Chest to the floor, full lockout."}');
 select race_test.eq(race_test.q('select count(*) from race_league_challenges where season_id = ''' || race_test.id('s1') || '''')::int, 2, 'an update does not create a second week-1 challenge');
@@ -86,10 +87,10 @@ select race_test.throws($$select race_league_set_challenge_status(race_test.id('
 select race_league_set_season_status(race_test.id('s1'), 'active');
 
 -- participants
-select race_test.eq((select count(*) from jsonb_array_elements(race_league_import_participants(race_test.id('s1'), '[{"display_name":"Ahmed K.","external_ref":"M-1"},{"display_name":"Bassem R.","external_ref":"M-2"},{"display_name":"Chris T.","external_ref":"M-3"},{"display_name":"Dina S.","external_ref":"M-4"},{"display_name":"Eman F.","external_ref":"M-5"}]') -> 'issues'))::int, 0, 'import: five clean rows');
+select race_test.eq((select count(*) from jsonb_array_elements(race_league_import_participants(race_test.id('s1'), '[{"display_name":"Ahmed K.","external_ref":"M-1","membership_verified":true},{"display_name":"Bassem R.","external_ref":"M-2","membership_verified":true},{"display_name":"Chris T.","external_ref":"M-3","membership_verified":true},{"display_name":"Dina S.","external_ref":"M-4","membership_verified":true},{"display_name":"Eman F.","external_ref":"M-5","membership_verified":true}]') -> 'issues'))::int, 0, 'import: five clean rows');
 select race_test.eq(race_test.q('select count(*) from race_league_participants where season_id = ''' || race_test.id('s1') || '''')::int, 5, 'import: five participants');
-select race_test.eq((race_league_import_participants(race_test.id('s1'), '[{"display_name":"Ahmed K.","external_ref":"M-1"},{"display_name":"=cmd()","external_ref":null},{"display_name":"Zed","external_ref":"bad ref!"},{"display_name":"Fresh F."}]') ->> 'added')::int, 1, 'import: only the valid new row is added');
-select race_test.eq((select jsonb_array_length(race_league_import_participants(race_test.id('s1'), '[{"display_name":"Ahmed K.","external_ref":"M-1"}]') -> 'issues')), 1, 'import: a duplicate is reported, never merged');
+select race_test.eq((race_league_import_participants(race_test.id('s1'), '[{"display_name":"Ahmed K.","external_ref":"M-1","membership_verified":true},{"display_name":"=cmd()","external_ref":null,"membership_verified":true},{"display_name":"Zed","external_ref":"bad ref!","membership_verified":true},{"display_name":"Expired E.","external_ref":"M-9","membership_verified":false},{"display_name":"Unattested U.","external_ref":"M-8"},{"display_name":"Fresh F.","membership_verified":true}]') ->> 'added')::int, 1, 'import: only the valid, membership-verified new row is added (an expired or unattested membership is refused)');
+select race_test.eq((select jsonb_array_length(race_league_import_participants(race_test.id('s1'), '[{"display_name":"Ahmed K.","external_ref":"M-1","membership_verified":true}]') -> 'issues')), 1, 'import: a duplicate is reported, never merged');
 select race_test.throws($$select race_league_add_participant(race_test.id('s1'), 'Ahmed K.', 'M-1', true)$$, 'LEAGUE_DUPLICATE', 'adding a duplicate participant is refused');
 select race_test.throws($$select race_league_add_participant(race_test.id('s1'), '+evil', null, true)$$, 'LEAGUE_INVALID', 'a formula-looking display name is refused');
 reset role;
@@ -176,15 +177,15 @@ select race_test.eq((select count(*) from race_league_points_ledger where season
 select race_test.login('lg_admin');
 select race_league_set_challenge_status(race_test.id('c1'), 'closed');
 reset role;
--- week 1 (higher reps wins): A=30 (a2 rejected), B=42, C=42 tie, D=12, E=20 → B,C rank 1 (2500), A rank 3 (1600), E rank 4 (1300), D rank 5 (1100)
+-- week 1 (higher reps wins): A=30 (a2 rejected), B=42, C=42 tie, D=12, E=20 → B,C rank 1 (100), A rank 3 (80), E rank 4 (75), D rank 5 (70)
 create function race_test.lp(p_challenge text, p_participant text) returns text language sql stable as $$
   select coalesce(sum(points_cents), 0) || ':' || coalesce((select rank::text from race_league_points_ledger z where z.challenge_id = race_test.id(p_challenge) and z.participant_id = race_test.id(p_participant) order by seq desc limit 1), '-')
     from race_league_points_ledger l where l.challenge_id = race_test.id(p_challenge) and l.participant_id = race_test.id(p_participant) $$;
-select race_test.eq(race_test.lp('c1', 'pB'), '2500:1', 'week 1: Bassem (42) shares rank 1');
-select race_test.eq(race_test.lp('c1', 'pC'), '2500:1', 'week 1: Chris (42) shares rank 1 — equal results share the points of the shared rank');
-select race_test.eq(race_test.lp('c1', 'pA'), '1600:3', 'week 1: Ahmed (30; his second attempt was rejected) is rank 3 — the next rank after the tie is skipped');
-select race_test.eq(race_test.lp('c1', 'pE'), '1300:4', 'week 1: Eman (20; the later attempt was rejected) is rank 4');
-select race_test.eq(race_test.lp('c1', 'pD'), '1100:5', 'week 1: Dina (12) is rank 5');
+select race_test.eq(race_test.lp('c1', 'pB'), '10000:1', 'week 1: Bassem (42) shares rank 1 and the 100 points');
+select race_test.eq(race_test.lp('c1', 'pC'), '10000:1', 'week 1: Chris (42) shares rank 1 — equal results share the points of the shared rank');
+select race_test.eq(race_test.lp('c1', 'pA'), '8000:3', 'week 1: Ahmed (30; his second attempt was rejected) is rank 3 — the next rank after the tie is skipped');
+select race_test.eq(race_test.lp('c1', 'pE'), '7500:4', 'week 1: Eman (20; the later attempt was rejected) is rank 4');
+select race_test.eq(race_test.lp('c1', 'pD'), '7000:5', 'week 1: Dina (12) is rank 5');
 select race_test.eq((select count(*) from race_league_points_ledger where challenge_id = race_test.id('c1'))::int, 5, 'week 1: five ledger lines');
 select race_test.login('lg_admin');
 select race_test.eq(race_league_recompute(race_test.id('c1')), 0, 'recomputing a closed challenge twice adds nothing (points are never awarded twice)');
@@ -192,15 +193,15 @@ select race_test.throws($$select race_league_set_challenge_status(race_test.id('
 select race_test.throws($$select race_league_record_attempt(race_test.id('c1'), race_test.id('pD'), 99, null, gen_random_uuid())$$, 'LEAGUE_CHALLENGE_NOT_OPEN', 'no attempts after a challenge closed');
 select race_league_set_challenge_status(race_test.id('c2'), 'closed');
 reset role;
--- week 2 (lower time wins): B=55.5, A=61, C=70, D,E absent (ZERO): B 2500, A 2000, C 1600
-select race_test.eq((select sum(points_cents)::int from race_league_points_ledger where challenge_id = race_test.id('c2') and participant_id = race_test.id('pB')), 2500, 'week 2: the lowest time wins');
+-- week 2 (lower time wins): B=55.5, A=61, C=70, D,E absent (ZERO): B 100, A 90, C 80
+select race_test.eq((select sum(points_cents)::int from race_league_points_ledger where challenge_id = race_test.id('c2') and participant_id = race_test.id('pB')), 10000, 'week 2: the lowest time wins (100 points)');
 select race_test.eq((select count(*) from race_league_points_ledger where challenge_id = race_test.id('c2'))::int, 3, 'week 2: absent participants get no line under the ZERO policy');
 
 -- standings
 select race_test.login('lg_judge');
-select race_test.eq((select r ->> 'displayName' from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'standings') r limit 1), 'Bassem R.', 'standings: Bassem leads (25 + 25 = 50)');
-select race_test.eq((select (r ->> 'totalPoints')::numeric from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'standings') r where r ->> 'displayName' = 'Chris T.'), 41.00, 'standings: Chris has 25 + 16 = 41');
-select race_test.eq((select (r ->> 'rank')::int from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'standings') r where r ->> 'displayName' = 'Ahmed K.'), 3, 'standings: Ahmed is third with 16 + 20 = 36');
+select race_test.eq((select r ->> 'displayName' from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'standings') r limit 1), 'Bassem R.', 'standings: Bassem leads (100 + 100 = 200)');
+select race_test.eq((select (r ->> 'totalPoints')::numeric from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'standings') r where r ->> 'displayName' = 'Chris T.'), 180.00, 'standings: Chris has 100 + 80 = 180');
+select race_test.eq((select (r ->> 'rank')::int from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'standings') r where r ->> 'displayName' = 'Ahmed K.'), 3, 'standings: Ahmed is third with 80 + 90 = 170');
 select race_test.ok((select r ->> 'externalRef' is null from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'participants') r limit 1), 'a judge does not receive the external member references');
 select race_test.login('lg_admin');
 select race_test.ok((select bool_and(r ->> 'externalRef' is not null) from jsonb_array_elements(race_league_admin_overview(race_test.id('s1')) -> 'participants') r where r ->> 'displayName' <> 'Fresh F.'), 'the administrator sees the external member references');
@@ -215,8 +216,8 @@ select race_test.throws($$select race_league_correct_attempt(race_test.id('a5'),
 select race_test.throws($$select race_league_correct_attempt(race_test.id('a2'), 50, 'x')$$, 'pending or approved', 'a rejected attempt cannot be corrected');
 select race_league_correct_attempt(race_test.id('a5'), 50, 'judge typed 12 instead of 50');     -- D was 12 (rank 5) → 50 (rank 1)
 reset role;
-select race_test.eq((select sum(points_cents)::int from race_league_points_ledger where challenge_id = race_test.id('c1') and participant_id = race_test.id('pD')), 2500, 'correction: Dina now holds rank 1 points for week 1');
-select race_test.eq((select sum(points_cents)::int from race_league_points_ledger where challenge_id = race_test.id('c1') and participant_id = race_test.id('pB')), 2000, 'correction: the others moved down one place (Bassem 2500 -> 2000)');
+select race_test.eq((select sum(points_cents)::int from race_league_points_ledger where challenge_id = race_test.id('c1') and participant_id = race_test.id('pD')), 10000, 'correction: Dina now holds rank 1 points for week 1');
+select race_test.eq((select sum(points_cents)::int from race_league_points_ledger where challenge_id = race_test.id('c1') and participant_id = race_test.id('pB')), 9000, 'correction: the others moved down one place (Bassem 100 -> 90)');
 select race_test.eq((select count(*) from race_league_points_ledger where challenge_id = race_test.id('c1'))::int > 5, true, 'correction: appended lines only, nothing rewritten');
 select race_test.eq((select status from race_league_attempts where id = race_test.id('a5')), 'void', 'correction: the old attempt is void');
 select race_test.ok(exists (select 1 from race_league_attempts where corrected_from = race_test.id('a5') and value = 50 and status = 'approved'), 'correction: a replacement attempt links back to the original');
@@ -240,12 +241,15 @@ select race_test.login('lg_admin');
 select race_test.eq(race_league_update_rules(race_test.id('s1'), '{"points":{"by_rank":[10,8,6,4,2],"beyond":1,"participation":1,"absent":0},"tie_policy":"SPLIT","absence_policy":"ZERO","eligibility":"AT_REGISTRATION"}', 'same again'), 0, 'applying the same rules again changes nothing');
 
 -- participants: deactivation keeps history; ineligibility reverses points
-select race_league_set_participant(race_test.id('pC'), null, false, null, 'left the gym');
+select race_league_set_participant(race_test.id('pC'), null, false, 'left the gym');
 reset role;
 select race_test.ok((select sum(points_cents) from race_league_points_ledger where participant_id = race_test.id('pC')) > 0, 'an inactive participant keeps the points already earned');
 select race_test.login('lg_admin');
 select race_test.throws($$select race_league_record_attempt(race_test.id('c1'), race_test.id('pC'), 1, null, gen_random_uuid())$$, 'LEAGUE_CHALLENGE_NOT_OPEN|LEAGUE_NOT_ELIGIBLE', 'no new attempts for an inactive participant');
-select race_league_set_participant(race_test.id('pC'), null, null, false, 'membership cancelled — not eligible');
+select race_test.throws($$select race_league_set_eligibility(race_test.id('pC'), false, 'DISCIPLINARY', '')$$, 'LEAGUE_REASON_REQUIRED', 'a restriction needs a documented reason');
+select race_test.throws($$select race_league_set_eligibility(race_test.id('pC'), false, 'REINSTATEMENT', 'wrong type')$$, 'LEAGUE_INVALID', 'a restriction cannot be recorded as a reinstatement');
+select race_test.throws($$select race_league_set_eligibility(race_test.id('pC'), false, 'EXPIRED_MEMBERSHIP', 'membership ended')$$, 'unknown decision type', 'a lapsed membership is not a valid ground');
+select race_league_set_eligibility(race_test.id('pC'), false, 'DISCIPLINARY', 'documented disciplinary decision DC-12');
 reset role;
 select race_test.eq((select coalesce(sum(points_cents), 0)::int from race_league_points_ledger where participant_id = race_test.id('pC')), 0, 'an ineligible participant loses the points (append-only reversal)');
 

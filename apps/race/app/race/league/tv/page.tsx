@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { PublicChallengeResults, PublicLeague } from "@9thround/league";
 import { useLeagueSource, usePublicLeague, useSeasonSlug } from "../../../../src/features/league/hooks";
-import { Movement, fmtPoints } from "../../../../src/components/league/league-ui";
+import { Movement, fmtPoints, fmtRank } from "../../../../src/components/league/league-ui";
 import { QrCodeImage } from "../../../../src/components/qr-code";
 
 type Mode = "standings" | "week" | "podium" | "progress";
@@ -109,7 +109,7 @@ function Standings({ league, reduced }: { league: PublicLeague; reduced: boolean
       <div className={`lg-tv-list${reduced ? "" : " lg-fade"}`} style={{ ["--rows" as string]: Math.max(6, top.length) }} data-testid="tv-standings">
         {top.map((r) => (
           <div className="lg-tv-row" key={r.publicId} data-top={r.rank <= 3 ? "1" : "0"} data-testid="tv-row">
-            <div className="lg-tv-rank">{r.rank}</div>
+            <div className="lg-tv-rank" data-tied={r.tied ? "1" : "0"}>{fmtRank(r.rank, r.tied)}</div>
             <div className="lg-tv-name">{r.displayName}</div>
             <div className="lg-tv-move"><Movement value={r.movement} /></div>
             <div className="lg-tv-pts">{fmtPoints(r.totalPoints)}</div>
@@ -157,7 +157,7 @@ function Podium({ league, reduced }: { league: PublicLeague; reduced: boolean })
       <div className={`lg-tv-podium${reduced ? "" : " lg-fade"}`} data-testid="tv-podium">
         {order.map((r, k) => r ? (
           <div className="lg-tv-pod" key={r.publicId} data-place={[2, 1, 3][k]}>
-            <div className="place">{r.rank}</div>
+            <div className="place">{fmtRank(r.rank, r.tied)}</div>
             <div className="who">{r.displayName}</div>
             <div className="pts">{fmtPoints(r.totalPoints)}</div>
             <div style={{ color: "var(--race-muted)", fontSize: "2.2vh" }}>POINTS</div>

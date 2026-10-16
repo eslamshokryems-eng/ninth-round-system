@@ -5,11 +5,18 @@ import { toPublicLeague, type PublicLeague } from "../domain/public";
 import { reconcileChallenge, scoreChallenge, selectCountedAttempt } from "../domain/scoring";
 import { buildStandings, centsToPoints } from "../domain/standings";
 import {
+  DEFAULT_ATTEMPT_POLICY,
+  ELIGIBILITY_DECISION_CATEGORIES,
   PROVISIONAL_SEASON_RULES,
   type Actor,
+  type Appeal,
   type Attempt,
   type Challenge,
   type ChallengeStatus,
+  type CorrectionRecord,
+  type CorrectionRequest,
+  type EligibilityDecision,
+  type EligibilityDecisionCategory,
   type LedgerEntry,
   type LeagueRole,
   type Metric,
@@ -19,7 +26,10 @@ import {
   type SeasonStatus,
 } from "../domain/types";
 import {
+  appealDeadline,
   requireChallengeTransition,
+  requireReason,
+  resultPublishedAt,
   requireSeasonTransition,
   validateChallenge,
   validateDisplayName,
@@ -36,6 +46,10 @@ interface State {
   ledger: LedgerEntry[]; // append-only
   audit: (AuditLine & { seasonId: string })[];
   staff: { seasonId: string; profileId: string; role: LeagueRole }[];
+  correctionRequests: CorrectionRequest[];
+  corrections: CorrectionRecord[]; // append-only
+  appeals: Appeal[];
+  eligibilityDecisions: EligibilityDecision[]; // append-only
 }
 
 function fail(code: ConstructorParameters<typeof LeagueError>[0], message: string): never {
@@ -58,7 +72,7 @@ function seeded(seed: number): () => number {
  * in a fast unit test. (The SQL equivalents are proven in the harness, including a shared scoring-parity file.)
  */
 export class InMemoryLeague implements LeagueGateway {
-  readonly state: State = { seasons: [], challenges: [], participants: [], attempts: [], ledger: [], audit: [], staff: [] };
+  readonly state: State = { seasons: [], challenges: [], participants: [], attempts: [], ledger: [], audit: [], staff: [], correctionRequests: [], corrections: [], appeals: [], eligibilityDecisions: [] };
   private actorValue: Actor | null;
 
   private readonly rand: () => number;
@@ -189,7 +203,7 @@ export class InMemoryLeague implements LeagueGateway {
     const admin = this.has(seasonId, ["LEAGUE_ADMIN"]);
     const st = this.standings(seasonId);
     const standings: AdminStanding[] = st.rows.map((r) => ({
-      id: r.participantId, publicId: r.publicId, displayName: r.displayName, rank: r.rank, totalPoints: centsToPoints(r.totalCents),
+      id: r.participantId, publicId: r.publicId, displayName: r.displayName, rank: r.rank, tied: r.tied, totalPoints: centsToPoints(r.totalCents),
       weeklyPoints: Object.fromEntries(Object.entries(r.weeklyCents).map(([w, c]) => [Number(w), centsToPoints(c)])), challengesCompleted: r.challengesCompleted, firstPlaces: r.firstPlaces,
       movement: r.movement, gapToNext: r.gapToNextCents === null ? null : centsToPoints(r.gapToNextCents),
     }));
@@ -200,8 +214,12 @@ export class InMemoryLeague implements LeagueGateway {
     return {
       season: se, isAdmin: admin,
       challenges: this.state.challenges.filter((c) => c.seasonId === seasonId).sort((a, b) => a.weekNumber - b.weekNumber),
-      participants: this.state.participants.filter((p) => p.seasonId === seasonId).map((p) => ({ id: p.id, publicId: p.publicId, displayName: p.displayName, active: p.active, eligible: p.eligible, externalRef: admin ? p.externalRef : null })),
+      participants: this.state.participants.filter((p) => p.seasonId === seasonId).map((p) => ({ id: p.id, publicId: p.publicId, displayName: p.displayName, active: p.active, eligible: p.eligible, externalRef: admin ? p.externalRef : null, membershipVerifiedOn: p.membershipVerifiedOn })),
       attempts, standings,
+      correctionRequests: this.state.correctionRequests.filter((r) => r.seasonId === seasonId),
+      corrections: admin ? this.state.corrections.filter((c) => c.seasonId === seasonId) : [],
+      appeals: admin ? this.state.appeals.filter((x) => x.seasonId === seasonId) : [],
+      eligibilityDecisions: admin ? this.state.eligibilityDecisions.filter((d) => d.seasonId === seasonId) : [],
       staff: admin ? this.state.staff.filter((f) => f.seasonId === seasonId).map((f) => ({ profileId: f.profileId, role: f.role, active: true })) : null,
     };
   }
@@ -221,7 +239,7 @@ export class InMemoryLeague implements LeagueGateway {
     if (this.state.seasons.some((s) => s.publicSlug === slug)) fail("LEAGUE_DUPLICATE", "That season address is already used.");
     const name = i.name.trim();
     if (name.length < 2 || name.length > 80) fail("LEAGUE_INVALID", "A season name is 2–80 characters.");
-    const s: Season = { id: this.uid("season"), publicSlug: slug, name, status: "draft", startsOn: i.startsOn, endsOn: i.endsOn, rules, published: false };
+    const s: Season = { id: this.uid("season"), publicSlug: slug, name, status: "draft", startsOn: i.startsOn, endsOn: i.endsOn, rules, published: false, firstPublishedAt: null };
     this.state.seasons.push(s);
     this.state.staff.push({ seasonId: s.id, profileId: a.id, role: "LEAGUE_ADMIN" });
     this.log(s.id, "league.season.create", { slug });
@@ -234,6 +252,8 @@ export class InMemoryLeague implements LeagueGateway {
     if (status === "completed") {
       if (this.state.challenges.some((c) => c.seasonId === seasonId && c.status === "open")) fail("LEAGUE_INVALID", "Close the open challenge first.");
       if (this.state.attempts.some((a) => a.seasonId === seasonId && a.status === "pending")) fail("LEAGUE_INVALID", "Some attempts are still waiting for review.");
+      if (this.state.appeals.some((x) => x.seasonId === seasonId && x.status === "submitted")) fail("LEAGUE_INVALID", "Some appeals have not been decided yet.");
+      if (this.state.correctionRequests.some((x) => x.seasonId === seasonId && x.status === "pending")) fail("LEAGUE_INVALID", "Some correction requests have not been decided yet.");
     }
     this.patch(this.state.seasons, seasonId, { status });
     this.log(seasonId, "league.season.status", { from: se.status, to: status, reason: reason ?? null });
@@ -243,7 +263,7 @@ export class InMemoryLeague implements LeagueGateway {
     if (reason.trim() === "") fail("LEAGUE_REASON_REQUIRED", "A reason is required.");
     const se = this.season(seasonId);
     if (published && se.status === "draft") fail("LEAGUE_INVALID", "Schedule the season before publishing it.");
-    this.patch(this.state.seasons, seasonId, { published });
+    this.patch(this.state.seasons, seasonId, { published, firstPublishedAt: published ? (se.firstPublishedAt ?? this.now().toISOString()) : se.firstPublishedAt });
     this.log(seasonId, "league.season.publish", { published, reason });
   }
   async updateRules(seasonId: string, rules: SeasonRules, reason: string): Promise<number> {
@@ -269,7 +289,8 @@ export class InMemoryLeague implements LeagueGateway {
       id: ex?.id ?? this.uid("challenge"), seasonId, weekNumber: week, status: ex?.status ?? "draft",
       name: (input.name ?? ex?.name ?? "").trim(), description: input.description ?? ex?.description ?? "", instructions: input.instructions ?? ex?.instructions ?? "", safetyNotes: input.safetyNotes ?? ex?.safetyNotes ?? "",
       metric: { kind, unit: input.unit ?? ex?.metric.unit ?? "reps", direction },
-      attemptPolicy: { maxAttempts: input.maxAttempts ?? ex?.attemptPolicy.maxAttempts ?? 1, counting: (input.counting ?? ex?.attemptPolicy.counting ?? "BEST") as Challenge["attemptPolicy"]["counting"] },
+      attemptPolicy: { maxAttempts: input.maxAttempts ?? ex?.attemptPolicy.maxAttempts ?? DEFAULT_ATTEMPT_POLICY.maxAttempts, counting: (input.counting ?? ex?.attemptPolicy.counting ?? DEFAULT_ATTEMPT_POLICY.counting) as Challenge["attemptPolicy"]["counting"] },
+      closedAt: ex?.closedAt ?? null,
       opensAt: input.opensAt !== undefined ? input.opensAt : (ex?.opensAt ?? null), closesAt: input.closesAt !== undefined ? input.closesAt : (ex?.closesAt ?? null),
       referenceUrl: input.referenceUrl !== undefined ? input.referenceUrl : (ex?.referenceUrl ?? null), requiresVerification: input.requiresVerification ?? ex?.requiresVerification ?? true,
     };
@@ -287,24 +308,25 @@ export class InMemoryLeague implements LeagueGateway {
     if ((status === "published" || status === "open") && se.status === "draft") fail("LEAGUE_INVALID", "Schedule the season first.");
     if (status === "open" && se.status !== "active") fail("LEAGUE_INVALID", "The season must be active to open a challenge.");
     if (status === "closed" && this.state.attempts.some((a) => a.challengeId === ch.id && a.status === "pending")) fail("LEAGUE_INVALID", "Some attempts are still waiting for review.");
-    this.patch(this.state.challenges, ch.id, { status });
+    this.patch(this.state.challenges, ch.id, { status, closedAt: status === "closed" ? this.now().toISOString() : ch.closedAt });
     const ledgerLines = status === "closed" ? this.applyScores(ch.id) : 0;
     this.log(ch.seasonId, "league.challenge.status", { week: ch.weekNumber, from: ch.status, to: status, ledgerLines });
     return { ledgerLines };
   }
 
   // ---- participants -------------------------------------------------------------------------------------------------------------------
-  async addParticipant(seasonId: string, displayName: string, externalRef: string | null, eligible: boolean): Promise<string> {
+  async addParticipant(seasonId: string, displayName: string, externalRef: string | null, membershipVerified: boolean): Promise<string> {
     this.requireAdmin(seasonId);
     this.lockCompleted(seasonId);
+    if (membershipVerified !== true) fail("LEAGUE_NOT_ELIGIBLE", "An active, verified gym membership is required to register for a season.");
     const name = validateDisplayName(displayName);
     const ref = externalRef && externalRef.trim() !== "" ? externalRef.trim() : null;
     if (ref !== null && !/^[A-Za-z0-9._:/#-]{1,60}$/.test(ref)) fail("LEAGUE_INVALID", "The member reference may only contain letters, numbers and . _ : / # -");
     const key = participantIdentityKey(name, ref);
     if (this.state.participants.some((p) => p.seasonId === seasonId && participantIdentityKey(p.displayName, p.externalRef) === key)) fail("LEAGUE_DUPLICATE", "Already a participant in this season.");
-    const p: Participant = { id: this.uid("participant"), seasonId, publicId: this.newPublicId(), displayName: name, externalRef: ref, active: true, eligible, joinedOn: this.now().toISOString().slice(0, 10) };
+    const p: Participant = { id: this.uid("participant"), seasonId, publicId: this.newPublicId(), displayName: name, externalRef: ref, active: true, eligible: true, joinedOn: this.now().toISOString().slice(0, 10), membershipVerifiedOn: this.now().toISOString().slice(0, 10) };
     this.state.participants.push(p);
-    this.log(seasonId, "league.participant.add", { eligible });
+    this.log(seasonId, "league.participant.add", { membershipVerified: true });
     return p.publicId;
   }
   async importParticipants(seasonId: string, csv: string) {
@@ -314,21 +336,35 @@ export class InMemoryLeague implements LeagueGateway {
     let added = 0;
     const issues: { row: number; message: string }[] = preview.issues.map((i) => ({ row: i.line, message: i.message }));
     for (const r of preview.rows) {
-      try { await this.addParticipant(seasonId, r.displayName, r.externalRef, r.eligible); added++; } catch (e) { issues.push({ row: r.line, message: e instanceof LeagueError ? e.message : "Invalid row." }); }
+      try { await this.addParticipant(seasonId, r.displayName, r.externalRef, r.membershipVerified); added++; } catch (e) { issues.push({ row: r.line, message: e instanceof LeagueError ? e.message : "Invalid row." }); }
     }
     this.log(seasonId, "league.participant.import", { added, issues: issues.length });
     return { preview, added, issues };
   }
-  async setParticipant(participantId: string, patch: { displayName?: string; active?: boolean; eligible?: boolean }, reason: string): Promise<void> {
+  async setParticipant(participantId: string, patch: { displayName?: string; active?: boolean }, reason: string): Promise<void> {
     const p = this.state.participants.find((x) => x.id === participantId) ?? fail("LEAGUE_NOT_FOUND", "Participant not found.");
     this.requireAdmin(p.seasonId);
-    if (reason.trim() === "") fail("LEAGUE_REASON_REQUIRED", "A reason is required.");
+    requireReason(reason);
     this.lockCompleted(p.seasonId);
     const name = patch.displayName ? validateDisplayName(patch.displayName) : p.displayName;
-    this.patch(this.state.participants, p.id, { displayName: name, active: patch.active ?? p.active, eligible: patch.eligible ?? p.eligible });
-    let lines = 0;
-    if (patch.eligible !== undefined && patch.eligible !== p.eligible) for (const c of this.state.challenges.filter((x) => x.seasonId === p.seasonId && x.status === "closed")) lines += this.applyScores(c.id);
-    this.log(p.seasonId, "league.participant.update", { reason, ledgerLines: lines });
+    this.patch(this.state.participants, p.id, { displayName: name, active: patch.active ?? p.active });
+    this.log(p.seasonId, "league.participant.update", { reason: reason.trim() });
+  }
+  async setEligibility(participantId: string, eligible: boolean, category: EligibilityDecisionCategory, reason: string): Promise<{ ledgerLines: number }> {
+    const p = this.state.participants.find((x) => x.id === participantId) ?? fail("LEAGUE_NOT_FOUND", "Participant not found.");
+    this.requireAdmin(p.seasonId);
+    const why = requireReason(reason, "The documented decision");
+    if (!ELIGIBILITY_DECISION_CATEGORIES.includes(category)) fail("LEAGUE_INVALID", "Unknown decision type.");
+    // Eligibility is preserved for the whole season. It changes only by a documented decision: restriction = DISCIPLINARY or FRAUD, reversal = REINSTATEMENT.
+    if (eligible ? category !== "REINSTATEMENT" : category === "REINSTATEMENT") fail("LEAGUE_INVALID", eligible ? "Reinstating a participant is recorded as REINSTATEMENT." : "A restriction must be a DISCIPLINARY or FRAUD decision.");
+    this.lockCompleted(p.seasonId);
+    if (p.eligible === eligible) fail("LEAGUE_INVALID", "The participant already has that eligibility.");
+    this.patch(this.state.participants, p.id, { eligible });
+    this.state.eligibilityDecisions.push({ id: this.uid("elig"), seasonId: p.seasonId, participantId: p.id, category, previousEligible: p.eligible, newEligible: eligible, reason: why, decidedBy: (this.actorValue as Actor).id, decidedAt: this.now().toISOString() });
+    let ledgerLines = 0;
+    for (const c of this.state.challenges.filter((x) => x.seasonId === p.seasonId && x.status === "closed").sort((a, b) => a.weekNumber - b.weekNumber)) ledgerLines += this.applyScores(c.id);
+    this.log(p.seasonId, "league.participant.eligibility", { category, eligible, reason: why, ledgerLines });
+    return { ledgerLines };
   }
 
   // ---- attempts -----------------------------------------------------------------------------------------------------------------------
@@ -376,20 +412,90 @@ export class InMemoryLeague implements LeagueGateway {
   async correctAttempt(attemptId: string, newValue: number | null, reason: string): Promise<{ ledgerLines: number }> {
     const a = this.state.attempts.find((x) => x.id === attemptId) ?? fail("LEAGUE_NOT_FOUND", "Attempt not found.");
     this.requireAdmin(a.seasonId);
-    if (reason.trim() === "") fail("LEAGUE_REASON_REQUIRED", "A reason is required.");
+    return this.applyCorrection(a, newValue, requireReason(reason), null);
+  }
+  /** The ONE correction path (direct admin correction and an applied judge request both end here): void + replace, permanent record, re-score, audit. */
+  private applyCorrection(a: Attempt, newValue: number | null, reason: string, requestId: string | null): { ledgerLines: number } {
     this.lockCompleted(a.seasonId);
     if (a.status !== "pending" && a.status !== "approved") fail("LEAGUE_INVALID", "Only a pending or approved attempt can be corrected.");
     const ch = this.challenge(a.challengeId);
     if (ch.status === "draft" || ch.status === "published") fail("LEAGUE_CHALLENGE_NOT_OPEN", "The challenge has not opened.");
     if (newValue !== null) validateResultValue(newValue, ch.metric);
-    this.patch(this.state.attempts, a.id, { status: "void", reason: reason.trim() });
+    const actor = this.actorValue as Actor;
+    this.patch(this.state.attempts, a.id, { status: "void", reason });
+    let replacementId: string | null = null;
     if (newValue !== null) {
-      const actor = this.actorValue as Actor;
-      this.state.attempts.push({ ...a, id: this.uid("attempt"), value: newValue, recordedBy: actor.id, reviewedBy: actor.id, status: "approved", reason: reason.trim(), correctedFrom: a.id, clientRequestId: this.uid("corr") });
+      replacementId = this.uid("attempt");
+      this.state.attempts.push({ ...a, id: replacementId, value: newValue, recordedBy: actor.id, reviewedBy: actor.id, status: "approved", reason, correctedFrom: a.id, clientRequestId: this.uid("corr") });
     }
+    this.state.corrections.push({ id: this.uid("correction"), seasonId: a.seasonId, challengeId: a.challengeId, participantId: a.participantId, attemptId: a.id, replacementAttemptId: replacementId, previousValue: a.value, newValue, reason, actor: actor.id, at: this.now().toISOString(), requestId });
     const ledgerLines = ch.status === "closed" ? this.applyScores(ch.id) : 0;
-    this.log(a.seasonId, "league.attempt.correct", { attempt: a.id, reason, ledgerLines });
+    this.log(a.seasonId, "league.attempt.correct", { attempt: a.id, previousValue: a.value, newValue, reason, ledgerLines });
     return { ledgerLines };
+  }
+  async requestCorrection(attemptId: string, proposedValue: number | null, reason: string): Promise<string> {
+    const a = this.state.attempts.find((x) => x.id === attemptId) ?? fail("LEAGUE_NOT_FOUND", "Attempt not found.");
+    const actor = this.actorValue;
+    if (!actor || !this.has(a.seasonId, ["LEAGUE_ADMIN", "JUDGE"])) fail("LEAGUE_FORBIDDEN", "Only a league judge or administrator can request a correction.");
+    const why = requireReason(reason);
+    this.lockCompleted(a.seasonId);
+    if (a.status !== "pending" && a.status !== "approved") fail("LEAGUE_INVALID", "Only a pending or approved attempt can be corrected.");
+    const ch = this.challenge(a.challengeId);
+    if (ch.status === "draft" || ch.status === "published") fail("LEAGUE_CHALLENGE_NOT_OPEN", "The challenge has not opened.");
+    if (proposedValue !== null) validateResultValue(proposedValue, ch.metric);
+    if (this.state.correctionRequests.some((r) => r.attemptId === a.id && r.status === "pending")) fail("LEAGUE_DUPLICATE", "A correction request for this result is already waiting.");
+    const r: CorrectionRequest = { id: this.uid("corrreq"), seasonId: a.seasonId, challengeId: a.challengeId, attemptId: a.id, participantId: a.participantId, proposedValue, reason: why, requestedBy: actor.id, requestedAt: this.now().toISOString(), status: "pending", decidedBy: null, decidedAt: null, decisionReason: null };
+    this.state.correctionRequests.push(r);
+    this.log(a.seasonId, "league.correction.request", { request: r.id, attempt: a.id, previousValue: a.value, proposedValue, reason: why });
+    return r.id;
+  }
+  async decideCorrectionRequest(requestId: string, decision: "apply" | "decline", reason: string): Promise<{ ledgerLines: number }> {
+    const r = this.state.correctionRequests.find((x) => x.id === requestId) ?? fail("LEAGUE_NOT_FOUND", "Correction request not found.");
+    this.requireAdmin(r.seasonId);
+    const why = requireReason(reason);
+    if (decision !== "apply" && decision !== "decline") fail("LEAGUE_INVALID", "Decision must be apply or decline.");
+    this.lockCompleted(r.seasonId);
+    if (r.status !== "pending") fail("LEAGUE_INVALID", "This request has already been decided.");
+    const actor = this.actorValue as Actor;
+    let ledgerLines = 0;
+    if (decision === "apply") ledgerLines = this.applyCorrection(this.state.attempts.find((x) => x.id === r.attemptId) as Attempt, r.proposedValue, why, r.id).ledgerLines;
+    this.patch(this.state.correctionRequests, r.id, { status: decision === "apply" ? "applied" : "declined", decidedBy: actor.id, decidedAt: this.now().toISOString(), decisionReason: why });
+    this.log(r.seasonId, `league.correction.${decision}`, { request: r.id, reason: why, ledgerLines });
+    return { ledgerLines };
+  }
+
+  // ---- appeals ------------------------------------------------------------------------------------------------------------------------
+  async lodgeAppeal(i: { challengeId: string; participantId: string; reason: string }): Promise<string> {
+    const ch = this.challenge(i.challengeId);
+    const actor = this.actorValue;
+    if (!actor || !this.has(ch.seasonId, ["LEAGUE_ADMIN", "JUDGE", "REVIEWER"])) fail("LEAGUE_FORBIDDEN", "Only league staff can lodge an appeal on a participant's behalf.");
+    const why = requireReason(i.reason);
+    const se = this.season(ch.seasonId);
+    this.lockCompleted(ch.seasonId);
+    const p = this.state.participants.find((x) => x.id === i.participantId && x.seasonId === ch.seasonId) ?? fail("LEAGUE_NOT_FOUND", "Participant not found.");
+    const published = resultPublishedAt(ch, se);
+    if (published === null) fail("LEAGUE_APPEAL_CLOSED", "This result has not been published, so there is nothing to appeal yet.");
+    const now = this.now();
+    if (now.getTime() > Date.parse(appealDeadline(published as string, se.rules.appealWindowHours))) fail("LEAGUE_APPEAL_CLOSED", `The ${se.rules.appealWindowHours}-hour appeal window for this result has ended.`);
+    if (this.state.appeals.some((x) => x.challengeId === ch.id && x.participantId === p.id)) fail("LEAGUE_DUPLICATE", "This participant has already appealed this result.");
+    const ap: Appeal = { id: this.uid("appeal"), seasonId: ch.seasonId, challengeId: ch.id, participantId: p.id, reason: why, lodgedBy: actor.id, lodgedAt: now.toISOString(), status: "submitted", decidedBy: null, decidedAt: null, decisionReason: null };
+    this.state.appeals.push(ap);
+    this.log(ch.seasonId, "league.appeal.lodge", { appeal: ap.id, week: ch.weekNumber });
+    return ap.id;
+  }
+  async decideAppeal(appealId: string, decision: "upheld" | "dismissed", reason: string): Promise<void> {
+    const ap = this.state.appeals.find((x) => x.id === appealId) ?? fail("LEAGUE_NOT_FOUND", "Appeal not found.");
+    this.requireAdmin(ap.seasonId);
+    const why = requireReason(reason);
+    if (decision !== "upheld" && decision !== "dismissed") fail("LEAGUE_INVALID", "Decision must be upheld or dismissed.");
+    this.lockCompleted(ap.seasonId);
+    if (ap.status !== "submitted") fail("LEAGUE_INVALID", "This appeal has already been decided.");
+    const actor = this.actorValue as Actor;
+    // Independence: whoever recorded (or corrected) any attempt in this participant's result cannot review its appeal.
+    if (this.state.attempts.some((a) => a.challengeId === ap.challengeId && a.participantId === ap.participantId && a.recordedBy === actor.id)) fail("LEAGUE_CONFLICT_OF_INTEREST", "The administrator who recorded this result cannot review its appeal.");
+    this.patch(this.state.appeals, ap.id, { status: decision, decidedBy: actor.id, decidedAt: this.now().toISOString(), decisionReason: why });
+    // Deliberately NO scoring call: an appeal never moves a score. An upheld appeal is followed, if warranted, by a normal audited correction.
+    this.log(ap.seasonId, `league.appeal.${decision}`, { appeal: ap.id, reason: why });
   }
   async recompute(challengeId: string): Promise<number> {
     const ch = this.challenge(challengeId);

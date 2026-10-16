@@ -31,6 +31,8 @@ export interface PublicStandingRow {
   readonly publicId: string;
   readonly displayName: string;
   readonly rank: number;
+  /** Shares this rank with at least one other participant (equal season totals). */
+  readonly tied: boolean;
   readonly totalPoints: number;
   readonly weeklyPoints: Readonly<Record<number, number>>;
   readonly challengesCompleted: number;
@@ -44,7 +46,7 @@ export interface PublicLeague {
   readonly generatedAt: string;
 }
 
-export const PUBLIC_STANDING_KEYS = ["publicId", "displayName", "rank", "totalPoints", "weeklyPoints", "challengesCompleted", "movement", "gapToNext"] as const;
+export const PUBLIC_STANDING_KEYS = ["publicId", "displayName", "rank", "tied", "totalPoints", "weeklyPoints", "challengesCompleted", "movement", "gapToNext"] as const;
 export const PUBLIC_SEASON_KEYS = ["slug", "name", "status", "startsOn", "endsOn", "totalWeeks", "throughWeek", "currentWeek"] as const;
 export const PUBLIC_CHALLENGE_KEYS = ["weekNumber", "name", "description", "instructions", "safetyNotes", "metricKind", "unit", "direction", "referenceUrl", "status"] as const;
 
@@ -80,6 +82,7 @@ export function toPublicLeague(season: Season, challenges: readonly Challenge[],
     publicId: r.publicId,
     displayName: r.displayName,
     rank: r.rank,
+    tied: r.tied,
     totalPoints: centsToPoints(r.totalCents),
     weeklyPoints: Object.fromEntries(Object.entries(r.weeklyCents).map(([w, c]) => [Number(w), centsToPoints(c)])),
     challengesCompleted: r.challengesCompleted,

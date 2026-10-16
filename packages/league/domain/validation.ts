@@ -61,8 +61,7 @@ export function validateMetric(m: Metric): Metric {
   if (!METRIC_KINDS.includes(m.kind)) bad("Unknown challenge type.");
   if (!METRIC_UNITS[m.kind].includes(m.unit)) bad(`Unit "${m.unit}" is not allowed for a ${m.kind} challenge (allowed: ${METRIC_UNITS[m.kind].join(", ")}).`);
   if (m.direction !== "LOWER_WINS" && m.direction !== "HIGHER_WINS") bad("Ranking direction must be LOWER_WINS or HIGHER_WINS.");
-  if (m.kind === "TIME" && m.direction !== "LOWER_WINS") bad("A time challenge ranks the lower valid time first.");
-  if ((m.kind === "REPS" || m.kind === "DISTANCE") && m.direction !== "HIGHER_WINS") bad(`A ${m.kind.toLowerCase()} challenge ranks the higher valid result first.`);
+  // The direction is a per-challenge choice: a sprint ranks the lower time first, a plank hold the longer one; the unit list stays closed per kind.
   return m;
 }
 
@@ -75,7 +74,7 @@ export function validateAttemptPolicy(p: AttemptPolicy): AttemptPolicy {
 
 const TEXT_MAX = { name: 80, description: 1000, instructions: 2000, safetyNotes: 1000 } as const;
 
-export function validateChallenge(c: Omit<Challenge, "id" | "seasonId" | "status">, season: { startsOn: string }): void {
+export function validateChallenge(c: Omit<Challenge, "id" | "seasonId" | "status" | "closedAt">, season: { startsOn: string }): void {
   if (!Number.isInteger(c.weekNumber) || c.weekNumber < 1 || c.weekNumber > SEASON_WEEKS) bad(`Week must be 1 to ${SEASON_WEEKS}.`);
   const name = c.name.trim();
   if (name.length < 2 || name.length > TEXT_MAX.name) bad(`Challenge name must be 2–${TEXT_MAX.name} characters.`);
@@ -114,6 +113,27 @@ export function validateRules(r: SeasonRules): SeasonRules {
   if (r.tiePolicy !== "SHARE" && r.tiePolicy !== "SPLIT") bad("Unknown tie policy.");
   if (r.absencePolicy !== "ZERO" && r.absencePolicy !== "PARTICIPATION") bad("Unknown absence policy.");
   if (r.eligibility !== "AT_REGISTRATION" && r.eligibility !== "ENTIRE_SEASON") bad("Unknown eligibility policy.");
+  if (!Number.isInteger(r.appealWindowHours) || r.appealWindowHours < 1 || r.appealWindowHours > 720) bad("The appeal window is a whole number of hours from 1 to 720.");
+  return r;
+}
+
+const HOUR_MS = 3_600_000;
+
+/** A result became public when the challenge was closed AND its season was published — whichever happened last. null = not public yet. */
+export function resultPublishedAt(challenge: Pick<Challenge, "status" | "closedAt">, season: { published: boolean; firstPublishedAt: string | null }): string | null {
+  if (challenge.status !== "closed" || challenge.closedAt === null || !season.published || season.firstPublishedAt === null) return null;
+  return Date.parse(challenge.closedAt) >= Date.parse(season.firstPublishedAt) ? challenge.closedAt : season.firstPublishedAt;
+}
+
+/** The last instant an appeal can be lodged for a result published at `publishedAt`. */
+export function appealDeadline(publishedAt: string, windowHours: number): string {
+  return new Date(Date.parse(publishedAt) + windowHours * HOUR_MS).toISOString();
+}
+
+export function requireReason(reason: string | null | undefined, label = "A reason"): string {
+  const r = (reason ?? "").trim();
+  if (r.length === 0) throw new LeagueError("LEAGUE_REASON_REQUIRED", `${label} is required.`);
+  if (r.length > 1000) bad(`${label} is too long (limit 1000 characters).`);
   return r;
 }
 

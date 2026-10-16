@@ -11,6 +11,8 @@ export type LeagueErrorCode =
   | "LEAGUE_NOT_ELIGIBLE"
   | "LEAGUE_DUPLICATE"
   | "LEAGUE_REASON_REQUIRED"
+  | "LEAGUE_APPEAL_CLOSED"
+  | "LEAGUE_CONFLICT_OF_INTEREST"
   | "LEAGUE_NOT_PUBLISHED"
   | "LEAGUE_UNAVAILABLE";
 
@@ -36,6 +38,8 @@ const MESSAGES: Record<LeagueErrorCode, string> = {
   LEAGUE_NOT_ELIGIBLE: "This participant is not eligible for the league.",
   LEAGUE_DUPLICATE: "That already exists.",
   LEAGUE_REASON_REQUIRED: "A reason is required.",
+  LEAGUE_APPEAL_CLOSED: "The appeal window for this result is not open.",
+  LEAGUE_CONFLICT_OF_INTEREST: "The administrator who recorded this result cannot review its appeal.",
   LEAGUE_NOT_PUBLISHED: "The league is not published yet.",
   LEAGUE_UNAVAILABLE: "The league is not available yet.",
 };

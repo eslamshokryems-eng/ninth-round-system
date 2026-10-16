@@ -70,6 +70,8 @@ export interface Challenge {
   readonly attemptPolicy: AttemptPolicy;
   readonly opensAt: string | null;
   readonly closesAt: string | null;
+  /** When the challenge was closed (points awarded); null before. Together with the season's first publication it fixes when a result became public. */
+  readonly closedAt: string | null;
   readonly referenceUrl: string | null;
   /** true: a second person must approve every attempt before it counts; false: an attempt recorded by authorized staff counts at once. */
   readonly requiresVerification: boolean;
@@ -88,13 +90,21 @@ export interface PointsSchedule {
   readonly absent: number;
 }
 
-/** DEVELOPMENT DEFAULT ONLY — the real table is a business decision that has not been taken. Always read the season's own schedule. */
+/**
+ * PROVISIONAL (owner-supplied, not final): 1st 100, 2nd 90, 3rd 80, 4th 75, 5th 70, 6th 65, 7th 60, 8th 55, 9th 50, every other eligible participant with an
+ * approved valid result 40, an absent participant 0. Always read the season's own schedule — this is only the default for a new season.
+ */
 export const PROVISIONAL_POINTS_SCHEDULE: PointsSchedule = {
-  byRank: [25, 20, 16, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
-  beyond: 1,
-  participation: 1,
+  byRank: [100, 90, 80, 75, 70, 65, 60, 55, 50],
+  beyond: 40,
+  participation: 40,
   absent: 0,
 };
+
+/** PROVISIONAL: how long after a result is published a participant may appeal. */
+export const DEFAULT_APPEAL_WINDOW_HOURS = 48;
+/** PROVISIONAL: up to three attempts per weekly challenge, the best valid judge-approved attempt counts. */
+export const DEFAULT_ATTEMPT_POLICY: AttemptPolicy = { maxAttempts: 3, counting: "BEST" };
 
 export interface SeasonRules {
   readonly points: PointsSchedule;
@@ -102,6 +112,8 @@ export interface SeasonRules {
   readonly tiePolicy: TiePolicy;
   readonly absencePolicy: AbsencePolicy;
   readonly eligibility: EligibilityPolicy;
+  /** Hours after a challenge's result is published during which an appeal may be lodged. */
+  readonly appealWindowHours: number;
 }
 
 export const PROVISIONAL_SEASON_RULES: SeasonRules = {
@@ -109,6 +121,7 @@ export const PROVISIONAL_SEASON_RULES: SeasonRules = {
   tiePolicy: "SHARE",
   absencePolicy: "ZERO",
   eligibility: "AT_REGISTRATION",
+  appealWindowHours: DEFAULT_APPEAL_WINDOW_HOURS,
 };
 
 export interface Season {
@@ -121,6 +134,8 @@ export interface Season {
   readonly rules: SeasonRules;
   /** Public visibility is separate from lifecycle: an unpublished season is never returned by any public read. */
   readonly published: boolean;
+  /** First moment the season was made public; null while it never was. Starts the appeal window for results that were already closed. */
+  readonly firstPublishedAt: string | null;
 }
 
 export interface Participant {
@@ -136,6 +151,74 @@ export interface Participant {
   readonly eligible: boolean;
   /** The day the participant was added (YYYY-MM-DD) — used by the ENTIRE_SEASON eligibility rule (no late joiners). */
   readonly joinedOn: string;
+  /** The day staff verified an ACTIVE gym membership for this registration. Required to register; later expiry never changes eligibility. */
+  readonly membershipVerifiedOn: string;
+}
+
+/** Why an administrator changed a participant's eligibility. A restriction needs a documented DISCIPLINARY or FRAUD decision; REINSTATEMENT reverses one. */
+export type EligibilityDecisionCategory = "DISCIPLINARY" | "FRAUD" | "REINSTATEMENT";
+export const ELIGIBILITY_DECISION_CATEGORIES: readonly EligibilityDecisionCategory[] = ["DISCIPLINARY", "FRAUD", "REINSTATEMENT"];
+export interface EligibilityDecision {
+  readonly id: string;
+  readonly seasonId: string;
+  readonly participantId: string;
+  readonly category: EligibilityDecisionCategory;
+  readonly previousEligible: boolean;
+  readonly newEligible: boolean;
+  readonly reason: string;
+  readonly decidedBy: string;
+  readonly decidedAt: string;
+}
+
+/** A judge's request to change a result. It never changes anything by itself. */
+export type CorrectionRequestStatus = "pending" | "applied" | "declined";
+export interface CorrectionRequest {
+  readonly id: string;
+  readonly seasonId: string;
+  readonly challengeId: string;
+  readonly attemptId: string;
+  readonly participantId: string;
+  /** null = remove the result. */
+  readonly proposedValue: number | null;
+  readonly reason: string;
+  readonly requestedBy: string;
+  readonly requestedAt: string;
+  readonly status: CorrectionRequestStatus;
+  readonly decidedBy: string | null;
+  readonly decidedAt: string | null;
+  readonly decisionReason: string | null;
+}
+/** The permanent record of an applied correction: what it was, what it became, who, when, why. */
+export interface CorrectionRecord {
+  readonly id: string;
+  readonly seasonId: string;
+  readonly challengeId: string;
+  readonly participantId: string;
+  readonly attemptId: string;
+  readonly replacementAttemptId: string | null;
+  readonly previousValue: number;
+  /** null = the result was removed. */
+  readonly newValue: number | null;
+  readonly reason: string;
+  readonly actor: string;
+  readonly at: string;
+  readonly requestId: string | null;
+}
+
+/** UPHELD = the reviewing admin agrees the result should be revisited — it still changes NOTHING until an admin applies a normal, audited correction. */
+export type AppealStatus = "submitted" | "upheld" | "dismissed";
+export interface Appeal {
+  readonly id: string;
+  readonly seasonId: string;
+  readonly challengeId: string;
+  readonly participantId: string;
+  readonly reason: string;
+  readonly lodgedBy: string;
+  readonly lodgedAt: string;
+  readonly status: AppealStatus;
+  readonly decidedBy: string | null;
+  readonly decidedAt: string | null;
+  readonly decisionReason: string | null;
 }
 
 export type AttemptStatus = "pending" | "approved" | "rejected" | "void";

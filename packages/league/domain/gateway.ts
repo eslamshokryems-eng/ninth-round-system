@@ -1,5 +1,5 @@
 import type { PublicLeague, PublicStandingRow } from "./public";
-import type { Attempt, Challenge, ChallengeStatus, LeagueRole, Season, SeasonRules, SeasonStatus } from "./types";
+import type { Appeal, Attempt, Challenge, ChallengeStatus, CorrectionRecord, CorrectionRequest, EligibilityDecision, EligibilityDecisionCategory, LeagueRole, Season, SeasonRules, SeasonStatus } from "./types";
 import type { ImportResult } from "./import";
 
 /** What the league staff screens read. Mirrors race_league_admin_overview(). */
@@ -7,8 +7,15 @@ export interface AdminOverview {
   readonly season: Season;
   readonly isAdmin: boolean;
   readonly challenges: readonly Challenge[];
-  readonly participants: readonly { id: string; publicId: string; displayName: string; active: boolean; eligible: boolean; externalRef: string | null }[];
+  readonly participants: readonly { id: string; publicId: string; displayName: string; active: boolean; eligible: boolean; externalRef: string | null; membershipVerifiedOn: string }[];
   readonly attempts: readonly AdminAttempt[];
+  /** Judges and administrators see requests (so a judge can follow up); only administrators decide them. */
+  readonly correctionRequests: readonly CorrectionRequest[];
+  /** Applied corrections: previous value, new value, actor, time, reason. Administrators only (empty for others). */
+  readonly corrections: readonly CorrectionRecord[];
+  /** Participant appeals contain a participant's own words: administrators only (empty for others). */
+  readonly appeals: readonly Appeal[];
+  readonly eligibilityDecisions: readonly EligibilityDecision[];
   readonly standings: readonly AdminStanding[];
   readonly staff: readonly { profileId: string; role: LeagueRole; active: boolean }[] | null;
 }
@@ -18,6 +25,7 @@ export interface AdminStanding {
   readonly publicId: string;
   readonly displayName: string;
   readonly rank: number;
+  readonly tied: boolean;
   readonly totalPoints: number;
   readonly weeklyPoints: Readonly<Record<number, number>>;
   readonly challengesCompleted: number;
@@ -76,12 +84,23 @@ export interface LeagueGateway {
   updateRules(seasonId: string, rules: SeasonRules, reason: string): Promise<number>;
   upsertChallenge(seasonId: string, week: number, input: ChallengeInput): Promise<string>;
   setChallengeStatus(challengeId: string, status: ChallengeStatus): Promise<{ ledgerLines: number }>;
-  addParticipant(seasonId: string, displayName: string, externalRef: string | null, eligible: boolean): Promise<string>;
+  /** Registration requires staff to confirm an ACTIVE, verified gym membership (`membershipVerified` must be true; false is refused). Nothing reads the gym database. */
+  addParticipant(seasonId: string, displayName: string, externalRef: string | null, membershipVerified: boolean): Promise<string>;
   importParticipants(seasonId: string, csv: string): Promise<{ preview: ImportResult; added: number; issues: readonly { row: number; message: string }[] }>;
-  setParticipant(participantId: string, patch: { displayName?: string; active?: boolean; eligible?: boolean }, reason: string): Promise<void>;
+  setParticipant(participantId: string, patch: { displayName?: string; active?: boolean }, reason: string): Promise<void>;
+  /** Restrict or reinstate a participant. A restriction needs a documented DISCIPLINARY or FRAUD decision; REINSTATEMENT reverses one. Membership expiry is never a reason. */
+  setEligibility(participantId: string, eligible: boolean, category: EligibilityDecisionCategory, reason: string): Promise<{ ledgerLines: number }>;
   recordAttempt(input: { challengeId: string; participantId: string; value: number; attemptedAt?: string; clientRequestId: string }): Promise<AdminAttempt & { replay: boolean }>;
   reviewAttempt(attemptId: string, decision: "approve" | "reject", reason?: string): Promise<AdminAttempt>;
   correctAttempt(attemptId: string, newValue: number | null, reason: string): Promise<{ ledgerLines: number }>;
+  /** Judge/administrator: ask for a result to change. Changes nothing by itself. `proposedValue` null = remove the result. */
+  requestCorrection(attemptId: string, proposedValue: number | null, reason: string): Promise<string>;
+  /** Administrator only: apply (a normal audited correction) or decline a request. */
+  decideCorrectionRequest(requestId: string, decision: "apply" | "decline", reason: string): Promise<{ ledgerLines: number }>;
+  /** Staff intake of a participant's appeal against a published result, inside the season's appeal window. Never changes a score. */
+  lodgeAppeal(input: { challengeId: string; participantId: string; reason: string }): Promise<string>;
+  /** Administrator who did not record the result: record UPHELD or DISMISSED with a reason. Never changes a score. */
+  decideAppeal(appealId: string, decision: "upheld" | "dismissed", reason: string): Promise<void>;
   recompute(challengeId: string): Promise<number>;
   audit(seasonId: string, limit?: number): Promise<readonly AuditLine[]>;
 }

@@ -37,11 +37,11 @@ describe("points", () => {
   it("SHARE gives every tied participant the points of the shared rank", () => {
     const e = scoreChallenge({ ...base, metric: { kind: "REPS", unit: "reps", direction: "HIGHER_WINS" }, rules: rules({ tiePolicy: "SHARE" }), eligibleParticipantIds: ["a", "b", "c"], attempts: [A({ id: "1", participantId: "a", value: 20 }), A({ id: "2", participantId: "b", value: 20 }), A({ id: "3", participantId: "c", value: 10 })] });
     const pts = Object.fromEntries(e.map((x) => [x.participantId, x.pointsCents]));
-    expect(pts).toEqual({ a: 2500, b: 2500, c: 1600 });
+    expect(pts).toEqual({ a: 10000, b: 10000, c: 8000 });
   });
-  it("SPLIT shares the average of the occupied places (25 + 20)/2 = 22.50", () => {
+  it("SPLIT shares the average of the occupied places (100 + 90)/2 = 95.00", () => {
     const e = scoreChallenge({ ...base, metric: { kind: "REPS", unit: "reps", direction: "HIGHER_WINS" }, rules: rules({ tiePolicy: "SPLIT" }), eligibleParticipantIds: ["a", "b"], attempts: [A({ id: "1", participantId: "a", value: 20 }), A({ id: "2", participantId: "b", value: 20 })] });
-    expect(e.map((x) => x.pointsCents)).toEqual([2250, 2250]);
+    expect(e.map((x) => x.pointsCents)).toEqual([9500, 9500]);
   });
   it("SPLIT rounds half up to a hundredth, and totals can differ by a cent per group, never more", () => {
     const e = scoreChallenge({ ...base, metric: { kind: "REPS", unit: "reps", direction: "HIGHER_WINS" }, rules: rules({ tiePolicy: "SPLIT", points: { byRank: [10, 5, 4], beyond: 1, participation: 1, absent: 0 } }), eligibleParticipantIds: ["a", "b", "c"], attempts: ["a", "b", "c"].map((p, i) => A({ id: String(i), participantId: p, value: 7 })) });
@@ -63,7 +63,7 @@ describe("scoreChallenge", () => {
     const attempts = [A({ id: "1", participantId: "a", value: 70 })];
     expect(scoreChallenge({ ...base, metric, rules: rules({ absencePolicy: "ZERO" }), eligibleParticipantIds: ["a", "b"], attempts }).map((x) => x.participantId)).toEqual(["a"]);
     const p = scoreChallenge({ ...base, metric, rules: rules({ absencePolicy: "PARTICIPATION" }), eligibleParticipantIds: ["a", "b"], attempts });
-    expect(p.find((x) => x.participantId === "b")).toMatchObject({ pointsCents: 100, rank: null, reason: "ABSENT" });
+    expect(p.find((x) => x.participantId === "b")).toMatchObject({ pointsCents: 4000, rank: null, reason: "ABSENT" });
   });
   it("a second attempt: BEST / LATEST / FIRST_APPROVED pick differently", () => {
     const list = [A({ id: "1", participantId: "a", value: 60, attemptNo: 1 }), A({ id: "2", participantId: "a", value: 55, attemptNo: 2, attemptedAt: "2026-11-02T11:00:00Z" }), A({ id: "3", participantId: "a", value: 58, attemptNo: 3, attemptedAt: "2026-11-02T12:00:00Z" })];
@@ -85,7 +85,7 @@ describe("reconcileChallenge (append-only, exactly once)", () => {
   it("the first run awards, a retry awards nothing more", () => {
     const attempts = [A({ id: "1", participantId: "a", value: 30 }), A({ id: "2", participantId: "b", value: 20 })];
     const l1 = apply([], reconcileChallenge([], scoreChallenge(input(attempts)), "c1", "s"));
-    expect(l1.map((x) => x.pointsCents)).toEqual([2500, 2000]);
+    expect(l1.map((x) => x.pointsCents)).toEqual([10000, 9000]);
     expect(reconcileChallenge(l1, scoreChallenge(input(attempts)), "c1", "s")).toEqual([]);
   });
   it("a correction appends only the difference and the totals follow", () => {
@@ -93,7 +93,7 @@ describe("reconcileChallenge (append-only, exactly once)", () => {
     const l1 = apply([], reconcileChallenge([], scoreChallenge(input(attempts)), "c1", "s"));
     const corrected = [A({ id: "1", participantId: "a", value: 10 }), A({ id: "2", participantId: "b", value: 20 })]; // a drops below b
     const delta = reconcileChallenge(l1, scoreChallenge(input(corrected)), "c1", "s");
-    expect(delta.map((x) => [x.participantId, x.pointsCents, x.rank])).toEqual([["a", -500, 2], ["b", 500, 1]]);
+    expect(delta.map((x) => [x.participantId, x.pointsCents, x.rank])).toEqual([["a", -1000, 2], ["b", 1000, 1]]);
     const l2 = apply(l1, delta);
     expect(reconcileChallenge(l2, scoreChallenge(input(corrected)), "c1", "s")).toEqual([]);
   });
@@ -101,7 +101,7 @@ describe("reconcileChallenge (append-only, exactly once)", () => {
     const attempts = [A({ id: "1", participantId: "a", value: 30 })];
     const l1 = apply([], reconcileChallenge([], scoreChallenge(input(attempts)), "c1", "s"));
     const delta = reconcileChallenge(l1, scoreChallenge(input([A({ id: "1", participantId: "a", value: 30, status: "rejected" })])), "c1", "s");
-    expect(delta).toEqual([{ seasonId: "s", challengeId: "c1", participantId: "a", pointsCents: -2500, rank: null, reason: "ADJUSTMENT" }]);
+    expect(delta).toEqual([{ seasonId: "s", challengeId: "c1", participantId: "a", pointsCents: -10000, rank: null, reason: "ADJUSTMENT" }]);
   });
   it("a rank change with the same points still records the new rank", () => {
     const rs = rules({ points: { byRank: [10, 10, 5], beyond: 1, participation: 1, absent: 0 } });

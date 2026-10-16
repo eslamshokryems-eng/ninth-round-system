@@ -103,7 +103,7 @@ describe("InMemoryLeague — lifecycle", () => {
     await rejects(l.createSeason({ slug: "short", name: "Short", startsOn: "2026-11-02", endsOn: "2026-12-20" }), "LEAGUE_INVALID");
     await rejects(l.createSeason({ slug: "small-season", name: "Dup", startsOn: "2026-11-02", endsOn: "2026-12-27" }), "LEAGUE_DUPLICATE");
     await rejects(l.upsertChallenge(s, 9, { name: "Nine", metricKind: "REPS", unit: "reps" }), "LEAGUE_INVALID");
-    await rejects(l.upsertChallenge(s, 3, { name: "Bad", metricKind: "TIME", unit: "s", direction: "HIGHER_WINS" }), "LEAGUE_INVALID");
+    await rejects(l.upsertChallenge(s, 3, { name: "Bad", metricKind: "TIME", unit: "kg" }), "LEAGUE_INVALID"); // units are a closed list per kind
   });
   it("completion needs nothing open and nothing pending, and is final", async () => {
     const { l, s, c1, A } = await small();
@@ -135,7 +135,7 @@ describe("InMemoryLeague — attempts", () => {
     await rejects(l.recordAttempt({ challengeId: c1, participantId: A, value: 5, attemptedAt: "2027-01-01T00:00:00Z", clientRequestId: REQ("fu") }), "LEAGUE_INVALID");
     await rejects(l.recordAttempt({ challengeId: c1, participantId: A, value: 5, clientRequestId: "" }), "LEAGUE_INVALID");
     await rejects(l.recordAttempt({ challengeId: c1, participantId: "nobody", value: 5, clientRequestId: REQ("np") }), "LEAGUE_NOT_FOUND");
-    await l.as(admin).setParticipant(A, { eligible: false }, "not a member any more");
+    await l.as(admin).setEligibility(A, false, "DISCIPLINARY", "documented disciplinary decision");
     await rejects(l.as(judge).recordAttempt({ challengeId: c1, participantId: A, value: 5, clientRequestId: REQ("ne") }), "LEAGUE_NOT_ELIGIBLE");
   });
   it("is idempotent: a retried request returns the original and never doubles", async () => {
@@ -192,7 +192,7 @@ describe("InMemoryLeague — points", () => {
   const total = (l: InMemoryLeague, id: string, ch: string) => l.state.ledger.filter((e) => e.participantId === id && e.challengeId === ch).reduce((n, e) => n + e.pointsCents, 0);
   it("closing awards once; ties share rank 1; the next rank is skipped; recomputing adds nothing", async () => {
     const { l, c1, A, B, C } = await played();
-    expect([total(l, B, c1), total(l, C, c1), total(l, A, c1)]).toEqual([2500, 2500, 1600]);
+    expect([total(l, B, c1), total(l, C, c1), total(l, A, c1)]).toEqual([10000, 10000, 8000]);
     const before = l.state.ledger.length;
     expect(await l.recompute(c1)).toBe(0);
     expect(l.state.ledger).toHaveLength(before);
@@ -201,8 +201,8 @@ describe("InMemoryLeague — points", () => {
     const { l, c1, A, B, ids } = await played();
     const snapshot = JSON.stringify(l.state.ledger);
     await l.as(admin).correctAttempt(ids[0] as string, 50, "judge mistyped 30");
-    expect(total(l, A, c1)).toBe(2500);
-    expect(total(l, B, c1)).toBe(2000);
+    expect(total(l, A, c1)).toBe(10000);
+    expect(total(l, B, c1)).toBe(9000);
     expect(JSON.stringify(l.state.ledger).startsWith(snapshot.slice(0, -1))).toBe(true); // earlier lines untouched, new ones appended
     await l.correctAttempt(ids[1] as string, null, "recorded for the wrong person");
     expect(total(l, B, c1)).toBe(0);
@@ -221,8 +221,8 @@ describe("InMemoryLeague — points", () => {
   it("an inactive participant keeps earned points; an ineligible one loses them", async () => {
     const { l, c1, C } = await played();
     await l.as(admin).setParticipant(C, { active: false }, "left");
-    expect(total(l, C, c1)).toBe(2500);
-    await l.setParticipant(C, { eligible: false }, "not eligible after all");
+    expect(total(l, C, c1)).toBe(10000);
+    await l.setEligibility(C, false, "FRAUD", "documented fraud finding");
     expect(total(l, C, c1)).toBe(0);
   });
 });
@@ -230,10 +230,10 @@ describe("InMemoryLeague — points", () => {
 describe("InMemoryLeague — import", () => {
   it("imports clean rows, reports bad/duplicate rows, never merges, and needs an administrator", async () => {
     const { l, s } = await small();
-    const r = await l.as(admin).importParticipants(s, "display_name,external_member_ref\nDina S.,M-D\nAhmed K.,M-A\n=BAD(),M-X\nEman F.,M-E\n");
+    const r = await l.as(admin).importParticipants(s, "display_name,external_member_ref,membership_verified\nDina S.,M-D,yes\nAhmed K.,M-A,yes\n=BAD(),M-X,yes\nEman F.,M-E,yes\n");
     expect(r.added).toBe(2);
     expect(r.issues.map((i) => i.row).sort()).toEqual([3, 4]);
-    await rejects(l.as(judge).importParticipants(s, "display_name\nZed Z.\n"), "LEAGUE_FORBIDDEN");
+    await rejects(l.as(judge).importParticipants(s, "display_name,membership_verified\nZed Z.,yes\n"), "LEAGUE_FORBIDDEN");
   });
 });
 
@@ -307,8 +307,8 @@ describe("SupabaseLeague (against a fake RPC client)", () => {
   });
   it("participant import validates the file locally and then sends only validated rows", async () => {
     const c = client(() => ({ data: { added: 1, issues: [] } }));
-    const r = await new SupabaseLeague(c).importParticipants("s", "full_name,external_member_ref\nAhmed Khaled Mostafa,M-1\n=cmd|' /C calc'!A0,M-2\n");
+    const r = await new SupabaseLeague(c).importParticipants("s", "full_name,external_member_ref,membership_verified\nAhmed Khaled Mostafa,M-1,yes\n=cmd|' /C calc'!A0,M-2,yes\n");
     expect(r.preview.issues).toHaveLength(1);
-    expect(c.calls[0]?.args.p_rows).toEqual([{ display_name: "Ahmed M.", external_ref: "M-1", eligible: true }]);
+    expect(c.calls[0]?.args.p_rows).toEqual([{ display_name: "Ahmed M.", external_ref: "M-1", membership_verified: true }]);
   });
 });

@@ -25,7 +25,7 @@ describe("TS side of the TS/SQL scoring parity cases", () => {
         challengeId: "c",
         metric: c.metric,
         counting: c.counting,
-        rules: c.rules,
+        rules: { ...c.rules, appealWindowHours: 48 },
         eligibleParticipantIds: c.participants.filter((p) => p.active && p.eligible).map((p) => p.id),
         attempts: c.attempts.map((a, i) => ({
           id: `a${i}`, seasonId: "s", challengeId: "c", participantId: a.p, value: a.value, unit: c.metric.unit, attemptNo: a.no, attemptedAt: a.at, recordedBy: "j", reviewedBy: "r",

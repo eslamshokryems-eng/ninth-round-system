@@ -61,7 +61,7 @@ export async function buildDemoLeague(now: Date = new Date(), participants = 24)
   const ids: string[] = [];
   for (const [i, w] of weeks.entries()) {
     ids.push(await league.upsertChallenge(seasonId, i + 1, {
-      name: w.name, metricKind: w.metricKind, unit: w.unit, maxAttempts: i === 1 ? 2 : 1, counting: "BEST", requiresVerification: w.verify,
+      name: w.name, metricKind: w.metricKind, unit: w.unit, requiresVerification: w.verify,
       description: `Week ${i + 1} challenge — demo data.`, instructions: "Full range of motion. A judge counts every repetition.", safetyNotes: "Stop if you feel pain or dizziness.",
     }));
   }

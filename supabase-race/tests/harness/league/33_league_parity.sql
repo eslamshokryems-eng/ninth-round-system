@@ -32,7 +32,7 @@ begin
         values (s, ch, (ids ->> (a ->> 'p'))::uuid, (a ->> 'value')::numeric, m ->> 'unit', (a ->> 'no')::int, (a ->> 'at')::timestamptz, super_id, super_id, a ->> 'status',
                 case when a ->> 'status' = 'rejected' then 'parity' end, gen_random_uuid());
     end loop;
-    update race_league_challenges set status = 'closed' where id = ch;     -- the pending/rejected fixtures are scoring inputs; the close-with-pending refusal is tested in suite 32
+    update race_league_challenges set status = 'closed', closed_at = clock_timestamp() where id = ch;     -- the pending/rejected fixtures are scoring inputs; the close-with-pending refusal is tested in suite 32
     perform race_league_apply_scores(ch);
     reset role;
     -- compare the ledger with the fixture
@@ -57,4 +57,4 @@ begin
 end $$;
 reset role;
 select race_test.eq((select detail from race_test.lp_result where name = 'all')::int, (select jsonb_array_length(doc -> 'cases') from race_test.league_parity), 'parity: SQL agrees with the TypeScript scoring on every shared case');
-select race_test.ok((select jsonb_array_length(doc -> 'cases') from race_test.league_parity) >= 24, 'parity: at least 24 cases were compared');
+select race_test.ok((select jsonb_array_length(doc -> 'cases') from race_test.league_parity) >= 28, 'parity: at least 28 cases were compared');

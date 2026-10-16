@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { PublicParticipantPage } from "@9thround/league";
 import { useLeagueSource, useSeasonSlug } from "../../../../../src/features/league/hooks";
-import { DemoBanner, Movement, fmtPoints } from "../../../../../src/components/league/league-ui";
+import { DemoBanner, Movement, fmtPoints, fmtRank } from "../../../../../src/components/league/league-ui";
 import { RaceBadge, RaceHeader, RaceNotice, RacePage, RaceSpinner } from "../../../../../src/components/race/race-ui";
 
 export default function ParticipantPage() {
@@ -33,7 +33,7 @@ function Inner() {
           <div className="mt-4 flex flex-col gap-4" data-testid="athlete">
             <p className="race-kicker">League athlete</p>
             <h1 className="race-display" style={{ fontSize: "clamp(2.2rem, 10vw, 3.6rem)" }}>{page.standing.displayName}</h1>
-            <div className="flex items-center gap-3"><RaceBadge tone="red">RANK {page.standing.rank}</RaceBadge><span className="race-display text-3xl">{fmtPoints(page.standing.totalPoints)} pts</span><Movement value={page.standing.movement} /></div>
+            <div className="flex items-center gap-3"><RaceBadge tone="red">RANK {fmtRank(page.standing.rank, page.standing.tied)}</RaceBadge><span className="race-display text-3xl">{fmtPoints(page.standing.totalPoints)} pts</span><Movement value={page.standing.movement} /></div>
             <div className="flex flex-col gap-2">
               {page.results.length === 0 ? <p className="lg-sub">No scored challenge yet.</p> : null}
               {page.results.map((r) => (
