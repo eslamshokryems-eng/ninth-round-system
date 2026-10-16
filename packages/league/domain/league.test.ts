@@ -6,7 +6,7 @@ import { defaultDirection, requireChallengeTransition, requireSeasonTransition, 
 import { LeagueError, parseLeagueError } from "./errors";
 import { PROVISIONAL_SEASON_RULES, type Challenge, type LedgerEntry, type Participant, type Season } from "./types";
 
-const P = (id: string, name: string, extra: Partial<Participant> = {}): Participant => ({ id, seasonId: "s", publicId: `pub-${id}`, displayName: name, externalRef: `secret-${id}`, active: true, eligible: true, ...extra });
+const P = (id: string, name: string, extra: Partial<Participant> = {}): Participant => ({ id, seasonId: "s", publicId: `pub-${id}`, displayName: name, externalRef: `secret-${id}`, active: true, eligible: true, joinedOn: "2026-10-01", ...extra });
 const C = (id: string, week: number, status: Challenge["status"] = "closed"): Challenge => ({
   id, seasonId: "s", weekNumber: week, name: `Week ${week}`, description: "", instructions: "", safetyNotes: "", metric: { kind: "REPS", unit: "reps", direction: "HIGHER_WINS" },
   attemptPolicy: { maxAttempts: 1, counting: "BEST" }, opensAt: null, closesAt: null, referenceUrl: null, requiresVerification: true, status,

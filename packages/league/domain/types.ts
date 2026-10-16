@@ -134,6 +134,8 @@ export interface Participant {
   readonly externalRef: string | null;
   readonly active: boolean;
   readonly eligible: boolean;
+  /** The day the participant was added (YYYY-MM-DD) — used by the ENTIRE_SEASON eligibility rule (no late joiners). */
+  readonly joinedOn: string;
 }
 
 export type AttemptStatus = "pending" | "approved" | "rejected" | "void";
