@@ -11,3 +11,5 @@ export { SupabaseLeague } from "./infrastructure/supabase-league";
 export type { RpcClient } from "./infrastructure/supabase-league";
 export { buildDemoLeague, DEMO_SLUG, DEMO_USERS } from "./infrastructure/demo-fixtures";
 export type { DemoLeague } from "./infrastructure/demo-fixtures";
+export { chooseLeagueSource } from "./domain/source-policy";
+export type { LeagueSourceKind } from "./domain/source-policy";

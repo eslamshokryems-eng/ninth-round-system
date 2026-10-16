@@ -14,6 +14,7 @@
     "prestart": "node scripts/link-react.mjs"
   },
   "dependencies": {
+    "@9thround/league": "workspace:*",
     "@9thround/race": "workspace:*",
     "@supabase/supabase-js": "2.45.4",
     "@tesseract.js-data/eng": "1.0.0",

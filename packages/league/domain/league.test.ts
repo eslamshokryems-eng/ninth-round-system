@@ -191,3 +191,16 @@ describe("participant CSV import", () => {
     expect(() => validateParticipantCsv("display_name\n" + "x".repeat(1_100_000))).toThrow(/too large/);
   });
 });
+
+import { chooseLeagueSource } from "./source-policy";
+describe("which data source the screens use", () => {
+  it("a production build NEVER uses the demo fixtures, whatever the variable says", () => {
+    for (const source of [undefined, "", "demo", "demo-fixtures", "database", "anything"]) expect(chooseLeagueSource({ nodeEnv: "production", source })).toBe("database");
+  });
+  it("development uses fixtures unless the database is asked for", () => {
+    expect(chooseLeagueSource({ nodeEnv: "development", source: undefined })).toBe("demo-fixtures");
+    expect(chooseLeagueSource({ nodeEnv: "development", source: "database" })).toBe("database");
+    expect(chooseLeagueSource({ nodeEnv: "test", source: undefined })).toBe("demo-fixtures");
+    expect(chooseLeagueSource({ nodeEnv: undefined, source: undefined })).toBe("demo-fixtures");
+  });
+});

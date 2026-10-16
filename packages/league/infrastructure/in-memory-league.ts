@@ -41,9 +41,16 @@ interface State {
 function fail(code: ConstructorParameters<typeof LeagueError>[0], message: string): never {
   throw new LeagueError(code, message);
 }
-let counter = 0;
-const uid = (prefix: string) => `${prefix}-${(++counter).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-const publicId = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 /**
  * The same rules as the database, in memory — for local development fixtures and for tests. It is NOT a second authority: production reads and
@@ -54,11 +61,23 @@ export class InMemoryLeague implements LeagueGateway {
   readonly state: State = { seasons: [], challenges: [], participants: [], attempts: [], ledger: [], audit: [], staff: [] };
   private actorValue: Actor | null;
 
+  private readonly rand: () => number;
+  private counter = 0;
+
+  /** `seed` makes every generated id reproducible (the dev fixtures use it so a page refresh keeps the same links); omit it for random ids. */
   constructor(
     actor: Actor | null,
     private readonly now: () => Date = () => new Date(),
+    seed?: number,
   ) {
     this.actorValue = actor;
+    this.rand = seed === undefined ? Math.random : seeded(seed);
+  }
+  private uid(prefix: string): string {
+    return `${prefix}-${(++this.counter).toString(36)}-${this.rand().toString(36).slice(2, 8)}`;
+  }
+  private newPublicId(): string {
+    return this.rand().toString(36).slice(2, 10) + this.rand().toString(36).slice(2, 10);
   }
 
   /** Switch the signed-in user (null = anonymous). */
@@ -202,7 +221,7 @@ export class InMemoryLeague implements LeagueGateway {
     if (this.state.seasons.some((s) => s.publicSlug === slug)) fail("LEAGUE_DUPLICATE", "That season address is already used.");
     const name = i.name.trim();
     if (name.length < 2 || name.length > 80) fail("LEAGUE_INVALID", "A season name is 2–80 characters.");
-    const s: Season = { id: uid("season"), publicSlug: slug, name, status: "draft", startsOn: i.startsOn, endsOn: i.endsOn, rules, published: false };
+    const s: Season = { id: this.uid("season"), publicSlug: slug, name, status: "draft", startsOn: i.startsOn, endsOn: i.endsOn, rules, published: false };
     this.state.seasons.push(s);
     this.state.staff.push({ seasonId: s.id, profileId: a.id, role: "LEAGUE_ADMIN" });
     this.log(s.id, "league.season.create", { slug });
@@ -247,7 +266,7 @@ export class InMemoryLeague implements LeagueGateway {
     const kind = (input.metricKind ?? ex?.metric.kind ?? "REPS") as Metric["kind"];
     const direction = (input.direction ?? ex?.metric.direction ?? (kind === "TIME" ? "LOWER_WINS" : "HIGHER_WINS")) as Metric["direction"];
     const next: Challenge = {
-      id: ex?.id ?? uid("challenge"), seasonId, weekNumber: week, status: ex?.status ?? "draft",
+      id: ex?.id ?? this.uid("challenge"), seasonId, weekNumber: week, status: ex?.status ?? "draft",
       name: (input.name ?? ex?.name ?? "").trim(), description: input.description ?? ex?.description ?? "", instructions: input.instructions ?? ex?.instructions ?? "", safetyNotes: input.safetyNotes ?? ex?.safetyNotes ?? "",
       metric: { kind, unit: input.unit ?? ex?.metric.unit ?? "reps", direction },
       attemptPolicy: { maxAttempts: input.maxAttempts ?? ex?.attemptPolicy.maxAttempts ?? 1, counting: (input.counting ?? ex?.attemptPolicy.counting ?? "BEST") as Challenge["attemptPolicy"]["counting"] },
@@ -283,7 +302,7 @@ export class InMemoryLeague implements LeagueGateway {
     if (ref !== null && !/^[A-Za-z0-9._:/#-]{1,60}$/.test(ref)) fail("LEAGUE_INVALID", "The member reference may only contain letters, numbers and . _ : / # -");
     const key = participantIdentityKey(name, ref);
     if (this.state.participants.some((p) => p.seasonId === seasonId && participantIdentityKey(p.displayName, p.externalRef) === key)) fail("LEAGUE_DUPLICATE", "Already a participant in this season.");
-    const p: Participant = { id: uid("participant"), seasonId, publicId: publicId(), displayName: name, externalRef: ref, active: true, eligible, joinedOn: this.now().toISOString().slice(0, 10) };
+    const p: Participant = { id: this.uid("participant"), seasonId, publicId: this.newPublicId(), displayName: name, externalRef: ref, active: true, eligible, joinedOn: this.now().toISOString().slice(0, 10) };
     this.state.participants.push(p);
     this.log(seasonId, "league.participant.add", { eligible });
     return p.publicId;
@@ -333,7 +352,7 @@ export class InMemoryLeague implements LeagueGateway {
     const maxNo = mine.reduce((m, a) => Math.max(m, a.attemptNo), 0);
     if (live >= ch.attemptPolicy.maxAttempts || maxNo >= 10) fail("LEAGUE_ATTEMPT_LIMIT", "The attempt limit for this challenge has been reached.");
     const a: Attempt = {
-      id: uid("attempt"), seasonId: ch.seasonId, challengeId: ch.id, participantId: p.id, value: i.value, unit: ch.metric.unit, attemptNo: maxNo + 1, attemptedAt: at,
+      id: this.uid("attempt"), seasonId: ch.seasonId, challengeId: ch.id, participantId: p.id, value: i.value, unit: ch.metric.unit, attemptNo: maxNo + 1, attemptedAt: at,
       recordedBy: (this.actorValue as Actor).id, reviewedBy: null, status: ch.requiresVerification ? "pending" : "approved", reason: null, correctedFrom: null, clientRequestId: i.clientRequestId,
     };
     this.state.attempts.push(a);
@@ -366,7 +385,7 @@ export class InMemoryLeague implements LeagueGateway {
     this.patch(this.state.attempts, a.id, { status: "void", reason: reason.trim() });
     if (newValue !== null) {
       const actor = this.actorValue as Actor;
-      this.state.attempts.push({ ...a, id: uid("attempt"), value: newValue, recordedBy: actor.id, reviewedBy: actor.id, status: "approved", reason: reason.trim(), correctedFrom: a.id, clientRequestId: uid("corr") });
+      this.state.attempts.push({ ...a, id: this.uid("attempt"), value: newValue, recordedBy: actor.id, reviewedBy: actor.id, status: "approved", reason: reason.trim(), correctedFrom: a.id, clientRequestId: this.uid("corr") });
     }
     const ledgerLines = ch.status === "closed" ? this.applyScores(ch.id) : 0;
     this.log(a.seasonId, "league.attempt.correct", { attempt: a.id, reason, ledgerLines });

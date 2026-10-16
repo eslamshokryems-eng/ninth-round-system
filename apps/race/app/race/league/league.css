@@ -1,0 +1,54 @@
+/* THE NINTH League — TV + phone styles. Scoped under .race-root's variables; nothing here touches any other route. */
+.lg-demo { background: repeating-linear-gradient(135deg, #3a0a08 0 14px, #1c0504 14px 28px); color: #ffb4ae; text-align: center; font-weight: 700; letter-spacing: 0.08em; font-size: 0.8rem; padding: 0.45rem 0.75rem; text-transform: uppercase; }
+.lg-row { display: grid; grid-template-columns: 2.6rem 1fr auto; align-items: center; gap: 0.75rem; padding: 0.85rem 0.9rem; background: var(--race-panel); border: 1px solid var(--race-line); border-left: 4px solid var(--race-line); }
+.lg-row[data-top="1"] { border-left-color: var(--race-red-hot); }
+.lg-rank { font-family: var(--race-display); font-weight: 800; font-size: 1.7rem; text-align: center; line-height: 1; }
+.lg-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-pts { font-family: var(--race-display); font-weight: 800; font-size: 1.6rem; font-variant-numeric: tabular-nums; text-align: right; line-height: 1; }
+.lg-sub { color: var(--race-muted); font-size: 0.78rem; }
+.lg-move-up { color: #6ee7a0; } .lg-move-down { color: #ff7a70; } .lg-move-flat { color: var(--race-muted); }
+.lg-bar { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.lg-bar > span { height: 8px; background: var(--race-line); }
+.lg-bar > span[data-s="closed"] { background: var(--race-red-hot); }
+.lg-bar > span[data-s="open"] { background: #fff; }
+.lg-bar > span[data-s="published"] { background: #7a7a7a; }
+
+/* ---- TV: landscape, read from across a gym. Sizes scale with the viewport height. ---- */
+.lg-tv { position: fixed; inset: 0; display: flex; flex-direction: column; background: #000; color: #fff; overflow: hidden; font-size: clamp(14px, 2.2vh, 40px); }
+.lg-tv-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 2vw; padding: 1.6vh 4vw 0.8vh; }
+.lg-tv-brand { font-family: var(--race-display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; font-size: 5.4vh; line-height: 1; }
+.lg-tv-brand span { color: var(--race-red-hot); }
+.lg-tv-season { color: var(--race-muted); font-size: 2.2vh; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 0.8vh; }
+.lg-tv-week { font-family: var(--race-display); font-weight: 800; font-size: 5.6vh; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.lg-tv-week small { display: block; font-size: 2vh; color: var(--race-red-hot); letter-spacing: 0.2em; margin-bottom: 0.4vh; }
+.lg-tv-body { flex: 1; min-height: 0; padding: 0.6vh 4vw 0.6vh; display: flex; flex-direction: column; gap: 0.8vh; }
+.lg-tv-title { font-family: var(--race-display); text-transform: uppercase; letter-spacing: 0.2em; color: var(--race-red-hot); font-weight: 700; font-size: 2.4vh; line-height: 1; }
+.lg-tv-list { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(var(--rows, 10), minmax(0, 1fr)); gap: 0.6vh; }
+.lg-tv-row { display: grid; grid-template-columns: 8vh 1fr auto auto; align-items: center; gap: 2vw; padding: 0 2vw; background: #111; border-left: 0.9vh solid #2a2a2a; line-height: 1; overflow: hidden; }
+.lg-tv-row[data-top="1"] { border-left-color: var(--race-red-hot); background: #170a09; }
+.lg-tv-rank { font-family: var(--race-display); font-weight: 800; font-size: 4.4vh; text-align: center; font-variant-numeric: tabular-nums; }
+.lg-tv-name { font-weight: 700; font-size: 3.8vh; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-tv-move { font-size: 2.8vh; min-width: 8vh; text-align: right; font-variant-numeric: tabular-nums; }
+.lg-tv-pts { font-family: var(--race-display); font-weight: 800; font-size: 4.8vh; font-variant-numeric: tabular-nums; min-width: 14vh; text-align: right; }
+.lg-tv-podium { flex: 1; display: grid; grid-template-columns: 1fr 1.25fr 1fr; align-items: end; gap: 2vw; padding-bottom: 2vh; }
+.lg-tv-pod { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; text-align: center; padding: 3vh 1vw; background: #111; border-top: 1vh solid #333; gap: 1vh; }
+.lg-tv-pod[data-place="1"] { border-top-color: var(--race-red-hot); background: #170a09; min-height: 62vh; }
+.lg-tv-pod[data-place="2"] { min-height: 50vh; } .lg-tv-pod[data-place="3"] { min-height: 42vh; }
+.lg-tv-pod .place { font-family: var(--race-display); font-weight: 800; font-size: 14vh; line-height: 1; color: var(--race-red-hot); }
+.lg-tv-pod .who { font-weight: 800; font-size: 5vh; }
+.lg-tv-pod .pts { font-family: var(--race-display); font-weight: 800; font-size: 9vh; font-variant-numeric: tabular-nums; line-height: 1; }
+.lg-tv-weeks { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 1.6vh; }
+.lg-tv-weektile { background: #111; border-top: 0.8vh solid #2a2a2a; padding: 2vh 1.4vw; display: flex; flex-direction: column; gap: 0.8vh; justify-content: space-between; }
+.lg-tv-weektile[data-s="closed"] { border-top-color: var(--race-red-hot); }
+.lg-tv-weektile[data-s="open"] { border-top-color: #fff; background: #1a1a1a; }
+.lg-tv-weektile .n { font-family: var(--race-display); font-weight: 800; font-size: 6vh; line-height: 1; }
+.lg-tv-weektile .t { font-weight: 700; font-size: 3.2vh; }
+.lg-tv-weektile .s { color: var(--race-muted); font-size: 2.2vh; letter-spacing: 0.12em; text-transform: uppercase; }
+.lg-tv-foot { display: flex; align-items: center; justify-content: space-between; gap: 2vw; padding: 1vh 4vw 1.4vh; flex: none; border-top: 1px solid var(--race-line); color: var(--race-muted); font-size: 2.2vh; }
+.lg-tv-foot strong { color: #fff; }
+.lg-tv-offline { background: var(--race-red); color: #fff; text-align: center; font-weight: 800; letter-spacing: 0.12em; font-size: 2.2vh; padding: 0.6vh 0; text-transform: uppercase; }
+.lg-tv-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2vh; }
+.lg-fade { animation: lg-fade 0.6s ease both; }
+@keyframes lg-fade { from { opacity: 0; transform: translateY(1vh); } to { opacity: 1; transform: none; } }
+.lg-reduce .lg-fade { animation: none; }
+@media (prefers-reduced-motion: reduce) { .lg-fade { animation: none; } }

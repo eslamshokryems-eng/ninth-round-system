@@ -180,6 +180,9 @@ importers:
 
   apps/race:
     dependencies:
+      '@9thround/league':
+        specifier: workspace:*
+        version: link:../../packages/league
       '@9thround/race':
         specifier: workspace:*
         version: link:../../packages/race

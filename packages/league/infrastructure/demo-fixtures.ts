@@ -36,7 +36,7 @@ export interface DemoLeague {
 
 /** An 8-week season in week 4: weeks 1–3 closed (points awarded), week 4 open, weeks 5–8 still drafts. */
 export async function buildDemoLeague(now: Date = new Date(), participants = 24): Promise<DemoLeague> {
-  const league = new InMemoryLeague(DEMO_USERS.admin, () => now);
+  const league = new InMemoryLeague(DEMO_USERS.admin, () => now, 20261101);
   const day = 86_400_000;
   const today = Date.parse(`${isoDay(now.getTime())}T00:00:00Z`);
   const monday = today - ((new Date(today).getUTCDay() + 6) % 7) * day;
@@ -73,7 +73,8 @@ export async function buildDemoLeague(now: Date = new Date(), participants = 24)
     const challengeId = ids[w] as string;
     await league.as(DEMO_USERS.admin).setChallengeStatus(challengeId, "published");
     await league.setChallengeStatus(challengeId, "open");
-    for (const p of people) {
+    for (const [idx, p] of people.entries()) {
+      if (w === 3 && idx < 4) continue; // the week in progress: the first four athletes have not had their turn yet
       if (rand() < 0.15) continue; // absent this week
       const spec = weeks[w] as (typeof weeks)[number];
       league.as(DEMO_USERS.judge);
