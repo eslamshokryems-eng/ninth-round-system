@@ -514,6 +514,18 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.43)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/league:
+    devDependencies:
+      '@9thround/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(lightningcss@1.33.0)(terser@5.49.2)
+
   packages/notifications:
     dependencies:
       '@9thround/shared-kernel':

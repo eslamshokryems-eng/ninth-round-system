@@ -1,0 +1,17 @@
+{
+  "name": "@9thround/league",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "main": "./index.ts",
+  "dependencies": {},
+  "devDependencies": {
+    "@9thround/config": "workspace:*",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
