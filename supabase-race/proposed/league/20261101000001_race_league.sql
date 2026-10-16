@@ -827,7 +827,10 @@ begin
   return jsonb_build_object(
     'season', jsonb_build_object('id', se.id, 'slug', se.public_slug, 'name', se.name, 'status', se.status, 'published', se.published, 'startsOn', se.starts_on, 'endsOn', se.ends_on, 'rules', se.rules),
     'isAdmin', v_admin,
-    'challenges', coalesce((select jsonb_agg(to_jsonb(c) - 'season_id' order by c.week_number) from public.race_league_challenges c where c.season_id = p_season), '[]'::jsonb),
+    'challenges', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'weekNumber', c.week_number, 'name', c.name, 'description', c.description, 'instructions', c.instructions,
+                    'safetyNotes', c.safety_notes, 'metricKind', c.metric_kind, 'unit', c.unit, 'direction', c.direction, 'maxAttempts', c.max_attempts, 'counting', c.counting,
+                    'opensAt', c.opens_at, 'closesAt', c.closes_at, 'referenceUrl', c.reference_url, 'requiresVerification', c.requires_verification, 'status', c.status)
+                    order by c.week_number) from public.race_league_challenges c where c.season_id = p_season), '[]'::jsonb),
     'participants', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'publicId', p.public_id, 'displayName', p.display_name, 'active', p.active, 'eligible', p.eligible,
                     'externalRef', case when v_admin then p.external_ref end) order by lower(p.display_name) collate "C", p.public_id)
                     from (select * from public.race_league_participants where season_id = p_season limit 5000) p), '[]'::jsonb),
