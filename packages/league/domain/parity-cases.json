@@ -1,0 +1,1913 @@
+{
+ "cases": [
+  {
+   "name": "time: lower wins",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "c",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 61,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 59.5,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "c",
+     "value": 70,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "a",
+     "cents": 2000,
+     "rank": 2
+    },
+    {
+     "p": "c",
+     "cents": 1600,
+     "rank": 3
+    }
+   ]
+  },
+  {
+   "name": "reps: higher wins",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 30,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 42,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "a",
+     "cents": 2000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "distance: higher wins",
+   "metric": {
+    "kind": "DISTANCE",
+    "unit": "m",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "c",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 1200.5,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 1500,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "c",
+     "value": 900,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "a",
+     "cents": 2000,
+     "rank": 2
+    },
+    {
+     "p": "c",
+     "cents": 1600,
+     "rank": 3
+    }
+   ]
+  },
+  {
+   "name": "load: higher wins",
+   "metric": {
+    "kind": "LOAD",
+    "unit": "kg",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 100,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 90,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 2000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "numeric watts may rank either way (higher here)",
+   "metric": {
+    "kind": "NUMERIC",
+    "unit": "watts",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 250,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 300,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "a",
+     "cents": 2000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "tie SHARE: equal results share the points of the shared rank, next rank skipped",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "c",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "d",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 20,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 20,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "c",
+     "value": 15,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "d",
+     "value": 10,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "c",
+     "cents": 1600,
+     "rank": 3
+    },
+    {
+     "p": "d",
+     "cents": 1300,
+     "rank": 4
+    }
+   ]
+  },
+  {
+   "name": "tie SPLIT: 25 and 20 share 22.50",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SPLIT",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "c",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 20,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 20,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "c",
+     "value": 5,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2250,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 2250,
+     "rank": 1
+    },
+    {
+     "p": "c",
+     "cents": 1600,
+     "rank": 3
+    }
+   ]
+  },
+  {
+   "name": "tie SPLIT three ways rounds half up to the cent",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      10,
+      5,
+      4
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SPLIT",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "c",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 7,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 7,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "c",
+     "value": 7,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 633,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 633,
+     "rank": 1
+    },
+    {
+     "p": "c",
+     "cents": 633,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "tie SPLIT: half cent rounds up",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      0.05,
+      0.04
+     ],
+     "beyond": 1,
+     "participation": 0,
+     "absent": 0
+    },
+    "tiePolicy": "SPLIT",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 7,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 7,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 5,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 5,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "points beyond the table, and the participation floor",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      10,
+      6,
+      3
+     ],
+     "beyond": 0.5,
+     "participation": 2,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "c",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "d",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "e",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 40,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "c",
+     "value": 30,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "d",
+     "value": 20,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "e",
+     "value": 10,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 1000,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 600,
+     "rank": 2
+    },
+    {
+     "p": "c",
+     "cents": 300,
+     "rank": 3
+    },
+    {
+     "p": "d",
+     "cents": 200,
+     "rank": 4
+    },
+    {
+     "p": "e",
+     "cents": 200,
+     "rank": 5
+    }
+   ]
+  },
+  {
+   "name": "absence ZERO gives nothing",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "absence PARTICIPATION gives the floor",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 3,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "PARTICIPATION",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 300,
+     "rank": null
+    }
+   ]
+  },
+  {
+   "name": "absence with an explicit absent value under ZERO",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 2
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 200,
+     "rank": null
+    }
+   ]
+  },
+  {
+   "name": "rejected, pending and void attempts never count",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 10,
+     "no": 1,
+     "status": "rejected",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 20,
+     "no": 2,
+     "status": "pending",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 5,
+     "no": 3,
+     "status": "void",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 70,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "counting BEST (time): the lowest approved value",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 60,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 55,
+     "no": 2,
+     "status": "approved",
+     "at": "2026-11-02T11:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 58,
+     "no": 3,
+     "status": "approved",
+     "at": "2026-11-02T12:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 56,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 2000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "counting LATEST: the last approved attempt",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "LATEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 60,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 55,
+     "no": 2,
+     "status": "approved",
+     "at": "2026-11-02T11:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 58,
+     "no": 3,
+     "status": "approved",
+     "at": "2026-11-02T12:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 56,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "a",
+     "cents": 2000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "counting FIRST_APPROVED: the first approved attempt",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "FIRST_APPROVED",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 60,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 55,
+     "no": 2,
+     "status": "approved",
+     "at": "2026-11-02T11:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 56,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "a",
+     "cents": 2000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "counting FIRST_APPROVED skips an earlier rejected attempt",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "FIRST_APPROVED",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 10,
+     "no": 1,
+     "status": "rejected",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 12,
+     "no": 2,
+     "status": "approved",
+     "at": "2026-11-02T11:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 30,
+     "no": 3,
+     "status": "approved",
+     "at": "2026-11-02T12:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "an ineligible participant never scores",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "x",
+     "active": true,
+     "eligible": false
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 5,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "x",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "an inactive participant with no earlier points is not scored",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "y",
+     "active": false,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 5,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "y",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "nobody has a result",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [],
+   "expect": []
+  },
+  {
+   "name": "a single participant",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 1,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    }
+   ]
+  },
+  {
+   "name": "zero reps is a valid (poor) result",
+   "metric": {
+    "kind": "REPS",
+    "unit": "reps",
+    "direction": "HIGHER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 0,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 3,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "a",
+     "cents": 2000,
+     "rank": 2
+    }
+   ]
+  },
+  {
+   "name": "equal best times with different attempt numbers tie",
+   "metric": {
+    "kind": "TIME",
+    "unit": "s",
+    "direction": "LOWER_WINS"
+   },
+   "counting": "BEST",
+   "rules": {
+    "points": {
+     "byRank": [
+      25,
+      20,
+      16,
+      13,
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1
+     ],
+     "beyond": 1,
+     "participation": 1,
+     "absent": 0
+    },
+    "tiePolicy": "SHARE",
+    "absencePolicy": "ZERO",
+    "eligibility": "AT_REGISTRATION"
+   },
+   "participants": [
+    {
+     "id": "a",
+     "active": true,
+     "eligible": true
+    },
+    {
+     "id": "b",
+     "active": true,
+     "eligible": true
+    }
+   ],
+   "attempts": [
+    {
+     "p": "a",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    },
+    {
+     "p": "a",
+     "value": 50,
+     "no": 2,
+     "status": "approved",
+     "at": "2026-11-02T11:00:00Z"
+    },
+    {
+     "p": "b",
+     "value": 50,
+     "no": 1,
+     "status": "approved",
+     "at": "2026-11-02T10:00:00Z"
+    }
+   ],
+   "expect": [
+    {
+     "p": "a",
+     "cents": 2500,
+     "rank": 1
+    },
+    {
+     "p": "b",
+     "cents": 2500,
+     "rank": 1
+    }
+   ]
+  }
+ ]
+}
