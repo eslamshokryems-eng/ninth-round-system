@@ -21,7 +21,7 @@ async function rejects(p: Promise<unknown>, code: LeagueErrorCode): Promise<void
 async function small() {
   const l = new InMemoryLeague(admin, () => NOW);
   const s = await l.createSeason({ slug: "small-season", name: "Small", startsOn: "2026-11-02", endsOn: "2026-12-27" });
-  l.state.staff.push({ seasonId: s, profileId: judge.id, role: "JUDGE" }, { seasonId: s, profileId: reviewer.id, role: "REVIEWER" });
+  l.state.staff.push({ seasonId: s, profileId: judge.id, role: "JUDGE" }, { seasonId: s, profileId: reviewer.id, role: "REVIEWER" }, { seasonId: s, profileId: "second-admin", role: "LEAGUE_ADMIN" });
   const c1 = await l.upsertChallenge(s, 1, { name: "Push-ups", metricKind: "REPS", unit: "reps", maxAttempts: 2, requiresVerification: true });
   const c2 = await l.upsertChallenge(s, 2, { name: "Plank run", metricKind: "TIME", unit: "s", maxAttempts: 1, requiresVerification: false });
   for (const n of ["Ahmed K.", "Bassem R.", "Chris T."]) await l.addParticipant(s, n, `M-${n[0]}`, true);

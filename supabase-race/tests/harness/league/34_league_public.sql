@@ -27,7 +27,7 @@ select race_test.eq(jsonb_array_length(race_league_public_season('season-one') -
 select race_test.eq((select array_agg(k order by k) from jsonb_object_keys(race_league_public_season('season-one') -> 'standings' -> 0) k),
                     array['challengesCompleted', 'displayName', 'gapToNext', 'movement', 'publicId', 'rank', 'tied', 'totalPoints', 'weeklyPoints'], 'public: a standing row carries exactly the allow-listed fields');
 select race_test.eq((select array_agg(k order by k) from jsonb_object_keys(race_league_public_season('season-one') -> 'season') k),
-                    array['currentWeek', 'endsOn', 'name', 'slug', 'startsOn', 'status', 'throughWeek', 'totalWeeks'], 'public: the season block carries exactly the allow-listed fields');
+                    array['currentWeek', 'endsOn', 'name', 'participantCount', 'slug', 'startsOn', 'status', 'throughWeek', 'totalWeeks', 'truncated'], 'public: the season block carries exactly the allow-listed fields');
 select race_test.eq((select array_agg(k order by k) from jsonb_object_keys(race_league_public_season('season-one') -> 'challenges' -> 0) k),
                     array['description', 'direction', 'instructions', 'metricKind', 'name', 'referenceUrl', 'safetyNotes', 'status', 'unit', 'weekNumber'], 'public: a challenge carries exactly the allow-listed fields');
 select race_test.ok(race_league_public_season('season-one')::text !~* '(M-[0-9]|external|season_id|"id"|recorded|reviewed|created_by|profile|email|phone|rules|points_cents)', 'public: no external reference, internal id, staff identity, contact field or scoring rule appears anywhere in the payload');
@@ -68,6 +68,8 @@ select race_test.anon();
 select race_test.ok((race_league_public_season('season-one') ->> 'available')::boolean, 'public: republishing restores it');
 
 -- only the published week of a scheduled season would show: publish season-two and check the draft challenge stays hidden
+reset role;
+insert into race_league_staff (season_id, profile_id, role) values (race_test.id('s2'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN');   -- a published season needs two independent administrators
 select race_test.login('lg_other_admin');
 select race_league_set_published(race_test.id('s2'), true, 'preview');
 select race_test.anon();

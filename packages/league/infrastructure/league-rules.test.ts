@@ -310,3 +310,43 @@ describe("rule 8 — no gym database; CSV adapter only", () => {
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(l)).filter((m) => /gym|member|sync/i.test(m))).toEqual([]);
   });
 });
+
+describe("independent review — two administrators, honest public limits, conflicts", () => {
+  it("a season with one administrator can be neither activated nor published; a Super Admin's implicit access does not count as the second", async () => {
+    const l = new InMemoryLeague({ id: "solo", isSuperAdmin: true, roles: ["LEAGUE_ADMIN"] }, () => new Date(T0));
+    const s = await l.createSeason({ slug: "solo-season", name: "Solo", startsOn: "2026-11-02", endsOn: "2026-12-27" });
+    await l.setSeasonStatus(s, "scheduled");
+    await rejects(l.setSeasonStatus(s, "active"), "LEAGUE_INVALID");
+    await rejects(l.setPublished(s, true, "preview"), "LEAGUE_INVALID");
+    l.state.staff.push({ seasonId: s, profileId: "solo", role: "LEAGUE_ADMIN" }); // the same account twice is still one administrator
+    await rejects(l.setSeasonStatus(s, "active"), "LEAGUE_INVALID");
+    l.state.staff.push({ seasonId: s, profileId: "other", role: "LEAGUE_ADMIN" });
+    await expect(l.setSeasonStatus(s, "active")).resolves.toBeUndefined();
+    await expect(l.setPublished(s, true, "preview")).resolves.toBeUndefined();
+  });
+  it("the administrator who removed (voided) a result is conflicted in its appeal, even though no replacement attempt carries their name", async () => {
+    const { l, s, c1, ids } = await league(2);
+    const p = ids[0] as string;
+    const a = await record(l, c1, p, 30);
+    await record(l, c1, ids[1] as string, 20);
+    await l.as(admin).setChallengeStatus(c1, "closed");
+    await l.setPublished(s, true, "results");
+    await l.correctAttempt(a.id, null, "recorded for the wrong athlete"); // admin-1 removes it
+    const ap = await l.as(judge).lodgeAppeal({ challengeId: c1, participantId: p, reason: "mine was removed" });
+    await rejects(l.as(admin).decideAppeal(ap, "upheld", "x"), "LEAGUE_CONFLICT_OF_INTEREST");
+    await expect(l.as(admin2).decideAppeal(ap, "upheld", "independent review")).resolves.toBeUndefined();
+  });
+  it("the public read is capped at 1,000 rows, best first, and says so", async () => {
+    const { l, s, c1, ids } = await league(1);
+    for (let i = 0; i < 1100; i++) await l.as(admin).addParticipant(s, `Mass ${String(i).padStart(4, "0")}`, `X-${i}`, true);
+    const everyone = l.state.participants.map((p) => p.id);
+    await record(l, c1, ids[0] as string, 50);
+    await l.as(admin).setChallengeStatus(c1, "closed");
+    await l.setPublished(s, true, "mass");
+    const pub = await l.as(null).publicLeague("rules-season");
+    expect(everyone.length).toBe(1101);
+    expect(pub?.standings).toHaveLength(1000);
+    expect(pub?.season).toMatchObject({ participantCount: 1101, truncated: true });
+    expect(pub?.standings[0]?.rank).toBe(1);
+  });
+});

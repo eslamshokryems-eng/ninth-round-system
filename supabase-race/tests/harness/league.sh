@@ -6,10 +6,13 @@ lapply() { "${PSQL[@]}" -d "$LDB" -f "$1" >/dev/null; }
 lapply "$HERE/supabase-shim.sql"
 for f in "$ROOT"/supabase-race/supabase/migrations/*.sql; do lapply "$f"; done
 PROPOSED="$ROOT/supabase-race/proposed/league"
-for f in "$PROPOSED"/*.sql; do lapply "$f"; echo "  ok  proposed: $(basename "$f")"; done
+for f in "$PROPOSED"/*.sql; do case "$f" in *.rollback.sql) continue;; esac; lapply "$f"; echo "  ok  proposed: $(basename "$f")"; done
 "${PSQL[@]}" -d "$LDB" -f "$HERE/helpers.sql" >/dev/null
 "${PSQL[@]}" -d "$LDB" -c "create table race_test.league_parity (doc jsonb not null); grant select on race_test.league_parity to public" >/dev/null
 "${PSQL[@]}" -d "$LDB" -c "insert into race_test.league_parity values (\$json\$$(cat "$ROOT/packages/league/domain/parity-cases.json")\$json\$::jsonb)" >/dev/null
+"${PSQL[@]}" -d "$LDB" -c "create table race_test.league_differential (doc jsonb not null); grant select on race_test.league_differential to public" >/dev/null
+{ printf 'insert into race_test.league_differential values ($json$'; cat "$ROOT/packages/league/domain/differential-cases.json"; printf '$json$::jsonb);\n'; } > "$WORK/diff.sql"   # too large for one argv entry
+"${PSQL[@]}" -d "$LDB" -q -f "$WORK/diff.sql" >/dev/null
 ltotal=0
 for t in "$HERE"/league/*.sql; do
   echo "-- league/$(basename "$t")"
@@ -64,3 +67,23 @@ lpass "league concurrency: 6 simultaneous recomputes -> the ledger is unchanged 
 
 # the same isolation checks the main database passes, now with the league objects present (verify_deployment.sql pins exact object counts; its numbers change at activation)
 "${PSQL[@]}" -d "$LDB" -f "$HERE/isolation.sql" 2>&1 | sed -n 's/^.*NOTICE:  //p'
+
+# --- rollback rehearsal: migrations -> snapshot of object counts -> proposed migration -> proposed rollback -> counts identical -> migration applies again ----------------
+RDB=race_league_rb_test
+"${PSQL[@]}" -d postgres -c "create database $RDB" >/dev/null
+rapply() { "${PSQL[@]}" -d "$RDB" -q -f "$1" >/dev/null; }
+rq() { "${PSQL[@]}" -d "$RDB" -At -c "$1"; }
+objects() { rq "select (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind in ('r','S','v','m')) || ':' || (select count(*) from pg_proc where pronamespace = 'public'::regnamespace) || ':' || (select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relnamespace = 'public'::regnamespace and not t.tgisinternal) || ':' || (select count(*) from pg_policies where schemaname = 'public') || ':' || (select count(*) from pg_type where typnamespace = 'public'::regnamespace and typtype = 'e')"; }
+rapply "$HERE/supabase-shim.sql"
+for f in "$ROOT"/supabase-race/supabase/migrations/*.sql; do rapply "$f"; done
+BEFORE=$(objects)
+rapply "$PROPOSED/20261101000001_race_league.sql"
+DURING=$(objects)
+[ "$BEFORE" != "$DURING" ] || lfail "league rollback: the migration changed nothing?"
+rapply "$PROPOSED/20261101000001_race_league.rollback.sql"
+AFTER=$(objects)
+[ "$BEFORE" = "$AFTER" ] || lfail "league rollback: objects differ after rollback (before $BEFORE, after $AFTER)"
+[ "$(rq "select count(*) from pg_class where relnamespace = 'public'::regnamespace and relname like 'race\\_league\\_%'")" = "0" ] || lfail "league rollback: league tables remain"
+rapply "$PROPOSED/20261101000001_race_league.sql"
+[ "$(objects)" = "$DURING" ] || lfail "league rollback: re-applying the migration after a rollback gives a different schema"
+lpass "league rollback: migration ($BEFORE -> $DURING objects) then rollback restores exactly $AFTER; the migration applies again identically"

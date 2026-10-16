@@ -44,7 +44,7 @@ export async function buildDemoLeague(now: Date = new Date(), participants = 24)
   const startsOn = isoDay(start);
   const endsOn = isoDay(start + 55 * day);
   const seasonId = await league.createSeason({ slug: DEMO_SLUG, name: "THE NINTH League — Season 1 (demo data)", startsOn, endsOn });
-  league.state.staff.push({ seasonId, profileId: DEMO_USERS.judge.id, role: "JUDGE" }, { seasonId, profileId: DEMO_USERS.reviewer.id, role: "REVIEWER" });
+  league.state.staff.push({ seasonId, profileId: "demo-admin-2", role: "LEAGUE_ADMIN" }, { seasonId, profileId: DEMO_USERS.judge.id, role: "JUDGE" }, { seasonId, profileId: DEMO_USERS.reviewer.id, role: "REVIEWER" });
   await league.setSeasonStatus(seasonId, "scheduled");
   await league.setSeasonStatus(seasonId, "active");
 

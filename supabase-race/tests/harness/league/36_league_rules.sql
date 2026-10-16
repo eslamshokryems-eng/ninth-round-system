@@ -1,7 +1,6 @@
 -- THE NINTH League — the owner-supplied PROVISIONAL rules, proven against the real functions: points table, ties, membership at registration + documented
 -- eligibility decisions, 3 attempts / best approved counts, absence, judge correction REQUESTS vs administrator corrections, appeals. Throw-away database only.
 reset role;
-select race_test.make_user('lg_admin_b', '');    -- a second administrator (an appeal must be decided by one who did not record the result)
 create function race_test.pts(p_participant text, p_challenge text) returns bigint language sql stable as $$
   select coalesce(sum(points_cents), 0) from race_league_points_ledger where participant_id = race_test.id(p_participant) and challenge_id = race_test.id(p_challenge) $$;
 create function race_test.recorded(p_challenge text, p_participant text, p_value numeric, p_who text default null) returns uuid language plpgsql as $$
@@ -9,9 +8,16 @@ declare v uuid; begin v := (race_league_record_attempt(race_test.id(p_challenge)
 
 select race_test.login('lg_admin');
 select race_test.put('s3', race_league_create_season('season-rules', 'Rules Season', date '2026-11-02', date '2026-12-27'));
+select race_league_set_season_status(race_test.id('s3'), 'scheduled');
+select race_test.throws($$select race_league_set_season_status(race_test.id('s3'), 'active')$$, 'two independent league administrators', 'two administrators: a season with one administrator cannot be activated');
+select race_test.throws($$select race_league_set_published(race_test.id('s3'), true, 'preview')$$, 'two independent league administrators', 'two administrators: a season with one administrator cannot be published');
 reset role;
 insert into race_league_staff (season_id, profile_id, role) values
-  (race_test.id('s3'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN'), (race_test.id('s3'), race_test.id('lg_judge'), 'JUDGE'), (race_test.id('s3'), race_test.id('lg_rev'), 'REVIEWER');
+  (race_test.id('s3'), race_test.id('lg_judge'), 'JUDGE'), (race_test.id('s3'), race_test.id('lg_rev'), 'REVIEWER');
+select race_test.login('super');
+select race_league_set_staff(race_test.id('s3'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN', true);
+select race_test.login('lg_admin');
+select race_test.throws($$select race_league_set_staff(race_test.id('s3'), race_test.id('lg_judge2'), 'LEAGUE_ADMIN', true)$$, 'LEAGUE_FORBIDDEN', 'two administrators: only a Super Admin appoints a league administrator'); 
 
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 -- rule 1 + 4: the default rules are the owner's, and remain configurable
@@ -26,7 +32,6 @@ select race_test.eq(race_league_admin_overview(race_test.id('s3')) -> 'season' -
   'the staff overview returns the rules in the shape the screens read (camelCase)');
 select race_test.throws($$select race_league_update_rules(race_test.id('s3'), '{"points":{"by_rank":[100,90],"beyond":40,"participation":40,"absent":0},"tie_policy":"SHARE","absence_policy":"ZERO","eligibility":"AT_REGISTRATION","appeal_window_hours":0}', 'bad window')$$, 'appeal window', 'an appeal window of 0 hours is refused');
 select race_test.throws($$select race_league_update_rules(race_test.id('s3'), '{"points":{"by_rank":[100,90],"beyond":40,"participation":40,"absent":0},"tie_policy":"SHARE","absence_policy":"ZERO","eligibility":"AT_REGISTRATION","appeal_window_hours":721}', 'bad window')$$, 'appeal window', 'an appeal window above 720 hours is refused');
-select race_league_set_season_status(race_test.id('s3'), 'scheduled');
 select race_test.put('w1', race_league_upsert_challenge(race_test.id('s3'), 1, '{"name":"Max push-ups","metric_kind":"REPS","unit":"reps","requires_verification":false}'));
 select race_test.put('w2', race_league_upsert_challenge(race_test.id('s3'), 2, '{"name":"Plank hold","metric_kind":"TIME","unit":"s","direction":"HIGHER_WINS","requires_verification":true}'));
 select race_test.eq(race_test.q('select max_attempts || '':'' || counting from race_league_challenges where id = ''' || race_test.id('w1') || ''''), '3:BEST', 'rule 4: a challenge defaults to 3 attempts, the best counts');
@@ -224,6 +229,18 @@ select race_test.eq(jsonb_array_length(race_league_admin_overview(race_test.id('
 select race_test.anon();
 select race_test.ok(position('SECRET-APPEAL-TEXT' in (race_league_public_season('season-rules')::text || race_league_public_challenge_results('season-rules', 1)::text || race_league_public_participant('season-rules', race_test.q('select public_id from race_league_participants where id = ''' || race_test.id('p6') || ''''))::text)) = 0,
    'rule 7: appeal text never reaches a public read');
+
+-- a removed (voided) result leaves no replacement attempt, but the administrator who removed it is still conflicted
+select race_test.login('lg_judge');
+select race_test.put('ap3', race_league_lodge_appeal(race_test.id('w1'), race_test.id('p9'), 'my result was removed by mistake'));
+select race_test.login('lg_admin');
+select race_league_correct_attempt((select race_test.q('select id from race_league_attempts where challenge_id = ''' || race_test.id('w1') || ''' and participant_id = ''' || race_test.id('p9') || ''' and status = ''approved'' limit 1')::uuid), null, 'recorded for the wrong athlete');
+select race_test.throws($$select race_league_decide_appeal(race_test.id('ap3'), 'dismissed', 'x')$$, 'LEAGUE_CONFLICT_OF_INTEREST', 'rule 7: the administrator who REMOVED the result is conflicted too');
+select race_test.login('lg_admin_b');
+select race_league_decide_appeal(race_test.id('ap3'), 'upheld', 'the removal was a mistake — a separate correction follows');
+-- two administrators: a live season never drops below two
+select race_test.login('super');
+select race_test.throws($$select race_league_set_staff(race_test.id('s3'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN', false)$$, 'two independent league administrators', 'two administrators: removing one from a live season is refused');
 
 -- the window: 48 hours from publication (whichever of closing / publishing came last), configurable
 reset role;

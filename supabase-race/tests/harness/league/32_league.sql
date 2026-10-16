@@ -8,6 +8,7 @@ select race_test.make_user('lg_rev', '');
 select race_test.make_user('lg_rev2', '');
 select race_test.make_user('lg_plain', '');       -- an account with no league role
 select race_test.make_user('lg_other_admin', 'C');-- admin of a DIFFERENT season
+select race_test.make_user('lg_admin_b', '');     -- the second, independent administrator every live season needs
 
 -- reads a value as the database owner (the signed-in test roles have, by design, no table privileges)
 create function race_test.q(p text) returns text language plpgsql security definer set search_path = public as $$
@@ -50,7 +51,8 @@ select race_test.put('s2', race_league_create_season('season-two', 'Season Two',
 reset role;
 insert into race_league_staff (season_id, profile_id, role) values
   (race_test.id('s1'), race_test.id('lg_judge'), 'JUDGE'), (race_test.id('s1'), race_test.id('lg_judge2'), 'JUDGE'),
-  (race_test.id('s1'), race_test.id('lg_rev'), 'REVIEWER'), (race_test.id('s1'), race_test.id('lg_rev2'), 'REVIEWER');
+  (race_test.id('s1'), race_test.id('lg_rev'), 'REVIEWER'), (race_test.id('s1'), race_test.id('lg_rev2'), 'REVIEWER'),
+  (race_test.id('s1'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN');
 
 select race_test.login('lg_other_admin');
 select race_test.throws($$select race_league_set_season_status(race_test.id('s1'), 'scheduled')$$, 'LEAGUE_FORBIDDEN', 'the admin of ANOTHER season cannot change this one');

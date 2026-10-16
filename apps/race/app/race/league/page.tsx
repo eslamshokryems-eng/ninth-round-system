@@ -51,6 +51,7 @@ function LeagueMobile() {
             {tab === "standings" ? (
               <>
                 <RaceInput id="lg-search" label="Find an athlete" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Start typing a name" autoComplete="off" />
+                {league.season.truncated ? <p className="lg-sub" data-testid="truncated">Showing the top {league.standings.length} of {league.season.participantCount} athletes.</p> : null}
                 {league.standings.length === 0 ? <p style={{ color: "var(--race-muted)" }}>No athletes yet.</p> : rows.length === 0 ? <p style={{ color: "var(--race-muted)" }} data-testid="no-match">No athlete matches “{query}”.</p> : null}
                 <div className="flex flex-col gap-2" data-testid="standings">
                   {rows.map((r) => <StandingRow key={r.publicId} row={r} href={`/race/league/p/${r.publicId}${suffix}`} />)}

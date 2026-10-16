@@ -14,6 +14,9 @@ export interface PublicSeason {
   readonly totalWeeks: number;
   readonly throughWeek: number;
   readonly currentWeek: number | null;
+  /** How many athletes the season has, and whether `standings` was cut at PUBLIC_ROW_LIMIT (the list is never silently incomplete). */
+  readonly participantCount: number;
+  readonly truncated: boolean;
 }
 export interface PublicChallenge {
   readonly weekNumber: number;
@@ -46,8 +49,11 @@ export interface PublicLeague {
   readonly generatedAt: string;
 }
 
+/** A public read returns at most this many standings rows (best first). Mirrors the database function. */
+export const PUBLIC_ROW_LIMIT = 1000;
+
 export const PUBLIC_STANDING_KEYS = ["publicId", "displayName", "rank", "tied", "totalPoints", "weeklyPoints", "challengesCompleted", "movement", "gapToNext"] as const;
-export const PUBLIC_SEASON_KEYS = ["slug", "name", "status", "startsOn", "endsOn", "totalWeeks", "throughWeek", "currentWeek"] as const;
+export const PUBLIC_SEASON_KEYS = ["slug", "name", "status", "startsOn", "endsOn", "totalWeeks", "throughWeek", "currentWeek", "participantCount", "truncated"] as const;
 export const PUBLIC_CHALLENGE_KEYS = ["weekNumber", "name", "description", "instructions", "safetyNotes", "metricKind", "unit", "direction", "referenceUrl", "status"] as const;
 
 /** Challenges still in draft are never public. */
@@ -78,7 +84,7 @@ export function currentWeek(startsOn: string, endsOn: string, now: Date): number
 
 export function toPublicLeague(season: Season, challenges: readonly Challenge[], standings: Standings, now: Date): PublicLeague | null {
   if (!season.published) return null;
-  const rows: PublicStandingRow[] = standings.rows.map((r) => ({
+  const rows: PublicStandingRow[] = standings.rows.slice(0, PUBLIC_ROW_LIMIT).map((r) => ({
     publicId: r.publicId,
     displayName: r.displayName,
     rank: r.rank,
@@ -99,6 +105,8 @@ export function toPublicLeague(season: Season, challenges: readonly Challenge[],
       totalWeeks: 8,
       throughWeek: standings.throughWeek,
       currentWeek: currentWeek(season.startsOn, season.endsOn, now),
+      participantCount: standings.rows.length,
+      truncated: standings.rows.length > PUBLIC_ROW_LIMIT,
     },
     challenges: challenges.map(toPublicChallenge).filter((c): c is PublicChallenge => c !== null).sort((a, b) => a.weekNumber - b.weekNumber),
     standings: rows,

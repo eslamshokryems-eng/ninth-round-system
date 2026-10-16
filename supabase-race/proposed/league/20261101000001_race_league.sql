@@ -223,6 +223,8 @@ alter table race_league_appeals enable row level security;
 revoke all on race_league_seasons, race_league_challenges, race_league_participants, race_league_attempts, race_league_points_ledger, race_league_staff,
   race_league_eligibility_decisions, race_league_correction_requests, race_league_corrections, race_league_appeals
   from public, anon, authenticated;
+-- the ledger's identity sequence orders "latest line wins": the default privileges of a Supabase project would let a client role setval() it
+revoke all on sequence race_league_points_ledger_seq_seq from public, anon, authenticated;
 -- (no policies: a table without a policy returns nothing to any client role; every access goes through the functions below)
 
 select race_make_append_only('race_league_points_ledger');
@@ -335,6 +337,14 @@ begin
 end $$;
 revoke execute on function race_league_require_admin(uuid) from public, anon, authenticated;
 
+-- two INDEPENDENT league administrators (two distinct accounts, both active) are required before a season is activated or published, and while it is live.
+-- A Super Admin's implicit access does not count as one of the two.
+create or replace function race_league_admin_count(p_season uuid)
+returns int language sql stable security definer set search_path = '' as $$
+  select count(distinct profile_id)::int from public.race_league_staff where season_id = p_season and role = 'LEAGUE_ADMIN' and active;
+$$;
+revoke execute on function race_league_admin_count(uuid) from public, anon, authenticated;
+
 create or replace function race_league_reason(p_reason text)
 returns text language plpgsql immutable set search_path = '' as $$
 begin
@@ -434,25 +444,28 @@ revoke execute on function race_league_apply_scores(uuid) from public, anon, aut
 create or replace function race_league_totals(p_season uuid, p_max_week int)
 returns table (participant_id uuid, total_cents bigint, completed int, firsts int)
 language sql stable security definer set search_path = '' as $$
+  -- set-based (one pass over the season's ledger lines, joins instead of per-participant subqueries): linear-ish in the number of athletes
   with lines as (
-    select l.participant_id, l.points_cents, c.week_number, l.challenge_id
+    select l.participant_id, l.challenge_id, l.points_cents, l.rank, l.seq
       from public.race_league_points_ledger l join public.race_league_challenges c on c.id = l.challenge_id
      where l.season_id = p_season and c.week_number <= p_max_week
+  ), sums as (
+    select participant_id, sum(points_cents) as total from lines group by participant_id
   ), latest as (
-    select distinct on (l.challenge_id, l.participant_id) l.challenge_id, l.participant_id, l.rank
-      from public.race_league_points_ledger l join public.race_league_challenges c on c.id = l.challenge_id
-     where l.season_id = p_season and c.week_number <= p_max_week
-     order by l.challenge_id, l.participant_id, l.seq desc
+    select distinct on (challenge_id, participant_id) participant_id, rank from lines order by challenge_id, participant_id, seq desc
+  ), lr as (
+    select participant_id, (count(*) filter (where rank is not null))::int as completed, (count(*) filter (where rank = 1))::int as firsts from latest group by participant_id
   )
-  select p.id,
-         coalesce((select sum(points_cents) from lines where lines.participant_id = p.id), 0)::bigint,
-         (select count(*) from latest where latest.participant_id = p.id and latest.rank is not null)::int,
-         (select count(*) from latest where latest.participant_id = p.id and latest.rank = 1)::int
-    from public.race_league_participants p where p.season_id = p_season;
+  select p.id, coalesce(s.total, 0)::bigint, coalesce(lr.completed, 0), coalesce(lr.firsts, 0)
+    from public.race_league_participants p
+    left join sums s on s.participant_id = p.id
+    left join lr on lr.participant_id = p.id
+   where p.season_id = p_season;
 $$;
 revoke execute on function race_league_totals(uuid, int) from public, anon, authenticated;
 
--- rows ordered (total desc, first places desc, name, public id); equal totals share a competition rank; ids are internal-only fields (`id`).
+-- rows ordered (total desc, first places desc, name, public id); equal totals share a competition rank and are flagged `tied`; ids are internal-only fields (`id`).
+-- Everything is a join / window function (no per-row subquery): the cost grows with n log n, not n squared.
 create or replace function race_league_standings_rows(p_season uuid)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_through int; v_out jsonb;
@@ -460,7 +473,8 @@ begin
   select coalesce(max(week_number), 0) into v_through from public.race_league_challenges where season_id = p_season and status = 'closed';
   with cur as (
     select t.*, p.public_id, p.display_name,
-           rank() over (order by t.total_cents desc) as rnk
+           rank() over (order by t.total_cents desc) as rnk,
+           (count(*) over (partition by t.total_cents)) > 1 as is_tied
       from public.race_league_totals(p_season, 8) t join public.race_league_participants p on p.id = t.participant_id
   ), prev as (
     select t.participant_id, rank() over (order by t.total_cents desc) as rnk
@@ -470,16 +484,24 @@ begin
     select l.participant_id, c.week_number, sum(l.points_cents) as cents
       from public.race_league_points_ledger l join public.race_league_challenges c on c.id = l.challenge_id
      where l.season_id = p_season group by l.participant_id, c.week_number
+  ), wk as (
+    select participant_id, jsonb_object_agg(week_number::text, cents / 100.0) as w from weekly group by participant_id
+  ), nxt as (
+    -- for each distinct total, the next higher distinct total
+    select total_cents, lead(total_cents) over (order by total_cents) as higher from (select distinct total_cents from cur) d
   )
   select coalesce(jsonb_agg(jsonb_build_object(
-      'id', c.participant_id, 'publicId', c.public_id, 'displayName', c.display_name, 'rank', c.rnk, 'totalPoints', c.total_cents / 100.0,
-      'weeklyPoints', coalesce((select jsonb_object_agg(w.week_number::text, w.cents / 100.0) from weekly w where w.participant_id = c.participant_id), '{}'::jsonb),
-      'tied', (select count(*) from cur o where o.total_cents = c.total_cents) > 1,
+      'id', c.participant_id, 'publicId', c.public_id, 'displayName', c.display_name, 'rank', c.rnk, 'tied', c.is_tied, 'totalPoints', c.total_cents / 100.0,
+      'weeklyPoints', coalesce(wk.w, '{}'::jsonb),
       'challengesCompleted', c.completed, 'firstPlaces', c.firsts,
-      'movement', (select pv.rnk - c.rnk from prev pv where pv.participant_id = c.participant_id),
-      'gapToNext', (select min(o.total_cents) - c.total_cents from cur o where o.total_cents > c.total_cents) / 100.0
+      'movement', pv.rnk - c.rnk,
+      'gapToNext', (n.higher - c.total_cents) / 100.0
     ) order by c.total_cents desc, c.firsts desc, lower(c.display_name) collate "C", c.public_id), '[]'::jsonb)
-    into v_out from cur c;
+    into v_out
+    from cur c
+    left join prev pv on pv.participant_id = c.participant_id
+    left join wk on wk.participant_id = c.participant_id
+    left join nxt n on n.total_cents = c.total_cents;
   return v_out;
 end $$;
 revoke execute on function race_league_standings_rows(uuid) from public, anon, authenticated;
@@ -489,7 +511,7 @@ revoke execute on function race_league_standings_rows(uuid) from public, anon, a
 -- ---------------------------------------------------------------------------
 create or replace function race_league_public_season(p_slug text)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare se public.race_league_seasons; v_through int; v_week int; v_rows jsonb;
+declare se public.race_league_seasons; v_through int; v_week int; v_rows jsonb; v_count int;
 begin
   select * into se from public.race_league_seasons where public_slug = lower(coalesce(p_slug, '')) and published;
   if se.id is null then return jsonb_build_object('available', false); end if;
@@ -497,11 +519,13 @@ begin
   v_week := case when current_date between se.starts_on and se.ends_on then ((current_date - se.starts_on) / 7) + 1 end;
   -- standings rows with every internal field removed (the `id` key never leaves the database)
   select coalesce(jsonb_agg(r - 'id' - 'firstPlaces'), '[]'::jsonb) into v_rows
-    from (select value as r from jsonb_array_elements(public.race_league_standings_rows(se.id)) limit 1000) x;
+    from (select value as r from jsonb_array_elements(public.race_league_standings_rows(se.id)) with ordinality t(value, n) order by n limit 1000) x;
+  select count(*) into v_count from public.race_league_participants where season_id = se.id;
   return jsonb_build_object(
     'available', true,
     'season', jsonb_build_object('slug', se.public_slug, 'name', se.name, 'status', se.status, 'startsOn', se.starts_on, 'endsOn', se.ends_on,
-                                 'totalWeeks', 8, 'throughWeek', v_through, 'currentWeek', v_week),
+                                 'totalWeeks', 8, 'throughWeek', v_through, 'currentWeek', v_week,
+                                 'participantCount', v_count, 'truncated', v_count > 1000),
     'challenges', coalesce((select jsonb_agg(jsonb_build_object('weekNumber', c.week_number, 'name', c.name, 'description', c.description,
                   'instructions', c.instructions, 'safetyNotes', c.safety_notes, 'metricKind', c.metric_kind, 'unit', c.unit, 'direction', c.direction,
                   'referenceUrl', c.reference_url, 'status', c.status) order by c.week_number)
@@ -525,7 +549,7 @@ begin
                from (select distinct on (participant_id) participant_id, rank from public.race_league_points_ledger where challenge_id = ch.id order by participant_id, seq desc) l
                join public.race_league_participants p on p.id = l.participant_id
                left join public.race_league_counted_attempts(ch.id) k on k.participant_id = p.id
-              where l.rank is not null limit 1000) x), '[]'::jsonb));
+              where l.rank is not null order by l.rank, lower(p.display_name) collate "C", p.public_id limit 1000) x), '[]'::jsonb));
 end $$;
 
 create or replace function race_league_public_participant(p_slug text, p_public_id text)
@@ -578,6 +602,9 @@ begin
   if se.id is null then raise exception 'LEAGUE_NOT_FOUND: season' using errcode = 'no_data_found'; end if;
   ok := (se.status = 'draft' and p_status = 'scheduled') or (se.status = 'scheduled' and p_status in ('active', 'draft')) or (se.status = 'active' and p_status = 'completed');
   if not ok then raise exception 'LEAGUE_INVALID_TRANSITION: a season cannot go from % to %', se.status, p_status using errcode = 'check_violation'; end if;
+  if p_status = 'active' and public.race_league_admin_count(p_season) < 2 then
+    raise exception 'LEAGUE_INVALID: two independent league administrators are required before the season can be activated' using errcode = 'check_violation';
+  end if;
   if p_status = 'completed' then
     if exists (select 1 from public.race_league_challenges where season_id = p_season and status in ('open')) then
       raise exception 'LEAGUE_INVALID: close the open challenge first' using errcode = 'check_violation';
@@ -606,6 +633,9 @@ begin
   select * into se from public.race_league_seasons where id = p_season for update;
   if se.id is null then raise exception 'LEAGUE_NOT_FOUND: season' using errcode = 'no_data_found'; end if;
   if p_published and se.status = 'draft' then raise exception 'LEAGUE_INVALID: schedule the season before publishing it' using errcode = 'check_violation'; end if;
+  if p_published and public.race_league_admin_count(p_season) < 2 then
+    raise exception 'LEAGUE_INVALID: two independent league administrators are required before the season can be published' using errcode = 'check_violation';
+  end if;
   update public.race_league_seasons set published = p_published, first_published_at = case when p_published then coalesce(first_published_at, clock_timestamp()) else first_published_at end where id = p_season;
   perform public.race_league_audit_log('league.season.publish', p_season, 'race_league_seasons', p_season, jsonb_build_object('published', se.published), jsonb_build_object('published', p_published),
     jsonb_build_object('reason', trim(p_reason)));
@@ -1005,8 +1035,9 @@ begin
   v_reason := public.race_league_reason(p_reason);
   if p_decision not in ('upheld', 'dismissed') then raise exception 'LEAGUE_INVALID: decision must be upheld or dismissed' using errcode = 'check_violation'; end if;
   if ap.status <> 'submitted' then raise exception 'LEAGUE_INVALID: this appeal has already been decided' using errcode = 'check_violation'; end if;
-  if exists (select 1 from public.race_league_attempts a where a.challenge_id = ap.challenge_id and a.participant_id = ap.participant_id and a.recorded_by = auth.uid()) then
-    raise exception 'LEAGUE_CONFLICT_OF_INTEREST: the administrator who recorded this result cannot review its appeal' using errcode = 'insufficient_privilege';
+  if exists (select 1 from public.race_league_attempts a where a.challenge_id = ap.challenge_id and a.participant_id = ap.participant_id and a.recorded_by = auth.uid())
+     or exists (select 1 from public.race_league_corrections k where k.challenge_id = ap.challenge_id and k.participant_id = ap.participant_id and k.actor = auth.uid()) then
+    raise exception 'LEAGUE_CONFLICT_OF_INTEREST: the administrator who recorded or corrected this result cannot review its appeal' using errcode = 'insufficient_privilege';
   end if;
   update public.race_league_appeals set status = p_decision, decided_by = auth.uid(), decided_at = clock_timestamp(), decision_reason = v_reason where id = ap.id;
   perform public.race_league_audit_log('league.appeal.' || p_decision, ap.season_id, 'race_league_appeals', ap.id, jsonb_build_object('status', 'submitted'), jsonb_build_object('status', p_decision),
@@ -1041,6 +1072,11 @@ begin
   if not exists (select 1 from public.race_profiles where id = p_profile) then raise exception 'LEAGUE_NOT_FOUND: account' using errcode = 'no_data_found'; end if;
   insert into public.race_league_staff (season_id, profile_id, role, active, assigned_by) values (p_season, p_profile, p_role, coalesce(p_active, true), auth.uid())
   on conflict (season_id, profile_id, role) do update set active = coalesce(p_active, true), assigned_by = auth.uid();
+  -- a live (active or published) season never drops below two independent administrators
+  if p_role = 'LEAGUE_ADMIN' and public.race_league_admin_count(p_season) < 2
+     and exists (select 1 from public.race_league_seasons where id = p_season and (status = 'active' or published)) then
+    raise exception 'LEAGUE_INVALID: an active or published season needs two independent league administrators' using errcode = 'check_violation';
+  end if;
   perform public.race_league_audit_log('league.staff.set', p_season, 'race_league_staff', null, null, jsonb_build_object('profile_id', p_profile, 'role', p_role, 'active', coalesce(p_active, true)));
 end $$;
 

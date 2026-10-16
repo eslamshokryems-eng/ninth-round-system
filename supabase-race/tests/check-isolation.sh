@@ -32,3 +32,18 @@ grep -rIn --exclude-dir=node_modules --exclude-dir=.next -E "SUPABASE_URL|SUPABA
 ! grep -rIln --exclude-dir=node_modules --exclude-dir=.next -E "SERVICE_ROLE_KEY|service_role" apps/race/app apps/race/src packages/race >/dev/null 2>&1 && pass "the service-role key is never referenced by browser code" || fail "service-role key referenced in browser code"
 ! git ls-files | grep -Eq '(^|/)\.env($|\.local|\.production)' && pass "no .env file is committed" || fail ".env file committed"
 ! git grep -IlE 'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.' -- . ':!pnpm-lock.yaml' >/dev/null 2>&1 && pass "no JWT-shaped secret is committed anywhere" || fail "a JWT-shaped string is committed"
+
+# --- THE NINTH League is part of the race product but is a separate MODULE: these checks make the dependency allow-list above mean what it says ----------------------------
+# (a) nothing outside the league screens imports the league package, and the race package never does
+hits=$(grep -rIln --exclude-dir=node_modules --exclude-dir=.next -E "@9thround/league" apps/race/app apps/race/src packages/race 2>/dev/null | grep -vE "^apps/race/app/race/league/|^apps/race/src/(features|components)/league/" || true)
+[ -z "$hits" ] && pass "@9thround/league is imported only by the league routes, features and components (never by the race engine or other race screens)" || { echo "$hits"; fail "league package imported outside the league screens"; }
+# (b) the league package imports nothing from the race engine or the app, by name or by relative path, and depends on no workspace package at runtime
+hits=$(grep -rIn --exclude-dir=node_modules -E "from ['\"](@9thround/race|\.\./\.\./(apps|race)|\.\./\.\./\.\./|.*apps/race|.*packages/race)" packages/league --include=*.ts 2>/dev/null || true)
+[ -z "$hits" ] && pass "packages/league imports nothing from the race engine or the app" || { echo "$hits"; fail "league package imports race code"; }
+node -e 'const j=require("./packages/league/package.json"); const r=Object.keys(j.dependencies||{}); if (r.length) { console.log(r.join(",")); process.exit(1); }' && pass "packages/league has no runtime dependencies at all" || fail "packages/league has runtime dependencies"
+# (c) the league SQL touches only a short allow-list of race objects (identity, audit, append-only helpers, role checks) — no race event, clock, station, slot, result or ranking object
+LSQL=supabase-race/proposed/league/20261101000001_race_league.sql
+bad=$(grep -v '^\s*--' "$LSQL" | grep -oE 'race_[a-z][a-z_]*' | grep -vE '^race_league' | sort -u | grep -vxE 'race_profiles|race_audit_log|race_log_audit_event|race_make_append_only|race_forbid_delete|race_is_super_admin|race_can_create_events' || true)
+[ -z "$bad" ] && pass "the league SQL references only race_profiles, the audit log and four shared helper functions of the race schema (no event / clock / station / slot / result object)" || { echo "$bad"; fail "league SQL references other race objects"; }
+# (d) and no race migration references a league object
+! grep -rIl "race_league" supabase-race/supabase >/dev/null 2>&1 && pass "no race migration mentions the league" || fail "a race migration references the league"

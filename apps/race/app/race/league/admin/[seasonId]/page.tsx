@@ -58,6 +58,8 @@ const gw = () => import("../../../../../src/features/league/source").then((m) =>
 function Overview({ d, act, slug }: { d: AdminOverview; act: Act; slug: string }) {
   const [reason, setReason] = useState("");
   const next = SEASON_TRANSITIONS[d.season.status];
+  const admins = d.staff ? new Set(d.staff.filter((x) => x.role === "LEAGUE_ADMIN" && x.active).map((x) => x.profileId)).size : null;
+  const needTwo = admins !== null && admins < 2;
   return (
     <div className="grid gap-4 md:grid-cols-2" data-testid="tab-overview">
       <div className="race-card flex flex-col gap-2">
@@ -70,12 +72,14 @@ function Overview({ d, act, slug }: { d: AdminOverview; act: Act; slug: string }
       {d.isAdmin ? (
         <div className="race-card flex flex-col gap-3">
           <p className="race-label">Season status</p>
+          <p className="lg-sub" data-testid="admin-count">Independent league administrators: <strong>{admins}</strong> of 2 required to activate or publish.</p>
+          {needTwo ? <RaceNotice>Appoint a second league administrator (a Super Admin does this) before the season can be activated or published.</RaceNotice> : null}
           <div className="flex flex-wrap gap-2">
-            {next.map((s) => <RaceButton key={s} size="sm" disabled={act.busy} onClick={() => void act.run(`Season → ${s}`, async () => (await gw()).setSeasonStatus(d.season.id, s))}>{s === "completed" ? "Complete season (final)" : `Move to ${s}`}</RaceButton>)}
+            {next.map((s) => <RaceButton key={s} size="sm" disabled={act.busy || (needTwo && s === "active")} onClick={() => void act.run(`Season → ${s}`, async () => (await gw()).setSeasonStatus(d.season.id, s))}>{s === "completed" ? "Complete season (final)" : `Move to ${s}`}</RaceButton>)}
             {next.length === 0 ? <span className="lg-sub">Completed — the results are final and cannot be reopened.</span> : null}
           </div>
           <RaceInput id="pub-reason" label="Reason (required to publish or hide)" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <RaceButton size="sm" variant={d.season.published ? "danger" : "primary"} disabled={act.busy || reason.trim() === ""} data-testid="toggle-publish"
+          <RaceButton size="sm" variant={d.season.published ? "danger" : "primary"} disabled={act.busy || reason.trim() === "" || (needTwo && !d.season.published)} data-testid="toggle-publish"
             onClick={() => void act.run(d.season.published ? "Hidden from the public" : "Published", async () => (await gw()).setPublished(d.season.id, !d.season.published, reason))}>{d.season.published ? "Hide from the public" : "Publish to the public pages"}</RaceButton>
         </div>
       ) : <div className="race-card"><p className="lg-sub">Only a league administrator changes the season.</p></div>}

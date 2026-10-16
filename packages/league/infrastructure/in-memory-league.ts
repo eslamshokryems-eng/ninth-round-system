@@ -128,6 +128,10 @@ export class InMemoryLeague implements LeagueGateway {
     list[i] = next;
     return next;
   }
+  /** Two distinct league-administrator accounts. A Super Admin's implicit access does not count as one of them. */
+  private independentAdmins(seasonId: string): number {
+    return new Set(this.state.staff.filter((s) => s.seasonId === seasonId && s.role === "LEAGUE_ADMIN").map((s) => s.profileId)).size;
+  }
   private lockCompleted(seasonId: string): void {
     if (this.season(seasonId).status === "completed") fail("LEAGUE_SEASON_LOCKED", "This season is completed — its results are final.");
   }
@@ -249,6 +253,7 @@ export class InMemoryLeague implements LeagueGateway {
     this.requireAdmin(seasonId);
     const se = this.season(seasonId);
     requireSeasonTransition(se.status, status);
+    if (status === "active" && this.independentAdmins(seasonId) < 2) fail("LEAGUE_INVALID", "Two independent league administrators are required before the season can be activated.");
     if (status === "completed") {
       if (this.state.challenges.some((c) => c.seasonId === seasonId && c.status === "open")) fail("LEAGUE_INVALID", "Close the open challenge first.");
       if (this.state.attempts.some((a) => a.seasonId === seasonId && a.status === "pending")) fail("LEAGUE_INVALID", "Some attempts are still waiting for review.");
@@ -263,6 +268,7 @@ export class InMemoryLeague implements LeagueGateway {
     if (reason.trim() === "") fail("LEAGUE_REASON_REQUIRED", "A reason is required.");
     const se = this.season(seasonId);
     if (published && se.status === "draft") fail("LEAGUE_INVALID", "Schedule the season before publishing it.");
+    if (published && this.independentAdmins(seasonId) < 2) fail("LEAGUE_INVALID", "Two independent league administrators are required before the season can be published.");
     this.patch(this.state.seasons, seasonId, { published, firstPublishedAt: published ? (se.firstPublishedAt ?? this.now().toISOString()) : se.firstPublishedAt });
     this.log(seasonId, "league.season.publish", { published, reason });
   }
@@ -492,7 +498,8 @@ export class InMemoryLeague implements LeagueGateway {
     if (ap.status !== "submitted") fail("LEAGUE_INVALID", "This appeal has already been decided.");
     const actor = this.actorValue as Actor;
     // Independence: whoever recorded (or corrected) any attempt in this participant's result cannot review its appeal.
-    if (this.state.attempts.some((a) => a.challengeId === ap.challengeId && a.participantId === ap.participantId && a.recordedBy === actor.id)) fail("LEAGUE_CONFLICT_OF_INTEREST", "The administrator who recorded this result cannot review its appeal.");
+    if (this.state.attempts.some((a) => a.challengeId === ap.challengeId && a.participantId === ap.participantId && a.recordedBy === actor.id)
+      || this.state.corrections.some((c) => c.challengeId === ap.challengeId && c.participantId === ap.participantId && c.actor === actor.id)) fail("LEAGUE_CONFLICT_OF_INTEREST", "The administrator who recorded or corrected this result cannot review its appeal.");
     this.patch(this.state.appeals, ap.id, { status: decision, decidedBy: actor.id, decidedAt: this.now().toISOString(), decisionReason: why });
     // Deliberately NO scoring call: an appeal never moves a score. An upheld appeal is followed, if warranted, by a normal audited correction.
     this.log(ap.seasonId, `league.appeal.${decision}`, { appeal: ap.id, reason: why });
