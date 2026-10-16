@@ -18,7 +18,7 @@ packages/league            pure TypeScript, no dependency on @9thround/race or o
   domain/                  types · validation · scoring (rank, points, ledger reconciliation) · standings · public projection · CSV import · gateway interface
   infrastructure/          SupabaseLeague (RPC wrapper) · InMemoryLeague (same rules, for dev + tests) · synthetic demo fixtures
 apps/race/app/race/league  /race/league (phone) · /tv · /p/<publicId> · /admin · /admin/<seasonId>
-supabase-race/proposed/league/20261101000001_race_league.sql    6 tables + 40 functions, all race_league_*
+supabase-race/proposed/league/20261101000001_race_league.sql    6 tables + 35 functions, all race_league_*
 ```
 * **No coupling to the race engine.** The league reads/writes no `race_events`, `race_clock`, `race_station_*`, `race_slots` or race result. A weekly *league challenge* is a different concept from an official THE NINTH *race*. If a future challenge should import a race result, the intended seam is a new, documented adapter — not a join into engine tables.
 * **Separate from the gym system.** Members are linked only through an optional opaque `external_ref` (text, private, never public); no cross-database foreign key, no gym credential. For development: synthetic "Demo Athlete NN".
