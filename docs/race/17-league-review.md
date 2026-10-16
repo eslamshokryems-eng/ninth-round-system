@@ -49,7 +49,7 @@ Method: read every function and table; wrote adversarial probes (suite `37_leagu
 
 ## 5. Race Engine regression status (accurate)
 * Unit tests: `pnpm test` — race 270/270 (all workspaces green), lint and typecheck clean, `check-isolation.sh` 0 failures, staging shell tests (2) pass.
-* Database: the full migration harness (all existing race suites, 1,447 assertions + the final 50-athlete simulation) is part of the runs in §9.
+* Database, final code: the full migration harness passed on **PostgreSQL 16.13 and 17.11**, each with the **1,447 existing race assertions** (incl. the final 50-athlete simulation and the parallel-session suites) unchanged, **287 league assertions**, the rollback rehearsal and the restore-fingerprint comparison: `ALL RACE MIGRATION TESTS PASSED` twice.
 * **Existing race browser suite (`race-e2e.mjs`) — rerun on the final code:** run 1 = **88/96**, run 2 = **89/96**. The same **7 rowing / OCR / evidence-page checks fail in both runs** (they also failed on the pre-league baseline in the earlier round; I did not re-run the baseline in this review, so the equality of the 7 names with the baseline is from that earlier comparison). Run 1 additionally failed `reception: several matches show a pick list` with a 30 s click timeout (element "not stable"); it passed in run 2 and no reception file is touched by the league — I classify it as a transient timing flake, but I did not root-cause it. **I do not claim the browser suite passes.**
 
 ## 6. The 1,000-row public limit: scaling and rate-limiting requirements
