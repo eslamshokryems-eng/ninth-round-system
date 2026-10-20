@@ -61,6 +61,7 @@ export default function LeadsPage() {
 
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
   const [sourceFilter, setSourceFilter] = useState<LeadSource | "">("");
+  const [assignmentFilter, setAssignmentFilter] = useState<"" | "unassigned">("");
   const [sort, setSort] = useState<SortKey>("newest");
   const [page, setPage] = useState(1);
 
@@ -99,6 +100,7 @@ export default function LeadsPage() {
   let rows = isFiltering ? results : allLeads;
   if (statusFilter) rows = rows.filter((lead) => lead.status === statusFilter);
   if (sourceFilter) rows = rows.filter((lead) => lead.source === sourceFilter);
+  if (assignmentFilter === "unassigned") rows = rows.filter((lead) => lead.assignedToId === null);
   rows = [...rows].sort((a, b) => {
     if (sort === "name") return a.fullName.localeCompare(b.fullName);
     if (sort === "oldest") return a.createdAt.getTime() - b.createdAt.getTime();
@@ -119,11 +121,12 @@ export default function LeadsPage() {
     );
   }
 
-  const hasActiveFilters = Boolean(statusFilter || sourceFilter);
+  const hasActiveFilters = Boolean(statusFilter || sourceFilter || assignmentFilter);
 
   function clearFilters() {
     setStatusFilter("");
     setSourceFilter("");
+    setAssignmentFilter("");
     setPage(1);
   }
 
@@ -176,6 +179,15 @@ export default function LeadsPage() {
               {SOURCE_LABEL[source]}
             </option>
           ))}
+        </SelectField>
+        <SelectField
+          label="Assignment"
+          value={assignmentFilter}
+          onChange={(e) => setAssignmentFilter(e.target.value as "" | "unassigned")}
+          className="w-44"
+        >
+          <option value="">All leads</option>
+          <option value="unassigned">Unassigned only</option>
         </SelectField>
       </FilterBar>
 
