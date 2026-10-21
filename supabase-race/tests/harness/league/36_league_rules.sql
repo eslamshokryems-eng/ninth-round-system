@@ -1,6 +1,7 @@
 -- THE NINTH League — the owner-supplied PROVISIONAL rules, proven against the real functions: points table, ties, membership at registration + documented
 -- eligibility decisions, 3 attempts / best approved counts, absence, judge correction REQUESTS vs administrator corrections, appeals. Throw-away database only.
 reset role;
+select race_test.use_gate();      -- the API's request carries the gate secret (see suite 34)
 create function race_test.pts(p_participant text, p_challenge text) returns bigint language sql stable as $$
   select coalesce(sum(points_cents), 0) from race_league_points_ledger where participant_id = race_test.id(p_participant) and challenge_id = race_test.id(p_challenge) $$;
 create function race_test.recorded(p_challenge text, p_participant text, p_value numeric, p_who text default null) returns uuid language plpgsql as $$

@@ -63,7 +63,7 @@ export function createPublicApi(deps: PublicApiDeps) {
     try {
       const res = await fetchImpl(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, {
         method: "POST",
-        headers: { apikey: config.supabaseAnonKey, Authorization: `Bearer ${config.supabaseAnonKey}`, "Content-Type": "application/json", Accept: "application/json" },
+        headers: { apikey: config.supabaseAnonKey, Authorization: `Bearer ${config.supabaseAnonKey}`, "Content-Type": "application/json", Accept: "application/json", ...(config.gateSecret ? { "x-league-gate": config.gateSecret } : {}) },
         body: JSON.stringify(args),
         signal: ctl.signal,
         ...({ cache: "no-store" } as Record<string, unknown>), // never reuse a framework-level fetch cache for this call

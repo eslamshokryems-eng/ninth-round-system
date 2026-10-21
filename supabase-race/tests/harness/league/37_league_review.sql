@@ -1,5 +1,6 @@
 -- Independent review probes: client roles have no path around the checked functions; cross-season writes are refused; privileged internals stay internal.
 reset role;
+select race_test.use_gate();      -- the API's request carries the gate secret (see suite 34)
 select race_test.make_user('rv_judge_a', '');
 select race_test.make_user('rv_admin_a', 'C');
 select race_test.make_user('rv_admin_a2', '');
@@ -20,7 +21,7 @@ declare t text; r text; ok boolean;
 begin
   foreach r in array array['anon', 'authenticated'] loop
     foreach t in array array['race_league_seasons', 'race_league_challenges', 'race_league_participants', 'race_league_attempts', 'race_league_points_ledger', 'race_league_staff',
-                             'race_league_eligibility_decisions', 'race_league_correction_requests', 'race_league_corrections', 'race_league_appeals'] loop
+                             'race_league_eligibility_decisions', 'race_league_correction_requests', 'race_league_corrections', 'race_league_appeals', 'race_league_public_gate'] loop
       ok := not has_table_privilege(r, 'public.' || t, 'select') and not has_table_privilege(r, 'public.' || t, 'insert') and not has_table_privilege(r, 'public.' || t, 'update')
         and not has_table_privilege(r, 'public.' || t, 'delete') and not has_table_privilege(r, 'public.' || t, 'truncate') and not has_table_privilege(r, 'public.' || t, 'references')
         and not has_table_privilege(r, 'public.' || t, 'trigger');
@@ -31,7 +32,7 @@ begin
       raise exception 'FAIL: % can use the ledger sequence', r;
     end if;
   end loop;
-  raise notice 'PASS  review: neither client role holds any privilege on any league table or on the ledger sequence';
+  raise notice 'PASS  review: neither client role holds any privilege on any of the 11 league tables or on the ledger sequence';
 end $$;
 select race_test.login('rv_admin_a');
 select race_test.throws($$select setval('public.race_league_points_ledger_seq_seq', 1)$$, 'permission denied', 'review: a signed-in administrator cannot reset the ledger sequence');
@@ -112,4 +113,14 @@ select race_test.eq(jsonb_array_length(race_league_public_season('review-scale')
 select race_test.eq(race_league_public_season('review-scale') -> 'season' ->> 'truncated', 'true', 'scale: ... and say that the list was cut');
 select race_test.ok(race_league_public_participant('review-scale', race_test.q('select public_id from race_league_participants where display_name = ''Scale 01500''')) ->> 'available' = 'true', 'scale: one athlete''s public page also answers inside 5 s');
 reset statement_timeout;
+reset role;
+
+-- 6. a direct call without the gate secret costs nothing: it is answered before any work, even on a big season
+select race_test.anon();
+select race_test.send_header('{}');
+set statement_timeout = '300ms';
+select race_test.eq(race_league_public_season('review-scale'), '{"available": false}'::jsonb, 'gate: a direct call without the secret on a 3,000-athlete season is answered instantly with "not available"');
+select race_test.eq(race_league_public_participant('review-scale', 'abcd1234abcd1234'), '{"available": false}'::jsonb, 'gate: ... for the athlete read as well');
+reset statement_timeout;
+select race_test.use_gate();
 reset role;

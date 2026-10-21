@@ -2,7 +2,7 @@
  * THE NINTH League — browser checks (manual; not part of CI). Two targets:
  *   A) a DEV server (synthetic fixtures):      RACE_LEAGUE_DEV=http://localhost:3101   (NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co … next dev -p 3101)
  *   B) a PRODUCTION build (database source):   RACE_LEAGUE_PROD=http://localhost:3100  (built with NEXT_PUBLIC_SUPABASE_URL=http://localhost:3199 — this script runs the mock database on that port;
- *      started with LEAGUE_RATELIMIT_BACKEND=memory LEAGUE_RATELIMIT_SALT=<16+ chars> LEAGUE_TRUSTED_PROXY=none LEAGUE_RATELIMIT_ATHLETE_PER_WINDOW=3; proves fixtures are unreachable, the API contract and the rate limit)
+ *      started with LEAGUE_RATELIMIT_BACKEND=memory LEAGUE_RATELIMIT_SALT=<16+ chars> LEAGUE_PUBLIC_GATE_SECRET=e2e-gate-secret-0123456789ab LEAGUE_TRUSTED_PROXY=none LEAGUE_RATELIMIT_ATHLETE_PER_WINDOW=3; proves fixtures are unreachable, the API contract and the rate limit)
  *   NODE_PATH=$(npm root -g) CHROMIUM_PATH=… node apps/race/scripts/league-e2e.mjs      (RACE_LEAGUE_ONLY=prod runs only B)
  */
 /* global document, window, getComputedStyle, fetch */
@@ -308,6 +308,7 @@ if (PROD) {
       if (req.method === "OPTIONS") { res.statusCode = 204; res.setHeader("access-control-allow-headers", "*"); return res.end(); }
       if (!fn) return res.end("[]");
       upstream.push(`${fn}:${args.p_slug ?? ""}`);
+      if (req.headers["x-league-gate"] !== (process.env.RACE_LEAGUE_GATE ?? "e2e-gate-secret-0123456789ab")) return res.end(JSON.stringify({ available: false })); // the database's gate: no secret, nothing public
       if (fn !== "race_league_public_season") return res.end(JSON.stringify({ available: false }));
       if (args.p_slug === "real-unpub") return res.end(JSON.stringify({ available: false }));
       if (args.p_slug === "real-missing") { res.statusCode = 404; return res.end(JSON.stringify({ code: "PGRST202", message: "Could not find the function public.race_league_public_season" })); }

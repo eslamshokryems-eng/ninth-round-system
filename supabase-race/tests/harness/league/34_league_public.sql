@@ -1,5 +1,54 @@
 -- PUBLIC reads (anon): only a PUBLISHED season, only the allow-listed fields, nothing that identifies a person beyond a public display name.
 reset role;
+-- ---------------------------------------------------------------------------------------------------------------------------------------------
+-- the public-read gate: nothing is public until a Super Admin sets it, and only a request carrying the secret is answered (so the API's cache and rate limiter cannot be bypassed
+-- by calling the database functions directly with the public anon key)
+-- ---------------------------------------------------------------------------------------------------------------------------------------------
+create function race_test.use_gate() returns void language sql as $$ select set_config('request.headers', '{"x-league-gate":"test-gate-secret-0123456789abcdef"}', false) $$;
+create function race_test.send_header(p text) returns void language sql as $$ select set_config('request.headers', p, false) $$;
+select race_test.send_header('{}');
+select race_test.anon();
+select race_test.eq(race_league_public_season('season-one'), '{"available": false}'::jsonb, 'gate: with NO gate configured nothing is public, even for a published season (fail closed)');
+select race_test.use_gate();
+select race_test.eq(race_league_public_season('season-one'), '{"available": false}'::jsonb, 'gate: ... and a request that carries a secret still gets nothing while none is configured');
+select race_test.login('lg_admin');
+select race_test.throws($$select race_league_set_public_gate('test-gate-secret-0123456789abcdef')$$, 'LEAGUE_FORBIDDEN', 'gate: a league administrator (not Super Admin) cannot set the gate');
+select race_test.anon();
+select race_test.throws($$select race_league_set_public_gate('test-gate-secret-0123456789abcdef')$$, 'permission denied', 'gate: anon cannot set the gate');
+select race_test.login('super');
+select race_test.throws($$select race_league_set_public_gate('too short')$$, 'LEAGUE_INVALID', 'gate: a short secret is refused');
+select race_test.throws($$select race_league_set_public_gate(null)$$, 'LEAGUE_INVALID', 'gate: a missing secret is refused');
+select race_league_set_public_gate('test-gate-secret-0123456789abcdef');
+select race_test.anon();
+select race_test.send_header('{}');
+select race_test.eq(race_league_public_season('season-one'), '{"available": false}'::jsonb, 'gate: a direct call without the secret is answered "not available"');
+select race_test.send_header('{"x-league-gate":"wrong-secret-wrong-secret-wrong-1"}');
+select race_test.eq(race_league_public_season('season-one'), '{"available": false}'::jsonb, 'gate: ... a wrong secret too');
+select race_test.send_header('not json at all');
+select race_test.eq(race_league_public_season('season-one'), '{"available": false}'::jsonb, 'gate: ... a malformed header setting too (no error leaks)');
+select race_test.send_header('{"X-Other":"test-gate-secret-0123456789abcdef"}');
+select race_test.eq(race_league_public_season('season-one'), '{"available": false}'::jsonb, 'gate: ... and the right secret in the wrong header');
+select race_test.send_header('{"x-league-gate":"wrong-secret-wrong-secret-wrong-1"}');
+select race_test.eq(race_league_public_challenge_results('season-one', 1), '{"available": false}'::jsonb, 'gate: the week-results read is gated too');
+select race_test.eq(race_league_public_participant('season-one', 'abcd1234abcd1234'), '{"available": false}'::jsonb, 'gate: ... and the athlete read');
+select race_test.use_gate();
+select race_test.ok((race_league_public_season('season-one') ->> 'available')::boolean, 'gate: with the secret (the API''s request) the published season is served');
+reset role;
+select race_test.ok((select secret_hash from race_league_public_gate) ~ '^[0-9a-f]{64}$' and (select secret_hash from race_league_public_gate) <> 'test-gate-secret-0123456789abcdef', 'gate: only a SHA-256 hash is stored, never the secret');
+select race_test.ok(exists (select 1 from race_audit_log where action = 'league.public_gate.set') and not exists (select 1 from race_audit_log where action = 'league.public_gate.set' and (metadata::text || coalesce(before::text, '') || coalesce(after::text, '')) like '%test-gate-secret%'), 'gate: setting it is audited and the audit record holds no secret');
+select race_test.throws($$delete from race_league_public_gate$$, 'never deleted|not allowed|forbid', 'gate: the row cannot be deleted');
+select race_test.login('super');
+select race_league_set_public_gate('rotated-secret-0123456789abcdefgh');
+select race_test.anon();
+select race_test.use_gate();
+select race_test.eq(race_league_public_season('season-one'), '{"available": false}'::jsonb, 'gate: rotation — the old secret stops working at once');
+select race_test.send_header('{"x-league-gate":"rotated-secret-0123456789abcdefgh"}');
+select race_test.ok((race_league_public_season('season-one') ->> 'available')::boolean, 'gate: ... and the new one works');
+select race_test.login('super');
+select race_league_set_public_gate('test-gate-secret-0123456789abcdef');     -- back to the secret the remaining suites send
+select race_test.use_gate();
+reset role;
+
 select race_test.login('lg_other_admin');       -- admin of season-two (created in suite 32; draft, unpublished)
 select race_league_set_season_status(race_test.id('s2'), 'scheduled');
 select race_test.put('s2c1', race_league_upsert_challenge(race_test.id('s2'), 1, '{"name":"Draft week","metric_kind":"REPS","unit":"reps"}'));

@@ -7,7 +7,7 @@
 -- It is NOT a supabase migration (it lives outside supabase/migrations); apply it by hand, once, inside a transaction.
 begin;
 drop table if exists
-  race_league_appeals, race_league_corrections, race_league_correction_requests, race_league_eligibility_decisions,
+  race_league_public_gate, race_league_appeals, race_league_corrections, race_league_correction_requests, race_league_eligibility_decisions,
   race_league_points_ledger, race_league_attempts, race_league_participants, race_league_staff, race_league_challenges, race_league_seasons
   cascade;   -- cascade: league functions taking a league row type (race_league_attempt_json) go with their table; only league objects can depend on league tables
 do $$

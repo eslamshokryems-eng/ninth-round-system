@@ -8,7 +8,7 @@ import { TtlCache } from "./ttl-cache";
 
 const PROD_ENV = {
   NODE_ENV: "production", NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
-  LEAGUE_RATELIMIT_BACKEND: "upstash-rest", LEAGUE_RATELIMIT_REST_URL: "https://limit.example", LEAGUE_RATELIMIT_REST_TOKEN: "tok", LEAGUE_RATELIMIT_SALT: "a-long-enough-server-side-salt", LEAGUE_TRUSTED_PROXY: "vercel",
+  LEAGUE_RATELIMIT_BACKEND: "upstash-rest", LEAGUE_RATELIMIT_REST_URL: "https://limit.example", LEAGUE_RATELIMIT_REST_TOKEN: "tok", LEAGUE_RATELIMIT_SALT: "a-long-enough-server-side-salt", LEAGUE_TRUSTED_PROXY: "vercel", LEAGUE_PUBLIC_GATE_SECRET: "gate-secret-gate-secret-1234",
 } as const;
 
 describe("configuration", () => {
@@ -27,6 +27,8 @@ describe("configuration", () => {
     expect(readPublicApiConfig({ ...PROD_ENV, LEAGUE_RATELIMIT_BACKEND: "none" }).misconfiguration).toMatch(/no rate-limit backend/);
     expect(readPublicApiConfig({ ...PROD_ENV, LEAGUE_RATELIMIT_REST_TOKEN: "" }).misconfiguration).toMatch(/REST_URL and/);
     expect(readPublicApiConfig({ ...PROD_ENV, LEAGUE_RATELIMIT_SALT: "short" }).misconfiguration).toMatch(/SALT/);
+    expect(readPublicApiConfig({ ...PROD_ENV, LEAGUE_PUBLIC_GATE_SECRET: "" }).misconfiguration).toMatch(/GATE_SECRET/);
+    expect(readPublicApiConfig({ ...PROD_ENV, LEAGUE_PUBLIC_GATE_SECRET: "short" }).misconfiguration).toMatch(/GATE_SECRET/);
     expect(readPublicApiConfig({ ...PROD_ENV, NEXT_PUBLIC_SUPABASE_URL: "" }).misconfiguration).toMatch(/Supabase/);
     expect(readPublicApiConfig({ ...PROD_ENV, LEAGUE_RATELIMIT_BACKEND: "memory" }).misconfiguration).toBeNull(); // an explicit, documented per-instance choice
   });
@@ -285,6 +287,12 @@ describe("public API", () => {
     expect(withCreds).toBe(plain);
     for (const c of calls) { expect(JSON.stringify(c.headers)).not.toContain("STAFF-TOKEN"); expect(JSON.stringify(c.headers)).not.toContain("SESSION"); expect(c.headers.apikey).toBe("anon-key"); }
   });
+  it("sends the gate secret to the database on every upstream call, and never reveals it in a response", async () => {
+    const { handle, calls } = api({}, { upstream: () => new Response(JSON.stringify(SEASON_OK), { status: 200 }) });
+    const res = await handle("season", get("/x"), { slug: "s-one" });
+    expect(calls[0]?.headers["x-league-gate"]).toBe("gate-secret-gate-secret-1234");
+    expect(JSON.stringify([...res.headers.entries()]) + (await res.text())).not.toContain("gate-secret-gate-secret-1234");
+  });
   it("burst: 25 simultaneous misses cause exactly one database call", async () => {
     const { handle, calls } = api({ rules: { season: { limit: 1000, windowSeconds: 60 }, results: { limit: 1000, windowSeconds: 60 }, athlete: { limit: 1000, windowSeconds: 60 } } });
     const all = await Promise.all(Array.from({ length: 25 }, () => handle("season", get("/x"), { slug: "s-one" })));
@@ -301,5 +309,49 @@ describe("public API", () => {
       ["race_league_public_challenge_results", { p_slug: "s-one", p_week: 3 }],
       ["race_league_public_participant", { p_slug: "s-one", p_public_id: "abcd1234abcd1234" }],
     ]);
+  });
+});
+
+describe("multi-instance behaviour (two independent server instances sharing one Redis-compatible REST backend)", () => {
+  it("counts globally through the shared backend, whereas the per-instance 'memory' backend gives each instance its own budget", async () => {
+    const http = await import("node:http");
+    const counts = new Map<string, number>();
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const cmds = JSON.parse(body) as string[][];
+        const out = cmds.map((c) => {
+          if (c[0] === "INCR") { const n = (counts.get(c[1] as string) ?? 0) + 1; counts.set(c[1] as string, n); return { result: n }; }
+          if (c[0] === "EXPIRE") return { result: 1 };
+          return { error: "ERR unknown command" };
+        });
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify(out));
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const port = (server.address() as { port: number }).port;
+    try {
+      const rules = { season: { limit: 3, windowSeconds: 60 }, results: { limit: 3, windowSeconds: 60 }, athlete: { limit: 3, windowSeconds: 60 } };
+      const make = (limiter: "upstash-rest" | "memory") => {
+        const config = { ...readPublicApiConfig({ ...PROD_ENV, LEAGUE_RATELIMIT_BACKEND: limiter, LEAGUE_RATELIMIT_REST_URL: `http://127.0.0.1:${port}`, LEAGUE_TRUSTED_PROXY: "vercel" }), rules } as PublicApiConfig;
+        const upstream = (async () => new Response(JSON.stringify(SEASON_OK), { status: 200 })) as unknown as typeof fetch;
+        const realFetch = fetch;
+        const fetchImpl = ((url: string, init: RequestInit) => (String(url).startsWith(`http://127.0.0.1:${port}`) ? realFetch(url, init) : upstream(url, init))) as unknown as typeof fetch;
+        return createPublicApi({ config, fetchImpl, log: () => undefined });
+      };
+      const hit = (h: ReturnType<typeof make>) => h("season", get("/x", { "x-vercel-forwarded-for": "5.5.5.5" }), { slug: "s-one" }).then((r) => r.status);
+      // distributed: two instances, one shared budget of 3
+      const a = make("upstash-rest"), b = make("upstash-rest");
+      const shared = [await hit(a), await hit(b), await hit(a), await hit(b), await hit(a)];
+      expect(shared).toEqual([200, 200, 200, 429, 429]);
+      // per-instance: each instance keeps its own counters, so the same caller gets 3 on EACH — the documented limitation of the memory backend
+      const m1 = make("memory"), m2 = make("memory");
+      const perInstance = [await hit(m1), await hit(m1), await hit(m1), await hit(m1), await hit(m2), await hit(m2), await hit(m2), await hit(m2)];
+      expect(perInstance).toEqual([200, 200, 200, 429, 200, 200, 200, 429]);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
   });
 });

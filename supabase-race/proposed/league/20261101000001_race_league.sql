@@ -210,6 +210,16 @@ create table race_league_appeals (
   constraint race_league_appeals_reason check (status = 'submitted' or length(trim(coalesce(decision_reason, ''))) > 0)
 );
 
+-- The public-read gate: ONE row holding the SHA-256 of a secret that only the league's public API (server side) knows. The three public functions answer only a request that
+-- carries that secret in the `x-league-gate` header (PostgREST exposes request headers as the `request.headers` setting). Anyone holding just the public anon key and calling the
+-- functions directly gets "not available" before any work is done — so the cache and the rate limiter in front of the API cannot be bypassed that way.
+create table race_league_public_gate (
+  id boolean primary key default true check (id),   -- exactly one row
+  secret_hash text not null check (secret_hash ~ '^[0-9a-f]{64}$'),
+  rotated_by uuid references race_profiles (id),
+  rotated_at timestamptz not null default clock_timestamp()
+);
+
 alter table race_league_seasons enable row level security;
 alter table race_league_challenges enable row level security;
 alter table race_league_participants enable row level security;
@@ -220,8 +230,9 @@ alter table race_league_eligibility_decisions enable row level security;
 alter table race_league_correction_requests enable row level security;
 alter table race_league_corrections enable row level security;
 alter table race_league_appeals enable row level security;
+alter table race_league_public_gate enable row level security;
 revoke all on race_league_seasons, race_league_challenges, race_league_participants, race_league_attempts, race_league_points_ledger, race_league_staff,
-  race_league_eligibility_decisions, race_league_correction_requests, race_league_corrections, race_league_appeals
+  race_league_eligibility_decisions, race_league_correction_requests, race_league_corrections, race_league_appeals, race_league_public_gate
   from public, anon, authenticated;
 -- the ledger's identity sequence orders "latest line wins": the default privileges of a Supabase project would let a client role setval() it
 revoke all on sequence race_league_points_ledger_seq_seq from public, anon, authenticated;
@@ -232,6 +243,7 @@ select race_make_append_only('race_league_eligibility_decisions');
 select race_make_append_only('race_league_corrections');
 create trigger trg_race_league_correction_requests_no_delete before delete on race_league_correction_requests for each row execute function race_forbid_delete();
 create trigger trg_race_league_appeals_no_delete before delete on race_league_appeals for each row execute function race_forbid_delete();
+create trigger trg_race_league_public_gate_no_delete before delete on race_league_public_gate for each row execute function race_forbid_delete();
 create trigger trg_race_league_seasons_no_delete before delete on race_league_seasons for each row execute function race_forbid_delete();
 create trigger trg_race_league_challenges_no_delete before delete on race_league_challenges for each row execute function race_forbid_delete();
 create trigger trg_race_league_participants_no_delete before delete on race_league_participants for each row execute function race_forbid_delete();
@@ -509,10 +521,42 @@ revoke execute on function race_league_standings_rows(uuid) from public, anon, a
 -- ---------------------------------------------------------------------------
 -- PUBLIC reads (anon + authenticated): published seasons only, explicit allow-list, bounded size
 -- ---------------------------------------------------------------------------
+-- true only when a gate is configured AND the request carries the matching secret. Fails closed in every other case (no gate row, no headers, malformed headers).
+create or replace function race_league_gate_ok()
+returns boolean language plpgsql stable security definer set search_path = '' as $$
+declare v_hash text; v_hdr text;
+begin
+  select secret_hash into v_hash from public.race_league_public_gate where id;
+  if v_hash is null then return false; end if;
+  begin
+    v_hdr := (nullif(current_setting('request.headers', true), '')::json) ->> 'x-league-gate';
+  exception when others then
+    return false;
+  end;
+  return v_hdr is not null and encode(sha256(convert_to(v_hdr, 'utf8')), 'hex') = v_hash;
+end $$;
+revoke execute on function race_league_gate_ok() from public, anon, authenticated;
+
+-- Super Admin sets / rotates the gate secret (the secret itself is never stored, logged or audited: only its hash). Until it is set, NOTHING is publicly readable.
+create or replace function race_league_set_public_gate(p_secret text)
+returns void language plpgsql volatile security definer set search_path = '' as $$
+begin
+  if auth.uid() is null or public.race_is_super_admin() is not true then
+    raise exception 'LEAGUE_FORBIDDEN: only a Super Admin can set the public gate' using errcode = 'insufficient_privilege';
+  end if;
+  if p_secret is null or length(p_secret) < 24 or length(p_secret) > 200 then
+    raise exception 'LEAGUE_INVALID: the gate secret must be 24 to 200 characters' using errcode = 'check_violation';
+  end if;
+  insert into public.race_league_public_gate (id, secret_hash, rotated_by) values (true, encode(sha256(convert_to(p_secret, 'utf8')), 'hex'), auth.uid())
+  on conflict (id) do update set secret_hash = excluded.secret_hash, rotated_by = auth.uid(), rotated_at = clock_timestamp();
+  perform public.race_log_audit_event('league.public_gate.set', 'race_league_public_gate', null, null, null, '{}'::jsonb);
+end $$;
+
 create or replace function race_league_public_season(p_slug text)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare se public.race_league_seasons; v_through int; v_week int; v_rows jsonb; v_count int;
 begin
+  if not public.race_league_gate_ok() then return jsonb_build_object('available', false); end if;   -- before any work
   select * into se from public.race_league_seasons where public_slug = lower(coalesce(p_slug, '')) and published;
   if se.id is null then return jsonb_build_object('available', false); end if;
   select coalesce(max(week_number), 0) into v_through from public.race_league_challenges where season_id = se.id and status = 'closed';
@@ -538,6 +582,7 @@ create or replace function race_league_public_challenge_results(p_slug text, p_w
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare se public.race_league_seasons; ch public.race_league_challenges;
 begin
+  if not public.race_league_gate_ok() then return jsonb_build_object('available', false); end if;
   select * into se from public.race_league_seasons where public_slug = lower(coalesce(p_slug, '')) and published;
   if se.id is null then return jsonb_build_object('available', false); end if;
   select * into ch from public.race_league_challenges where season_id = se.id and week_number = p_week and status = 'closed';
@@ -556,6 +601,7 @@ create or replace function race_league_public_participant(p_slug text, p_public_
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare se public.race_league_seasons; p public.race_league_participants; v_row jsonb;
 begin
+  if not public.race_league_gate_ok() then return jsonb_build_object('available', false); end if;
   select * into se from public.race_league_seasons where public_slug = lower(coalesce(p_slug, '')) and published;
   if se.id is null then return jsonb_build_object('available', false); end if;
   select * into p from public.race_league_participants where season_id = se.id and public_id = p_public_id;
@@ -1216,7 +1262,7 @@ begin
             and p.proname in ('race_league_create_season', 'race_league_set_season_status', 'race_league_set_published', 'race_league_update_rules', 'race_league_upsert_challenge',
               'race_league_set_challenge_status', 'race_league_add_participant', 'race_league_import_participants', 'race_league_set_participant', 'race_league_record_attempt',
               'race_league_review_attempt', 'race_league_correct_attempt', 'race_league_recompute', 'race_league_set_eligibility', 'race_league_request_correction',
-              'race_league_decide_correction_request', 'race_league_lodge_appeal', 'race_league_decide_appeal', 'race_league_set_staff', 'race_league_find_account', 'race_league_my_seasons', 'race_league_admin_overview',
+              'race_league_decide_correction_request', 'race_league_lodge_appeal', 'race_league_decide_appeal', 'race_league_set_staff', 'race_league_find_account', 'race_league_set_public_gate', 'race_league_my_seasons', 'race_league_admin_overview',
               'race_league_audit') loop
     execute format('grant execute on function %s to authenticated', f.sig);
   end loop;
