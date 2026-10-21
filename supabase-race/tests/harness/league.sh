@@ -65,6 +65,17 @@ wait; sleep 1
 [ "$(lq "select count(*) from race_league_points_ledger where challenge_id = '$CC3'")" = "6" ] || lfail "league concurrency: parallel recomputes appended duplicate lines"
 lpass "league concurrency: 6 simultaneous recomputes -> the ledger is unchanged (exactly-once accounting)"
 
+# 5. two parallel removals of two different administrators of a live season with three administrators -> exactly one succeeds, two remain
+RS=$(fx cc_roles); A1=$(fx cc_adm1); A2=$(fx cc_adm2); SUPER=$(fx super)
+lbarrier 4
+as_user "$SUPER" "select race_league_set_staff('$RS', '$A1', 'LEAGUE_ADMIN', false, 'parallel removal one')" "rm1" &
+as_user "$SUPER" "select race_league_set_staff('$RS', '$A2', 'LEAGUE_ADMIN', false, 'parallel removal two')" "rm2" &
+wait; sleep 1
+[ "$(lq "select count(*) from race_league_staff where season_id = '$RS' and role = 'LEAGUE_ADMIN' and active")" = "2" ] || lfail "league concurrency: two parallel removals left $(lq "select count(*) from race_league_staff where season_id = '$RS' and role = 'LEAGUE_ADMIN' and active") administrators in a live season"
+[ "$(cat "$WORK"/lc/rm1.out "$WORK"/lc/rm2.out | grep -c 'changed' || true)" = "1" ] || lfail "league concurrency: both parallel removals reported success"
+[ "$(cat "$WORK"/lc/rm1.err "$WORK"/lc/rm2.err | grep -c 'two independent league administrators' || true)" = "1" ] || lfail "league concurrency: the losing removal was not refused with the administrator rule"
+lpass "league concurrency: 2 simultaneous removals from a live season with 3 administrators -> exactly one succeeds, the other is refused, two administrators remain"
+
 # the same isolation checks the main database passes, now with the league objects present (verify_deployment.sql pins exact object counts; its numbers change at activation)
 "${PSQL[@]}" -d "$LDB" -f "$HERE/isolation.sql" 2>&1 | sed -n 's/^.*NOTICE:  //p'
 

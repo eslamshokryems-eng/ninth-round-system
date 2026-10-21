@@ -1,13 +1,15 @@
 /*
  * THE NINTH League — browser checks (manual; not part of CI). Two targets:
  *   A) a DEV server (synthetic fixtures):      RACE_LEAGUE_DEV=http://localhost:3101   (NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co … next dev -p 3101)
- *   B) a PRODUCTION build (database source):   RACE_LEAGUE_PROD=http://localhost:3100  (Supabase mocked at the network layer; proves fixtures are unreachable)
+ *   B) a PRODUCTION build (database source):   RACE_LEAGUE_PROD=http://localhost:3100  (built with NEXT_PUBLIC_SUPABASE_URL=http://localhost:3199 — this script runs the mock database on that port;
+ *      started with LEAGUE_RATELIMIT_BACKEND=memory LEAGUE_RATELIMIT_SALT=<16+ chars> LEAGUE_TRUSTED_PROXY=none LEAGUE_RATELIMIT_ATHLETE_PER_WINDOW=3; proves fixtures are unreachable, the API contract and the rate limit)
  *   NODE_PATH=$(npm root -g) CHROMIUM_PATH=… node apps/race/scripts/league-e2e.mjs      (RACE_LEAGUE_ONLY=prod runs only B)
  */
-/* global document, window, getComputedStyle, URL */
+/* global document, window, getComputedStyle, fetch */
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const DEV = process.env.RACE_LEAGUE_DEV ?? "http://localhost:3101";
@@ -255,52 +257,109 @@ await stepA("admin: the audit trail records what was done", async () => {
   const t = await a.locator("[data-testid=tab-audit]").innerText();
   assert.match(t, /league\.appeal\.lodge/); assert.match(t, /league\.appeal\.upheld/); assert.match(t, /league\.correction\.apply/); assert.match(t, /previousValue":\d+,"newValue":77/);
 });
+await stepA("admin (Super Admin): staff & roles — look up by e-mail, refuse unknown / unconfirmed, appoint, remove, and never drop below two administrators", async () => {
+  await a.goto(`${DEV}/race/league/admin`); await a.locator("[data-testid=as-admin]").click(); await a.waitForSelector("[data-testid=season-list] a");
+  await a.locator("[data-testid=season-list] a").first().click(); await a.waitForSelector("[data-testid=season-admin]");
+  await a.getByRole("tab", { name: "Staff & roles" }).click(); await a.waitForSelector("[data-testid=tab-staff]");
+  assert.match(await a.locator("[data-testid=tab-staff]").innerText(), /2 of 2 independent administrators/i);
+  await a.locator("#st-email").fill("nobody@example.test"); await a.locator("[data-testid=lookup]").click(); await a.waitForSelector("text=No account with that address");
+  assert.equal(await a.locator("[data-testid=appoint]").count(), 0, "nothing can be appointed from a failed lookup");
+  await a.locator("#st-email").fill("demo.unconfirmed@example.test"); await a.locator("[data-testid=lookup]").click(); await a.waitForSelector("[data-testid=found-account]");
+  await a.locator("#st-reason").fill("pilot administrator"); await a.waitForSelector("text=has not confirmed its e-mail address");
+  assert.equal(await a.locator("[data-testid=appoint]").isDisabled(), true, "an unconfirmed address cannot be appointed");
+  await a.locator("#st-email").fill("demo.candidate@example.test"); await a.locator("[data-testid=lookup]").click(); await a.waitForSelector("[data-testid=found-account]");
+  await a.locator("#st-reason").fill("");
+  assert.equal(await a.locator("[data-testid=appoint]").isDisabled(), true, "a reason is required");
+  await a.locator("#st-reason").fill("second independent administrator"); await a.locator("[data-testid=appoint]").click(); await a.waitForSelector("[data-testid=ok]");
+  assert.match(await a.locator("[data-testid=tab-staff]").innerText(), /3 of 2 independent administrators/i);
+  // remove the new one again (confirmation + reason), then try to remove below two
+  const rows = a.locator("[data-testid=staff-row]");
+  const cand = rows.filter({ hasText: "Demo Candidate" });
+  await cand.locator("[data-testid=remove-staff]").click(); await a.locator("#st-reason-remove").fill("handover");
+  await cand.locator("[data-testid=confirm-remove]").click(); await a.waitForSelector("text=Removed: done");
+  assert.match(await a.locator("[data-testid=tab-staff]").innerText(), /2 of 2 independent administrators/i);
+  const second = rows.filter({ hasText: "Demo Second Admin" });
+  await second.locator("[data-testid=remove-staff]").click(); await a.locator("#st-reason-remove").fill("too few");
+  await second.locator("[data-testid=confirm-remove]").click(); await a.waitForSelector("text=two independent league administrators");
+  assert.match(await a.locator("[data-testid=tab-staff]").innerText(), /2 of 2 independent administrators/i, "a refused removal leaves the screen truthful");
+  await a.screenshot({ path: `${shots}/34-admin-staff.png` });
+});
+await stepA("admin (as the judge): the staff screen is read-only information, with no lookup and no appoint control", async () => {
+  await a.goto(`${DEV}/race/league/admin`); await a.locator("[data-testid=as-judge]").click(); await a.waitForSelector("[data-testid=season-list] a");
+  await a.locator("[data-testid=season-list] a").first().click(); await a.waitForSelector("[data-testid=season-admin]");
+  await a.getByRole("tab", { name: "Staff & roles" }).click(); await a.waitForSelector("[data-testid=tab-staff]");
+  assert.match(await a.locator("[data-testid=tab-staff]").innerText(), /Only a Super Admin appoints or removes staff/);
+  assert.equal(await a.locator("#st-email").count(), 0); assert.equal(await a.locator("[data-testid=remove-staff]").count(), 0);
+});
 
-// ---------------------------------------------------------------- B) production build: fixtures are unreachable
+// ---------------------------------------------------------------- B) production build: fixtures are unreachable; public reads go through the cached, rate-limited API
+// The built server is started with NEXT_PUBLIC_SUPABASE_URL=http://localhost:<RACE_LEAGUE_MOCK_PORT> and a league limiter configured (see docs/race/18-league-public-protection.md).
 if (PROD) {
-  const SB = "https://example.supabase.co";
-  const pc = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  let mode = "unpublished"; const rpcs = [];
-  await pc.route(`${SB}/**`, async (route) => {
-    const url = new URL(route.request().url());
-    const json = (b) => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(b) });
-    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
-    const m = /\/rest\/v1\/rpc\/([a-z_]+)/.exec(url.pathname);
-    if (!m) return json([]);
-    rpcs.push(m[1]);
-    if (m[1] === "race_league_public_season") {
-      if (mode === "unpublished") return json({ available: false });
-      if (mode === "missing") return route.fulfill({ status: 404, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ code: "PGRST202", message: "Could not find the function public.race_league_public_season" }) });
-      return json({ available: true, season: { slug: "real", name: "Real Season", status: "active", startsOn: "2026-11-02", endsOn: "2026-12-27", totalWeeks: 8, throughWeek: 1, currentWeek: 2 }, challenges: [], standings: [{ publicId: "x1", displayName: "Real P.", rank: 1, totalPoints: 25, weeklyPoints: { 1: 25 }, challengesCompleted: 1, movement: null, gapToNext: null }], generatedAt: new Date().toISOString() });
-    }
-    return json(null);
+  const MOCK = Number(process.env.RACE_LEAGUE_MOCK_PORT ?? 3199);
+  const upstream = []; // every database function the SERVER called
+  const published = { available: true, season: { slug: "real", name: "Real Season", status: "active", startsOn: "2026-11-02", endsOn: "2026-12-27", totalWeeks: 8, throughWeek: 1, currentWeek: 2, participantCount: 1, truncated: false }, challenges: [], standings: [{ publicId: "x1", displayName: "Real P.", rank: 1, tied: false, totalPoints: 25, weeklyPoints: { 1: 25 }, challengesCompleted: 1, movement: null, gapToNext: null, id: "UUID-LEAK", externalRef: "M-1", recordedBy: "staff-uuid" }], generatedAt: new Date().toISOString() };
+  const mockServer = http.createServer((req, res) => {
+    let body = ""; req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const fn = (/\/rest\/v1\/rpc\/([a-z_]+)/.exec(req.url ?? "") ?? [])[1];
+      const args = body ? JSON.parse(body) : {};
+      res.setHeader("content-type", "application/json");
+      res.setHeader("access-control-allow-origin", "*");
+      if (req.method === "OPTIONS") { res.statusCode = 204; res.setHeader("access-control-allow-headers", "*"); return res.end(); }
+      if (!fn) return res.end("[]");
+      upstream.push(`${fn}:${args.p_slug ?? ""}`);
+      if (fn !== "race_league_public_season") return res.end(JSON.stringify({ available: false }));
+      if (args.p_slug === "real-unpub") return res.end(JSON.stringify({ available: false }));
+      if (args.p_slug === "real-missing") { res.statusCode = 404; return res.end(JSON.stringify({ code: "PGRST202", message: "Could not find the function public.race_league_public_season" })); }
+      return res.end(JSON.stringify(published));
+    });
   });
+  await new Promise((r) => mockServer.listen(MOCK, r));
+  const pc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const browserCalls = []; // anything the BROWSER sent to a Supabase-looking host
+  pc.on("request", (r) => { if (/\/rest\/v1\//.test(r.url())) browserCalls.push(r.url()); });
   const pp = await pc.newPage(); watch(pp, "prod");
   await step("production build: the fixtures are unreachable — an unpublished league shows 'not published', no demo banner, no Demo Athlete", async () => {
-    await pp.goto(`${PROD}/race/league?season=real`); await pp.waitForSelector("[data-testid=league-unavailable]");
+    await pp.goto(`${PROD}/race/league?season=real-unpub`); await pp.waitForSelector("[data-testid=league-unavailable]");
     const html = await pp.content(); assert.ok(!html.includes("Demo Athlete") && !html.includes("synthetic"));
     assert.equal(await pp.locator("[data-testid=demo-banner]").count(), 0);
     await pp.goto(`${PROD}/race/league`); await pp.waitForSelector("text=No season selected");   // no default season configured in production
-    assert.ok(rpcs.every((n) => n.startsWith("race_league_")), "only league RPCs were called");
+    assert.ok(upstream.every((n) => n.startsWith("race_league_")), "only league functions were called");
+  });
+  await step("production build: the browser never calls the database for public data — only the same-origin public API does", async () => {
+    assert.deepEqual(browserCalls, [], "the browser sent a request to a /rest/v1 endpoint");
   });
   await step("production build: the TV shows a waiting screen until a season is published, and the DEMO route flag does nothing", async () => {
-    const q = await pc.newPage(); await q.goto(`${PROD}/race/league/tv?season=real&source=demo&demo=1`); await q.waitForSelector("[data-testid=tv-unavailable]");
+    const q = await pc.newPage(); await q.goto(`${PROD}/race/league/tv?season=real-unpub&source=demo&demo=1`); await q.waitForSelector("[data-testid=tv-unavailable]");
     assert.equal(await q.locator("[data-testid=demo-banner]").count(), 0); await q.close();
   });
   await step("production build: before the league tables exist (migration not applied) the page degrades to an error, never to fixtures", async () => {
-    mode = "missing"; const q = await pc.newPage(); await q.goto(`${PROD}/race/league?season=real`);
+    const q = await pc.newPage(); await q.goto(`${PROD}/race/league?season=real-missing`);
     await q.waitForSelector("text=could not load"); assert.equal(await q.locator("[data-testid=demo-banner]").count(), 0); await q.close();
   });
-  await step("production build: a published season renders from the database, read-only", async () => {
-    mode = "published"; const q = await pc.newPage(); await q.goto(`${PROD}/race/league?season=real`); await q.waitForSelector("[data-testid=standings]");
+  await step("production build: a published season renders from the public API, read-only, with no private field in the page or the API response", async () => {
+    const q = await pc.newPage(); await q.goto(`${PROD}/race/league?season=real`); await q.waitForSelector("[data-testid=standings]");
     assert.match(await q.locator("main").innerText(), /Real Season/i); assert.equal(await q.locator("[data-testid=demo-banner]").count(), 0);
     const tvp = await pc.newPage(); await tvp.setViewportSize({ width: 1920, height: 1080 }); await tvp.goto(`${PROD}/race/league/tv?season=real&rotate=off`); await tvp.waitForSelector("[data-testid=tv-standings]");
     assert.equal(await tvp.locator("[data-testid=tv-row]").count(), 1); await tvp.close(); await q.close();
+    const api = await fetch(`${PROD}/race/league/api/season/real`);
+    assert.equal(api.status, 200); assert.match(api.headers.get("cache-control") ?? "", /^public, max-age=0, s-maxage=\d+$/);
+    const text = await api.text(); for (const secret of ["UUID-LEAK", "externalRef", "recordedBy"]) assert.ok(!text.includes(secret), `leaked ${secret}`);
+    assert.equal(await (await fetch(`${PROD}/race/league/api/season/real?cb=1`)).status, 400, "cache-busting query strings are refused");
+    assert.equal(await (await fetch(`${PROD}/race/league/api/season/real-unpub`)).status, 404);
   });
   await step("production build: the staff pages do not offer 'acting as' and ask a signed-out visitor to sign in", async () => {
     const q = await pc.newPage(); await q.goto(`${PROD}/race/league/admin`); await q.waitForSelector("text=Sign in with your league staff account");
     assert.equal(await q.locator("[data-testid=act-as]").count(), 0); await q.close();
   });
+  await step("production build: the API rate-limits a caller (429 + Retry-After) and never caches the refusal", async () => {
+    // the server under test is started with LEAGUE_RATELIMIT_ATHLETE_PER_WINDOW=3
+    const codes = []; let last;
+    for (let i = 0; i < 5; i++) { last = await fetch(`${PROD}/race/league/api/season/real/athlete/abcd1234abcd1234`); codes.push(last.status); }
+    assert.ok(codes.includes(429), `no 429 in ${codes}`);
+    assert.equal(last.headers.get("cache-control"), "no-store"); assert.ok(Number(last.headers.get("retry-after")) >= 1);
+  });
+  mockServer.close();
 }
 
 await step("no uncaught page errors on any league page", async () => { assert.deepEqual(errors, []); });

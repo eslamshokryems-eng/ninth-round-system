@@ -44,6 +44,15 @@ export async function buildDemoLeague(now: Date = new Date(), participants = 24)
   const startsOn = isoDay(start);
   const endsOn = isoDay(start + 55 * day);
   const seasonId = await league.createSeason({ slug: DEMO_SLUG, name: "THE NINTH League — Season 1 (demo data)", startsOn, endsOn });
+  // a synthetic user directory (example.test addresses) so the role screen can be exercised locally
+  league.state.accounts.push(
+    { id: "demo-admin", email: "demo.owner@example.test", fullName: "Demo Owner", active: true, emailConfirmed: true, banned: false },
+    { id: "demo-admin-2", email: "demo.second@example.test", fullName: "Demo Second Admin", active: true, emailConfirmed: true, banned: false },
+    { id: "demo-candidate", email: "demo.candidate@example.test", fullName: "Demo Candidate", active: true, emailConfirmed: true, banned: false },
+    { id: "demo-unconfirmed", email: "demo.unconfirmed@example.test", fullName: "Demo Unconfirmed", active: true, emailConfirmed: false, banned: false },
+    { id: "demo-judge", email: "demo.judge@example.test", fullName: "Demo Judge", active: true, emailConfirmed: true, banned: false },
+    { id: "demo-reviewer", email: "demo.reviewer@example.test", fullName: "Demo Reviewer", active: true, emailConfirmed: true, banned: false },
+  );
   league.state.staff.push({ seasonId, profileId: "demo-admin-2", role: "LEAGUE_ADMIN" }, { seasonId, profileId: DEMO_USERS.judge.id, role: "JUDGE" }, { seasonId, profileId: DEMO_USERS.reviewer.id, role: "REVIEWER" });
   await league.setSeasonStatus(seasonId, "scheduled");
   await league.setSeasonStatus(seasonId, "active");

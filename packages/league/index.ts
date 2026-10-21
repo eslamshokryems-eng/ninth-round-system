@@ -8,6 +8,8 @@ export * from "./domain/import";
 export * from "./domain/gateway";
 export { InMemoryLeague } from "./infrastructure/in-memory-league";
 export { SupabaseLeague } from "./infrastructure/supabase-league";
+export { PublicHttpLeague, LeagueRetryError } from "./infrastructure/public-http-league";
+export type { PublicReader } from "./infrastructure/public-http-league";
 export type { RpcClient } from "./infrastructure/supabase-league";
 export { buildDemoLeague, DEMO_SLUG, DEMO_USERS } from "./infrastructure/demo-fixtures";
 export type { DemoLeague } from "./infrastructure/demo-fixtures";

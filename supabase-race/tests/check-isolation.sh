@@ -35,7 +35,7 @@ grep -rIn --exclude-dir=node_modules --exclude-dir=.next -E "SUPABASE_URL|SUPABA
 
 # --- THE NINTH League is part of the race product but is a separate MODULE: these checks make the dependency allow-list above mean what it says ----------------------------
 # (a) nothing outside the league screens imports the league package, and the race package never does
-hits=$(grep -rIln --exclude-dir=node_modules --exclude-dir=.next -E "@9thround/league" apps/race/app apps/race/src packages/race 2>/dev/null | grep -vE "^apps/race/app/race/league/|^apps/race/src/(features|components)/league/" || true)
+hits=$(grep -rIln --exclude-dir=node_modules --exclude-dir=.next -E "@9thround/league" apps/race/app apps/race/src packages/race 2>/dev/null | grep -vE "^apps/race/app/race/league/|^apps/race/src/(features|components)/league/|^apps/race/src/server/league-public-api.ts" || true)
 [ -z "$hits" ] && pass "@9thround/league is imported only by the league routes, features and components (never by the race engine or other race screens)" || { echo "$hits"; fail "league package imported outside the league screens"; }
 # (b) the league package imports nothing from the race engine or the app, by name or by relative path, and depends on no workspace package at runtime
 hits=$(grep -rIn --exclude-dir=node_modules -E "from ['\"](@9thround/race|\.\./\.\./(apps|race)|\.\./\.\./\.\./|.*apps/race|.*packages/race)" packages/league --include=*.ts 2>/dev/null || true)
@@ -47,3 +47,6 @@ bad=$(grep -v '^\s*--' "$LSQL" | grep -oE 'race_[a-z][a-z_]*' | grep -vE '^race_
 [ -z "$bad" ] && pass "the league SQL references only race_profiles, the audit log and four shared helper functions of the race schema (no event / clock / station / slot / result object)" || { echo "$bad"; fail "league SQL references other race objects"; }
 # (d) and no race migration references a league object
 ! grep -rIl "race_league" supabase-race/supabase >/dev/null 2>&1 && pass "no race migration mentions the league" || fail "a race migration references the league"
+# (e) the server half of the league package (rate limiter, cache, public API) is imported only by the server entry points, never by browser code
+hits=$(grep -rIln --exclude-dir=node_modules --exclude-dir=.next -E "@9thround/league/server" apps packages 2>/dev/null | grep -vE "^apps/race/src/server/|^packages/league/server/" || true)
+[ -z "$hits" ] && pass "@9thround/league/server is imported only by apps/race/src/server (server-side)" || { echo "$hits"; fail "league server module imported outside the server entry point"; }

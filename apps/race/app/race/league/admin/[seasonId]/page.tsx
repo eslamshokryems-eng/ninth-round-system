@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { DEFAULT_ATTEMPT_POLICY, METRIC_UNITS, PROVISIONAL_SEASON_RULES, SEASON_TRANSITIONS, appealDeadline, resultPublishedAt, weekWindow, type AdminOverview, type AuditLine, type Challenge, type ChallengeInput, type ChallengeStatus, type EligibilityDecisionCategory, type MetricKind, type SeasonRules } from "@9thround/league";
-import { useAction, useCurrentUserId, useOverview } from "../../../../../src/features/league/admin";
+import { DEFAULT_ATTEMPT_POLICY, LeagueError, METRIC_UNITS, PROVISIONAL_SEASON_RULES, SEASON_TRANSITIONS, appealDeadline, resultPublishedAt, weekWindow, type AdminOverview, type AuditLine, type Challenge, type ChallengeInput, type AccountLookup, type ChallengeStatus, type EligibilityDecisionCategory, type LeagueRole, type MetricKind, type SeasonRules } from "@9thround/league";
+import { describeError, useAction, useCurrentUserId, useOverview } from "../../../../../src/features/league/admin";
 import { DemoBanner, fmtPoints, fmtRank } from "../../../../../src/components/league/league-ui";
 import { RaceBadge, RaceButton, RaceHeader, RaceInput, RaceNotice, RacePage, RaceSelect, RaceSpinner, RaceTextArea } from "../../../../../src/components/race/race-ui";
 
-const TABS = ["Overview", "Challenges", "Participants", "Attempts", "Appeals", "Points rules", "Standings", "Audit"] as const;
+const TABS = ["Overview", "Challenges", "Participants", "Attempts", "Appeals", "Staff & roles", "Points rules", "Standings", "Audit"] as const;
 type Tab = (typeof TABS)[number];
 const NEXT_CHALLENGE: Record<ChallengeStatus, ChallengeStatus[]> = { draft: ["published"], published: ["open", "draft"], open: ["closed", "published"], closed: [] };
 
@@ -42,6 +42,7 @@ export default function SeasonAdminPage() {
             {tab === "Participants" ? <Participants d={data} act={act} /> : null}
             {tab === "Attempts" ? <Attempts d={data} act={act} me={me} /> : null}
             {tab === "Appeals" ? <Appeals d={data} act={act} me={me} /> : null}
+            {tab === "Staff & roles" ? <StaffRoles d={data} act={act} /> : null}
             {tab === "Points rules" ? <Rules d={data} act={act} /> : null}
             {tab === "Standings" ? <Standings d={data} /> : null}
             {tab === "Audit" ? <Audit d={data} /> : null}
@@ -346,6 +347,78 @@ function Appeals({ d, act, me }: { d: AdminOverview; act: Act; me: string | null
             </div>
           ))}
         </> : <RaceNotice>Appeals are decided by a league administrator who did not record the result.</RaceNotice>}
+      </div>
+    </div>
+  );
+}
+
+function StaffRoles({ d, act }: { d: AdminOverview; act: Act }) {
+  const [email, setEmail] = useState("");
+  const [found, setFound] = useState<AccountLookup | null>(null);
+  const [looking, setLooking] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [role, setRole] = useState<LeagueRole>("LEAGUE_ADMIN");
+  const [reason, setReason] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const staff = d.staff ?? [];
+  const admins = new Set(staff.filter((x) => x.role === "LEAGUE_ADMIN" && x.active).map((x) => x.profileId)).size;
+  const live = d.season.status === "active" || d.season.published;
+  const canManage = d.isSuperAdmin;
+  const lookup = async () => {
+    setLooking(true); setLookupError(null); setFound(null);
+    try { setFound(await (await gw()).findAccount(email)); } catch (e) { setLookupError(describeError(e)); } finally { setLooking(false); }
+  };
+  const blocked = found && found.found ? (!found.active ? "This account is deactivated." : found.banned ? "This account is suspended." : role === "LEAGUE_ADMIN" && !found.emailConfirmed ? "This account has not confirmed its e-mail address." : null) : null;
+  return (
+    <div className="grid gap-4 md:grid-cols-[1fr_24rem]" data-testid="tab-staff">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="race-display text-2xl">League staff</h2>
+          <RaceBadge tone={admins >= 2 ? "white" : "red"} >{admins} of 2 independent administrators</RaceBadge>
+        </div>
+        <p className="lg-sub">Two distinct league administrators are required before a season can be activated or published{live ? ", and a live season cannot drop below two" : ""}. Only a Super Admin appoints or removes administrators; the database checks this on every request.</p>
+        {staff.length === 0 ? <p className="lg-sub">No staff yet.</p> : null}
+        {staff.map((x) => (
+          <div key={`${x.profileId}-${x.role}`} className="race-card race-card--flat flex flex-wrap items-center justify-between gap-2" data-testid="staff-row" style={{ padding: "0.6rem 0.9rem" }}>
+            <span><strong>{x.fullName || "(no name)"}</strong> <span className="lg-sub">· {x.emailHint ?? "no e-mail on file"} · {x.role === "LEAGUE_ADMIN" ? "League administrator" : x.role === "JUDGE" ? "Judge" : "Reviewer"}</span></span>
+            <span className="flex flex-wrap items-center gap-2">
+              <RaceBadge tone={x.active ? "white" : "line"}>{x.active ? "ACTIVE" : "REMOVED"}</RaceBadge>
+              {canManage && x.active && confirmRemove !== `${x.profileId}-${x.role}` ? <RaceButton size="sm" variant="ghost" disabled={act.busy} data-testid="remove-staff" onClick={() => setConfirmRemove(`${x.profileId}-${x.role}`)}>Remove…</RaceButton> : null}
+              {canManage && confirmRemove === `${x.profileId}-${x.role}` ? <>
+                <RaceButton size="sm" variant="danger" disabled={act.busy || reason.trim() === ""} data-testid="confirm-remove" onClick={() => void act.run("Removed", async () => { await (await gw()).setStaff({ seasonId: d.season.id, profileId: x.profileId, role: x.role, active: false, reason }); setConfirmRemove(null); })}>Confirm removal</RaceButton>
+                <RaceButton size="sm" variant="ghost" onClick={() => setConfirmRemove(null)}>Cancel</RaceButton>
+              </> : null}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-3">
+        {canManage ? (
+          <div className="race-card flex flex-col gap-2">
+            <h2 className="race-display text-xl">Appoint someone</h2>
+            <p className="lg-sub">Find the account by e-mail address. The system looks it up in the project's own user directory; an address typed here grants nothing by itself.</p>
+            <RaceInput id="st-email" type="email" label="E-mail address" value={email} onChange={(e) => { setEmail(e.target.value); setFound(null); setLookupError(null); }} />
+            <RaceButton variant="ghost" disabled={looking || act.busy || email.trim() === ""} data-testid="lookup" onClick={() => void lookup()}>{looking ? "Looking up…" : "Look up account"}</RaceButton>
+            {lookupError ? <RaceNotice>{lookupError}</RaceNotice> : null}
+            {found && !found.found ? <RaceNotice>No account with that address exists in this project. The person must sign in once first; nothing was created or granted.</RaceNotice> : null}
+            {found && found.found ? (
+              <div className="race-card race-card--flat flex flex-col gap-1" data-testid="found-account" style={{ padding: "0.6rem 0.9rem" }}>
+                <strong>{found.fullName || "(no name)"}</strong>
+                <span className="lg-sub">{found.email}</span>
+                <span className="flex flex-wrap gap-2"><RaceBadge tone={found.emailConfirmed ? "white" : "red"}>{found.emailConfirmed ? "E-MAIL CONFIRMED" : "NOT CONFIRMED"}</RaceBadge><RaceBadge tone={found.active && !found.banned ? "white" : "red"}>{found.active && !found.banned ? "ACTIVE" : "NOT ACTIVE"}</RaceBadge></span>
+              </div>
+            ) : null}
+            {found && found.found ? <>
+              <RaceSelect id="st-role" label="Role" value={role} onChange={(e) => setRole(e.target.value as LeagueRole)}>
+                <option value="LEAGUE_ADMIN">League administrator</option><option value="JUDGE">Judge</option><option value="REVIEWER">Reviewer</option>
+              </RaceSelect>
+              <RaceInput id="st-reason" label="Reason (recorded in the audit trail)" value={reason} onChange={(e) => setReason(e.target.value)} />
+              {blocked ? <RaceNotice>{blocked}</RaceNotice> : null}
+              <RaceButton disabled={act.busy || reason.trim() === "" || blocked !== null} data-testid="appoint" onClick={() => void act.run("Appointed", async () => { const r = await (await gw()).setStaff({ seasonId: d.season.id, profileId: found.id, role, active: true, reason }); if (!r.changed) throw new LeagueError("LEAGUE_DUPLICATE", "This account already holds that role — nothing changed."); setEmail(""); setFound(null); })}>Appoint</RaceButton>
+            </> : null}
+          </div>
+        ) : <div className="race-card"><p className="lg-sub">Only a Super Admin appoints or removes staff. You can see who works on this season.</p></div>}
+        {canManage && confirmRemove !== null ? <RaceInput id="st-reason-remove" label="Reason for removal (required)" value={reason} onChange={(e) => setReason(e.target.value)} /> : null}
       </div>
     </div>
   );

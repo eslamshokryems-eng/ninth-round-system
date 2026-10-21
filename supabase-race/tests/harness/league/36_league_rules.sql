@@ -15,9 +15,9 @@ reset role;
 insert into race_league_staff (season_id, profile_id, role) values
   (race_test.id('s3'), race_test.id('lg_judge'), 'JUDGE'), (race_test.id('s3'), race_test.id('lg_rev'), 'REVIEWER');
 select race_test.login('super');
-select race_league_set_staff(race_test.id('s3'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN', true);
+select race_league_set_staff(race_test.id('s3'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN', true, 'test reason');
 select race_test.login('lg_admin');
-select race_test.throws($$select race_league_set_staff(race_test.id('s3'), race_test.id('lg_judge2'), 'LEAGUE_ADMIN', true)$$, 'LEAGUE_FORBIDDEN', 'two administrators: only a Super Admin appoints a league administrator'); 
+select race_test.throws($$select race_league_set_staff(race_test.id('s3'), race_test.id('lg_judge2'), 'LEAGUE_ADMIN', true, 'test reason')$$, 'LEAGUE_FORBIDDEN', 'two administrators: only a Super Admin appoints a league administrator'); 
 
 -- ---------------------------------------------------------------------------------------------------------------------------------------------
 -- rule 1 + 4: the default rules are the owner's, and remain configurable
@@ -240,7 +240,7 @@ select race_test.login('lg_admin_b');
 select race_league_decide_appeal(race_test.id('ap3'), 'upheld', 'the removal was a mistake — a separate correction follows');
 -- two administrators: a live season never drops below two
 select race_test.login('super');
-select race_test.throws($$select race_league_set_staff(race_test.id('s3'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN', false)$$, 'two independent league administrators', 'two administrators: removing one from a live season is refused');
+select race_test.throws($$select race_league_set_staff(race_test.id('s3'), race_test.id('lg_admin_b'), 'LEAGUE_ADMIN', false, 'test reason')$$, 'two independent league administrators', 'two administrators: removing one from a live season is refused');
 
 -- the window: 48 hours from publication (whichever of closing / publishing came last), configurable
 reset role;

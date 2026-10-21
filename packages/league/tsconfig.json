@@ -8,5 +8,5 @@
     "declaration": true,
     "resolveJsonModule": true
   },
-  "include": ["domain", "application", "infrastructure", "index.ts"]
+  "include": ["domain", "application", "infrastructure", "server", "index.ts"]
 }

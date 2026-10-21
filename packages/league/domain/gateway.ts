@@ -6,6 +6,8 @@ import type { ImportResult } from "./import";
 export interface AdminOverview {
   readonly season: Season;
   readonly isAdmin: boolean;
+  /** true for a Super Admin: only they see the appoint / remove controls for league administrators (the database enforces it regardless). */
+  readonly isSuperAdmin: boolean;
   readonly challenges: readonly Challenge[];
   readonly participants: readonly { id: string; publicId: string; displayName: string; active: boolean; eligible: boolean; externalRef: string | null; membershipVerifiedOn: string }[];
   readonly attempts: readonly AdminAttempt[];
@@ -17,7 +19,7 @@ export interface AdminOverview {
   readonly appeals: readonly Appeal[];
   readonly eligibilityDecisions: readonly EligibilityDecision[];
   readonly standings: readonly AdminStanding[];
-  readonly staff: readonly { profileId: string; role: LeagueRole; active: boolean }[] | null;
+  readonly staff: readonly { profileId: string; role: LeagueRole; active: boolean; fullName: string; emailHint: string | null }[] | null;
 }
 export type AdminAttempt = Pick<Attempt, "id" | "challengeId" | "participantId" | "value" | "unit" | "attemptNo" | "attemptedAt" | "status" | "reason" | "recordedBy" | "reviewedBy" | "correctedFrom">;
 export interface AdminStanding {
@@ -59,6 +61,23 @@ export interface ChallengeInput {
   readonly referenceUrl?: string | null;
   readonly requiresVerification?: boolean;
 }
+/** What a Super Admin's directory lookup returns. The id is the ONLY thing an appointment is based on. */
+export type AccountLookup =
+  | { readonly found: false }
+  | { readonly found: true; readonly id: string; readonly email: string; readonly fullName: string; readonly active: boolean; readonly emailConfirmed: boolean; readonly banned: boolean };
+export interface SetStaffInput {
+  readonly seasonId: string;
+  readonly profileId: string;
+  readonly role: LeagueRole;
+  readonly active: boolean;
+  readonly reason: string;
+}
+export interface SetStaffResult {
+  /** false = the account already had exactly that state: nothing was changed or audited (a repeated click is safe). */
+  readonly changed: boolean;
+  readonly administrators: number;
+}
+
 export interface AuditLine {
   readonly at: string;
   readonly actor: string | null;
@@ -77,6 +96,10 @@ export interface LeagueGateway {
   publicParticipant(slug: string, publicId: string): Promise<PublicParticipantPage | null>;
   // staff
   mySeasons(): Promise<readonly MySeason[]>;
+  /** Super Admin only: look an account up in the project's own user directory by e-mail. Never grants anything. */
+  findAccount(email: string): Promise<AccountLookup>;
+  /** Appoint / remove one account in one role. League administrators: Super Admin only. Idempotent; a live season never drops below two administrators. */
+  setStaff(input: SetStaffInput): Promise<SetStaffResult>;
   overview(seasonId: string): Promise<AdminOverview>;
   createSeason(input: { slug: string; name: string; startsOn: string; endsOn: string; rules?: SeasonRules }): Promise<string>;
   setSeasonStatus(seasonId: string, status: SeasonStatus, reason?: string): Promise<void>;

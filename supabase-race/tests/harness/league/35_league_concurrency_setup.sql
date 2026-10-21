@@ -20,3 +20,12 @@ insert into race_league_attempts (season_id, challenge_id, participant_id, value
   select race_test.id('cc_season'), race_test.id('cc_c3'), p.id, 10 + row_number() over (order by p.display_name), 'reps', 1, now(), race_test.id('cc_judge'), race_test.id('super'), 'approved', gen_random_uuid()
     from race_league_participants p where p.season_id = race_test.id('cc_season');
 select race_test.ok(true, 'concurrency fixtures are ready');
+
+-- role management under concurrency: a LIVE season with three administrators; two parallel removals must never leave fewer than two (see league.sh)
+reset role;
+select race_test.make_user('cc_adm1', ''); select race_test.make_user('cc_adm2', ''); select race_test.make_user('cc_adm3', '');
+insert into race_league_seasons (public_slug, name, status, starts_on, ends_on, rules, created_by)
+  values ('concurrency-roles', 'Concurrency roles', 'active', date '2026-11-02', date '2026-12-27', race_league_default_rules(), (select id from race_test.fx where key = 'super'));
+select race_test.put('cc_roles', (select id from race_league_seasons where public_slug = 'concurrency-roles'));
+insert into race_league_staff (season_id, profile_id, role) select race_test.id('cc_roles'), race_test.id(k), 'LEAGUE_ADMIN' from (values ('cc_adm1'), ('cc_adm2'), ('cc_adm3')) v(k);
+select race_test.ok(true, 'role concurrency fixtures are ready');

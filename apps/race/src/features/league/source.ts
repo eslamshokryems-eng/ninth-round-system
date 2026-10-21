@@ -1,6 +1,6 @@
 "use client";
 
-import { buildDemoLeague, chooseLeagueSource, DEMO_SLUG, DEMO_USERS, SupabaseLeague, type InMemoryLeague, type LeagueGateway } from "@9thround/league";
+import { buildDemoLeague, chooseLeagueSource, DEMO_SLUG, DEMO_USERS, PublicHttpLeague, SupabaseLeague, type InMemoryLeague, type LeagueGateway } from "@9thround/league";
 import { getRaceClient } from "../../lib/composition-root";
 
 export interface LeagueSource {
@@ -28,7 +28,8 @@ export function getLeagueSource(): Promise<LeagueSource> {
       } catch { /* sessionStorage blocked: stay as the administrator */ }
       return { gateway: d.league, demo: true, defaultSlug: DEMO_SLUG, fixtures: { league: d.league, seasonId: d.seasonId } };
     }
-    return { gateway: new SupabaseLeague(getRaceClient() as unknown as ConstructorParameters<typeof SupabaseLeague>[0]), demo: false, defaultSlug: process.env.NEXT_PUBLIC_LEAGUE_SEASON ?? null, fixtures: null };
+    // staff calls: the database (RPCs re-check every caller). Public reads: the same-origin public API — cached at the edge, rate limited, allow-listed.
+    return { gateway: new SupabaseLeague(getRaceClient() as unknown as ConstructorParameters<typeof SupabaseLeague>[0], new PublicHttpLeague("/race/league/api")), demo: false, defaultSlug: process.env.NEXT_PUBLIC_LEAGUE_SEASON ?? null, fixtures: null };
   })();
   return cached;
 }

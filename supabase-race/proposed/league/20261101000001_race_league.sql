@@ -1060,24 +1060,72 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- staff + admin reads
 -- ---------------------------------------------------------------------------
-create or replace function race_league_set_staff(p_season uuid, p_profile uuid, p_role text, p_active boolean)
-returns void language plpgsql volatile security definer set search_path = '' as $$
+-- ---------------------------------------------------------------------------
+-- league staff management (Super Admin appoints / removes league administrators; season administrators manage judges and reviewers)
+-- ---------------------------------------------------------------------------
+-- Identity comes from the project's own directory, never from the browser: race_profiles is the mirror of auth.users that the existing signup trigger maintains.
+-- A Super Admin looks an account up by e-mail; the database returns the account's id and state; every later operation is by that id.
+create or replace function race_league_find_account(p_email text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare v_email text := lower(trim(coalesce(p_email, ''))); r record;
 begin
-  if p_role not in ('LEAGUE_ADMIN', 'JUDGE', 'REVIEWER') then raise exception 'LEAGUE_INVALID: unknown role' using errcode = 'check_violation'; end if;
+  if auth.uid() is null or public.race_is_super_admin() is not true then
+    raise exception 'LEAGUE_FORBIDDEN: only a Super Admin can look up an account' using errcode = 'insufficient_privilege';
+  end if;
+  if length(v_email) not between 5 and 254 or v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+    raise exception 'LEAGUE_INVALID: that is not an e-mail address' using errcode = 'check_violation';
+  end if;
+  select p.id, p.email, p.full_name, p.is_active, (u.email_confirmed_at is not null) as confirmed, (u.banned_until is not null and u.banned_until > clock_timestamp()) as banned
+    into r
+    from public.race_profiles p join auth.users u on u.id = p.id
+   where lower(p.email) = v_email and lower(u.email) = v_email;
+  -- the lookup is audited (who looked, whether something was found; never the e-mail address itself)
+  perform public.race_log_audit_event('league.account.lookup', 'race_profiles', r.id, null, null, jsonb_build_object('found', r.id is not null));
+  if r.id is null then return jsonb_build_object('found', false); end if;
+  return jsonb_build_object('found', true, 'id', r.id, 'email', r.email, 'fullName', r.full_name, 'active', r.is_active, 'emailConfirmed', r.confirmed, 'banned', r.banned);
+end $$;
+
+-- Appoint (p_active = true) or remove (false) one account in one role of one season. Idempotent: repeating the same request changes nothing and writes no second audit entry.
+-- Concurrent changes to a season's staff are serialised by a lock on the season row, so two parallel removals can never leave a live season below two administrators.
+create or replace function race_league_set_staff(p_season uuid, p_profile uuid, p_role text, p_active boolean, p_reason text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare se public.race_league_seasons; cur public.race_league_staff; v_reason text; v_want boolean := coalesce(p_active, true); pr record; v_n int;
+begin
+  if auth.uid() is null then raise exception 'LEAGUE_FORBIDDEN: sign in first' using errcode = 'insufficient_privilege'; end if;
+  if p_role is null or p_role not in ('LEAGUE_ADMIN', 'JUDGE', 'REVIEWER') then raise exception 'LEAGUE_INVALID: unknown role' using errcode = 'check_violation'; end if;
+  if p_profile is null then raise exception 'LEAGUE_INVALID: choose an account' using errcode = 'check_violation'; end if;
+  select * into se from public.race_league_seasons where id = p_season for update;           -- the lock that serialises staff changes
+  if se.id is null then raise exception 'LEAGUE_NOT_FOUND: season' using errcode = 'no_data_found'; end if;
   if p_role = 'LEAGUE_ADMIN' then
-    if public.race_is_super_admin() is not true then raise exception 'LEAGUE_FORBIDDEN: only a Super Admin can appoint a league administrator' using errcode = 'insufficient_privilege'; end if;
+    if public.race_is_super_admin() is not true then raise exception 'LEAGUE_FORBIDDEN: only a Super Admin can appoint or remove a league administrator' using errcode = 'insufficient_privilege'; end if;
   else
     perform public.race_league_require_admin(p_season);
   end if;
-  if not exists (select 1 from public.race_profiles where id = p_profile) then raise exception 'LEAGUE_NOT_FOUND: account' using errcode = 'no_data_found'; end if;
-  insert into public.race_league_staff (season_id, profile_id, role, active, assigned_by) values (p_season, p_profile, p_role, coalesce(p_active, true), auth.uid())
-  on conflict (season_id, profile_id, role) do update set active = coalesce(p_active, true), assigned_by = auth.uid();
+  v_reason := public.race_league_reason(p_reason);
+  if se.status = 'completed' then raise exception 'LEAGUE_SEASON_LOCKED: a completed season is final' using errcode = 'check_violation'; end if;
+  select p.id, p.is_active, (u.email_confirmed_at is not null) as confirmed, (u.banned_until is not null and u.banned_until > clock_timestamp()) as banned
+    into pr from public.race_profiles p left join auth.users u on u.id = p.id where p.id = p_profile;
+  if pr.id is null then raise exception 'LEAGUE_NOT_FOUND: account' using errcode = 'no_data_found'; end if;
+  if v_want and (pr.is_active is not true or pr.banned is true) then raise exception 'LEAGUE_INVALID: that account is deactivated' using errcode = 'check_violation'; end if;
+  if v_want and p_role = 'LEAGUE_ADMIN' and pr.confirmed is not true then raise exception 'LEAGUE_INVALID: that account has not confirmed its e-mail address' using errcode = 'check_violation'; end if;
+  select * into cur from public.race_league_staff where season_id = p_season and profile_id = p_profile and role = p_role for update;
+  if (cur.id is null and not v_want) or (cur.id is not null and cur.active = v_want) then
+    return jsonb_build_object('changed', false, 'administrators', public.race_league_admin_count(p_season));
+  end if;
+  if cur.id is null then
+    insert into public.race_league_staff (season_id, profile_id, role, active, assigned_by) values (p_season, p_profile, p_role, v_want, auth.uid());
+  else
+    update public.race_league_staff set active = v_want, assigned_by = auth.uid() where id = cur.id;
+  end if;
+  v_n := public.race_league_admin_count(p_season);
   -- a live (active or published) season never drops below two independent administrators
-  if p_role = 'LEAGUE_ADMIN' and public.race_league_admin_count(p_season) < 2
-     and exists (select 1 from public.race_league_seasons where id = p_season and (status = 'active' or published)) then
+  if p_role = 'LEAGUE_ADMIN' and not v_want and v_n < 2 and (se.status = 'active' or se.published) then
     raise exception 'LEAGUE_INVALID: an active or published season needs two independent league administrators' using errcode = 'check_violation';
   end if;
-  perform public.race_league_audit_log('league.staff.set', p_season, 'race_league_staff', null, null, jsonb_build_object('profile_id', p_profile, 'role', p_role, 'active', coalesce(p_active, true)));
+  perform public.race_league_audit_log('league.staff.' || case when v_want then 'appoint' else 'remove' end, p_season, 'race_league_staff', cur.id,
+    jsonb_build_object('role', p_role, 'active', cur.active), jsonb_build_object('role', p_role, 'active', v_want),
+    jsonb_build_object('target_profile_id', p_profile, 'role', p_role, 'reason', v_reason, 'administrators_after', v_n));
+  return jsonb_build_object('changed', true, 'administrators', v_n);
 end $$;
 
 create or replace function race_league_my_seasons()
@@ -1110,6 +1158,7 @@ begin
   return jsonb_build_object(
     'season', jsonb_build_object('id', se.id, 'slug', se.public_slug, 'name', se.name, 'status', se.status, 'published', se.published, 'startsOn', se.starts_on, 'endsOn', se.ends_on, 'rules', public.race_league_rules_json(se.rules), 'firstPublishedAt', se.first_published_at),
     'isAdmin', v_admin,
+    'isSuperAdmin', public.race_is_super_admin(),
     'challenges', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'weekNumber', c.week_number, 'name', c.name, 'description', c.description, 'instructions', c.instructions,
                     'safetyNotes', c.safety_notes, 'metricKind', c.metric_kind, 'unit', c.unit, 'direction', c.direction, 'maxAttempts', c.max_attempts, 'counting', c.counting,
                     'opensAt', c.opens_at, 'closesAt', c.closes_at, 'closedAt', c.closed_at, 'referenceUrl', c.reference_url, 'requiresVerification', c.requires_verification, 'status', c.status)
@@ -1136,7 +1185,10 @@ begin
     'eligibilityDecisions', case when v_admin then coalesce((select jsonb_agg(jsonb_build_object('id', d.id, 'seasonId', d.season_id, 'participantId', d.participant_id, 'category', d.category,
                     'previousEligible', d.previous_eligible, 'newEligible', d.new_eligible, 'reason', d.reason, 'decidedBy', d.decided_by, 'decidedAt', d.decided_at) order by d.decided_at)
                     from (select * from public.race_league_eligibility_decisions where season_id = p_season order by decided_at limit 500) d), '[]'::jsonb) else '[]'::jsonb end,
-    'staff', case when v_admin then coalesce((select jsonb_agg(jsonb_build_object('profileId', f.profile_id, 'role', f.role, 'active', f.active)) from public.race_league_staff f where f.season_id = p_season), '[]'::jsonb) end);
+    -- who works on this season: name and a MASKED e-mail hint only (the full address is shown to a Super Admin by race_league_find_account, never listed)
+    'staff', case when v_admin then coalesce((select jsonb_agg(jsonb_build_object('profileId', f.profile_id, 'role', f.role, 'active', f.active, 'fullName', pr.full_name,
+                    'emailHint', case when pr.email is null then null else left(pr.email, 1) || '***@' || split_part(pr.email, '@', 2) end) order by f.role, f.created_at)
+                    from public.race_league_staff f left join public.race_profiles pr on pr.id = f.profile_id where f.season_id = p_season), '[]'::jsonb) end);
 end $$;
 
 create or replace function race_league_audit(p_season uuid, p_limit int default 100)
@@ -1164,7 +1216,7 @@ begin
             and p.proname in ('race_league_create_season', 'race_league_set_season_status', 'race_league_set_published', 'race_league_update_rules', 'race_league_upsert_challenge',
               'race_league_set_challenge_status', 'race_league_add_participant', 'race_league_import_participants', 'race_league_set_participant', 'race_league_record_attempt',
               'race_league_review_attempt', 'race_league_correct_attempt', 'race_league_recompute', 'race_league_set_eligibility', 'race_league_request_correction',
-              'race_league_decide_correction_request', 'race_league_lodge_appeal', 'race_league_decide_appeal', 'race_league_set_staff', 'race_league_my_seasons', 'race_league_admin_overview',
+              'race_league_decide_correction_request', 'race_league_lodge_appeal', 'race_league_decide_appeal', 'race_league_set_staff', 'race_league_find_account', 'race_league_my_seasons', 'race_league_admin_overview',
               'race_league_audit') loop
     execute format('grant execute on function %s to authenticated', f.sig);
   end loop;

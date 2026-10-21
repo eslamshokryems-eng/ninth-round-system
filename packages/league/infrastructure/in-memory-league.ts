@@ -1,5 +1,5 @@
 import { LeagueError } from "../domain/errors";
-import type { AdminAttempt, AdminOverview, AdminStanding, AuditLine, ChallengeInput, LeagueGateway, MySeason, PublicChallengeResults, PublicParticipantPage } from "../domain/gateway";
+import type { AccountLookup, AdminAttempt, AdminOverview, AdminStanding, AuditLine, ChallengeInput, LeagueGateway, MySeason, PublicChallengeResults, PublicParticipantPage, SetStaffInput, SetStaffResult } from "../domain/gateway";
 import { participantIdentityKey, validateParticipantCsv } from "../domain/import";
 import { toPublicLeague, type PublicLeague } from "../domain/public";
 import { reconcileChallenge, scoreChallenge, selectCountedAttempt } from "../domain/scoring";
@@ -45,7 +45,10 @@ interface State {
   attempts: Attempt[];
   ledger: LedgerEntry[]; // append-only
   audit: (AuditLine & { seasonId: string })[];
-  staff: { seasonId: string; profileId: string; role: LeagueRole }[];
+  /** `active` undefined = active (older callers push plain rows). */
+  staff: { seasonId: string; profileId: string; role: LeagueRole; active?: boolean }[];
+  /** The project's user directory (the mirror of the Auth users). Synthetic in the fixtures. */
+  accounts: { id: string; email: string; fullName: string; active: boolean; emailConfirmed: boolean; banned: boolean }[];
   correctionRequests: CorrectionRequest[];
   corrections: CorrectionRecord[]; // append-only
   appeals: Appeal[];
@@ -72,7 +75,7 @@ function seeded(seed: number): () => number {
  * in a fast unit test. (The SQL equivalents are proven in the harness, including a shared scoring-parity file.)
  */
 export class InMemoryLeague implements LeagueGateway {
-  readonly state: State = { seasons: [], challenges: [], participants: [], attempts: [], ledger: [], audit: [], staff: [], correctionRequests: [], corrections: [], appeals: [], eligibilityDecisions: [] };
+  readonly state: State = { seasons: [], challenges: [], participants: [], attempts: [], ledger: [], audit: [], staff: [], accounts: [], correctionRequests: [], corrections: [], appeals: [], eligibilityDecisions: [] };
   private actorValue: Actor | null;
 
   private readonly rand: () => number;
@@ -108,7 +111,7 @@ export class InMemoryLeague implements LeagueGateway {
     const a = this.actorValue;
     if (!a) return false;
     if (a.isSuperAdmin) return true;
-    return this.state.staff.some((s) => s.seasonId === seasonId && s.profileId === a.id && roles.includes(s.role));
+    return this.state.staff.some((s) => s.seasonId === seasonId && s.profileId === a.id && s.active !== false && roles.includes(s.role));
   }
   private requireAdmin(seasonId: string): void {
     if (!this.has(seasonId, ["LEAGUE_ADMIN"])) fail("LEAGUE_FORBIDDEN", "League administrators only.");
@@ -130,7 +133,7 @@ export class InMemoryLeague implements LeagueGateway {
   }
   /** Two distinct league-administrator accounts. A Super Admin's implicit access does not count as one of them. */
   private independentAdmins(seasonId: string): number {
-    return new Set(this.state.staff.filter((s) => s.seasonId === seasonId && s.role === "LEAGUE_ADMIN").map((s) => s.profileId)).size;
+    return new Set(this.state.staff.filter((s) => s.seasonId === seasonId && s.role === "LEAGUE_ADMIN" && s.active !== false).map((s) => s.profileId)).size;
   }
   private lockCompleted(seasonId: string): void {
     if (this.season(seasonId).status === "completed") fail("LEAGUE_SEASON_LOCKED", "This season is completed — its results are final.");
@@ -198,7 +201,7 @@ export class InMemoryLeague implements LeagueGateway {
     if (!a) return [];
     return this.state.seasons.filter((s) => this.has(s.id, ["LEAGUE_ADMIN", "JUDGE", "REVIEWER"])).map((s) => ({
       id: s.id, slug: s.publicSlug, name: s.name, status: s.status, published: s.published, startsOn: s.startsOn, endsOn: s.endsOn,
-      roles: [...new Set(this.state.staff.filter((f) => f.seasonId === s.id && f.profileId === a.id).map((f) => f.role))], isSuperAdmin: a.isSuperAdmin,
+      roles: [...new Set(this.state.staff.filter((f) => f.seasonId === s.id && f.profileId === a.id && f.active !== false).map((f) => f.role))], isSuperAdmin: a.isSuperAdmin,
     }));
   }
   async overview(seasonId: string): Promise<AdminOverview> {
@@ -216,7 +219,7 @@ export class InMemoryLeague implements LeagueGateway {
       recordedBy: a.recordedBy, reviewedBy: a.reviewedBy, correctedFrom: a.correctedFrom,
     }));
     return {
-      season: se, isAdmin: admin,
+      season: se, isAdmin: admin, isSuperAdmin: this.actorValue?.isSuperAdmin === true,
       challenges: this.state.challenges.filter((c) => c.seasonId === seasonId).sort((a, b) => a.weekNumber - b.weekNumber),
       participants: this.state.participants.filter((p) => p.seasonId === seasonId).map((p) => ({ id: p.id, publicId: p.publicId, displayName: p.displayName, active: p.active, eligible: p.eligible, externalRef: admin ? p.externalRef : null, membershipVerifiedOn: p.membershipVerifiedOn })),
       attempts, standings,
@@ -224,8 +227,43 @@ export class InMemoryLeague implements LeagueGateway {
       corrections: admin ? this.state.corrections.filter((c) => c.seasonId === seasonId) : [],
       appeals: admin ? this.state.appeals.filter((x) => x.seasonId === seasonId) : [],
       eligibilityDecisions: admin ? this.state.eligibilityDecisions.filter((d) => d.seasonId === seasonId) : [],
-      staff: admin ? this.state.staff.filter((f) => f.seasonId === seasonId).map((f) => ({ profileId: f.profileId, role: f.role, active: true })) : null,
+      staff: admin ? this.state.staff.filter((f) => f.seasonId === seasonId).map((f) => {
+        const acc = this.state.accounts.find((x) => x.id === f.profileId);
+        return { profileId: f.profileId, role: f.role, active: f.active !== false, fullName: acc?.fullName ?? "", emailHint: acc ? `${acc.email.slice(0, 1)}***@${acc.email.split("@")[1] ?? ""}` : null };
+      }) : null,
     };
+  }
+  async findAccount(email: string): Promise<AccountLookup> {
+    if (!this.actorValue?.isSuperAdmin) fail("LEAGUE_FORBIDDEN", "Only a Super Admin can look up an account.");
+    const e = email.trim().toLowerCase();
+    if (e.length < 5 || e.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) fail("LEAGUE_INVALID", "That is not an e-mail address.");
+    const a = this.state.accounts.find((x) => x.email.toLowerCase() === e);
+    return a ? { found: true, id: a.id, email: a.email, fullName: a.fullName, active: a.active, emailConfirmed: a.emailConfirmed, banned: a.banned } : { found: false };
+  }
+  async setStaff(i: SetStaffInput): Promise<SetStaffResult> {
+    const actor = this.actorValue;
+    if (!actor) fail("LEAGUE_FORBIDDEN", "Sign in first.");
+    if (!["LEAGUE_ADMIN", "JUDGE", "REVIEWER"].includes(i.role)) fail("LEAGUE_INVALID", "Unknown role.");
+    if (!i.profileId) fail("LEAGUE_INVALID", "Choose an account.");
+    const se = this.state.seasons.find((x) => x.id === i.seasonId) ?? fail("LEAGUE_NOT_FOUND", "Season not found.");
+    if (i.role === "LEAGUE_ADMIN") { if (!actor?.isSuperAdmin) fail("LEAGUE_FORBIDDEN", "Only a Super Admin can appoint or remove a league administrator."); } else this.requireAdmin(i.seasonId);
+    const why = requireReason(i.reason);
+    if (se.status === "completed") fail("LEAGUE_SEASON_LOCKED", "This season is completed — its results are final.");
+    const acc = this.state.accounts.find((x) => x.id === i.profileId) ?? fail("LEAGUE_NOT_FOUND", "Account not found.");
+    if (i.active && (!acc.active || acc.banned)) fail("LEAGUE_INVALID", "That account is deactivated.");
+    if (i.active && i.role === "LEAGUE_ADMIN" && !acc.emailConfirmed) fail("LEAGUE_INVALID", "That account has not confirmed its e-mail address.");
+    const cur = this.state.staff.find((f) => f.seasonId === i.seasonId && f.profileId === i.profileId && f.role === i.role);
+    if ((!cur && !i.active) || (cur && (cur.active !== false) === i.active)) return { changed: false, administrators: this.independentAdmins(i.seasonId) };
+    const before = cur ? { ...cur } : null;
+    if (cur) cur.active = i.active; else this.state.staff.push({ seasonId: i.seasonId, profileId: i.profileId, role: i.role, active: i.active });
+    const n = this.independentAdmins(i.seasonId);
+    if (i.role === "LEAGUE_ADMIN" && !i.active && n < 2 && (se.status === "active" || se.published)) {
+      if (before && cur) cur.active = before.active !== false; // the whole operation is refused: nothing is left half-done
+      else this.state.staff.pop();
+      fail("LEAGUE_INVALID", "An active or published season needs two independent league administrators.");
+    }
+    this.log(i.seasonId, `league.staff.${i.active ? "appoint" : "remove"}`, { target: i.profileId, role: i.role, reason: why, administratorsAfter: n });
+    return { changed: true, administrators: n };
   }
   async audit(seasonId: string, limit = 100): Promise<readonly AuditLine[]> {
     this.requireAdmin(seasonId);

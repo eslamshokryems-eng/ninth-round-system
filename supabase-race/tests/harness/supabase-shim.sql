@@ -26,6 +26,7 @@ create table auth.users (
   raw_user_meta_data jsonb not null default '{}'::jsonb,
   raw_app_meta_data jsonb not null default '{}'::jsonb,
   banned_until timestamptz,
+  email_confirmed_at timestamptz default now(),   -- the real auth.users has this column (null until the address is confirmed); the test default is 'confirmed'
   created_at timestamptz not null default now()
 );
 

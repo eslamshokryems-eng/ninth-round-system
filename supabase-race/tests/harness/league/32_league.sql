@@ -28,7 +28,7 @@ select race_test.ok(not exists (select 1 from pg_proc p where p.pronamespace = '
    'lock-down: every SECURITY DEFINER league function pins search_path');
 select race_test.eq((select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'race\_league\_%' and has_function_privilege('anon', p.oid, 'execute'))::int, 3,
    'lock-down: anon can execute exactly the three public read functions');
-select race_test.ok(not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'race\_league\_%' and p.proname !~ '^race_league_(public_|create_season|set_|update_rules|upsert_|add_|import_|record_|review_|correct_|request_|decide_|lodge_|recompute|my_seasons|admin_overview|audit$)'
+select race_test.ok(not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'race\_league\_%' and p.proname !~ '^race_league_(public_|create_season|set_|update_rules|upsert_|add_|import_|record_|review_|correct_|request_|decide_|lodge_|find_account|recompute|my_seasons|admin_overview|audit$)'
    and has_function_privilege('authenticated', p.oid, 'execute')), 'lock-down: no internal helper is executable by a client role');
 select race_test.ok(not exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relname like 'race\_league\_%' and c.relkind = 'r' and c.relname !~ '^race_league_(seasons|challenges|participants|attempts|points_ledger|staff|eligibility_decisions|correction_requests|corrections|appeals)$'), 'isolation: only the ten expected league tables exist');
 

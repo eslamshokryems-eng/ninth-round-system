@@ -1,7 +1,8 @@
 import { LeagueError, parseLeagueError } from "../domain/errors";
-import type { AdminOverview, AuditLine, ChallengeInput, LeagueGateway, MySeason, PublicChallengeResults, PublicParticipantPage } from "../domain/gateway";
+import type { AccountLookup, AdminOverview, AuditLine, ChallengeInput, LeagueGateway, MySeason, PublicChallengeResults, PublicParticipantPage, SetStaffInput, SetStaffResult } from "../domain/gateway";
 import { validateParticipantCsv } from "../domain/import";
 import type { PublicLeague } from "../domain/public";
+import type { PublicReader } from "./public-http-league";
 import type { EligibilityDecisionCategory, SeasonRules } from "../domain/types";
 
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }>;
@@ -23,7 +24,8 @@ const rulesToDb = (r: SeasonRules) => ({
  * approval — a browser that lies to this class gets the database's refusal, not a result.
  */
 export class SupabaseLeague implements LeagueGateway {
-  constructor(private readonly client: RpcClient) {}
+  /** `publicReader`: when given, the three PUBLIC reads go through it (the cached, rate-limited public API) instead of straight to the database. Staff calls never do. */
+  constructor(private readonly client: RpcClient, private readonly publicReader?: PublicReader) {}
 
   private async call<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
     const { data, error } = await this.client.rpc(fn, args);
@@ -38,18 +40,25 @@ export class SupabaseLeague implements LeagueGateway {
   }
 
   async publicLeague(slug: string): Promise<PublicLeague | null> {
+    if (this.publicReader) return this.publicReader.publicLeague(slug);
     const d = await this.call<{ available: boolean } & Partial<PublicLeague>>("race_league_public_season", { p_slug: slug });
     return d.available ? ({ season: d.season, challenges: d.challenges, standings: d.standings, generatedAt: d.generatedAt } as PublicLeague) : null;
   }
   async publicChallengeResults(slug: string, week: number): Promise<PublicChallengeResults | null> {
+    if (this.publicReader) return this.publicReader.publicChallengeResults(slug, week);
     const d = await this.call<{ available: boolean } & Partial<PublicChallengeResults>>("race_league_public_challenge_results", { p_slug: slug, p_week: week });
     return d.available ? (d as PublicChallengeResults) : null;
   }
   async publicParticipant(slug: string, publicId: string): Promise<PublicParticipantPage | null> {
+    if (this.publicReader) return this.publicReader.publicParticipant(slug, publicId);
     const d = await this.call<{ available: boolean } & Partial<PublicParticipantPage>>("race_league_public_participant", { p_slug: slug, p_public_id: publicId });
     return d.available ? ({ standing: d.standing ?? null, results: d.results ?? [] } as PublicParticipantPage) : null;
   }
   mySeasons() { return this.call<readonly MySeason[]>("race_league_my_seasons"); }
+  findAccount(email: string) { return this.call<AccountLookup>("race_league_find_account", { p_email: email }); }
+  setStaff(i: SetStaffInput) {
+    return this.call<SetStaffResult>("race_league_set_staff", { p_season: i.seasonId, p_profile: i.profileId, p_role: i.role, p_active: i.active, p_reason: i.reason });
+  }
   overview(seasonId: string) { return this.call<AdminOverview>("race_league_admin_overview", { p_season: seasonId }); }
   createSeason(i: { slug: string; name: string; startsOn: string; endsOn: string; rules?: SeasonRules }) {
     return this.call<string>("race_league_create_season", { p_slug: i.slug, p_name: i.name, p_starts_on: i.startsOn, p_ends_on: i.endsOn, p_rules: i.rules ? rulesToDb(i.rules) : null });

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { PublicLeague } from "@9thround/league";
+import { LeagueRetryError, type PublicLeague } from "@9thround/league";
 import { getLeagueSource, type LeagueSource } from "./source";
 
 export function useLeagueSource(): LeagueSource | null {
@@ -35,15 +35,20 @@ export function usePublicLeague(source: LeagueSource | null, slug: string | null
   const [offline, setOffline] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const busy = useRef(false);
+  const failures = useRef(0);
+  const retryAfterMs = useRef(0);
   const refresh = useCallback(async () => {
     if (!source || !slug || busy.current) return;
     busy.current = true;
     try {
       const l = await source.gateway.publicLeague(slug);
+      failures.current = 0; retryAfterMs.current = 0;
       setOffline(false);
       setUpdatedAt(new Date());
       if (l) { setLeague(l); setState("ready"); } else { setLeague(null); setState("unavailable"); }
-    } catch {
+    } catch (e) {
+      failures.current += 1;
+      retryAfterMs.current = e instanceof LeagueRetryError ? e.retryAfterSeconds * 1000 : 0;
       setOffline(true);
       setState((s) => (s === "ready" ? "ready" : "error"));
     } finally {
@@ -52,12 +57,22 @@ export function usePublicLeague(source: LeagueSource | null, slug: string | null
   }, [source, slug]);
   useEffect(() => {
     if (!source || !slug) return;
-    void refresh();
-    const t = window.setInterval(() => void refresh(), everyMs);
-    const wake = () => void refresh();
+    let stopped = false;
+    let timer: number | undefined;
+    // Self-scheduling poll: after failures wait longer (x2 each time, up to x8) plus jitter, and never sooner than the server's Retry-After — a struggling
+    // server is not hammered by every open phone and TV at once.
+    const loop = async () => {
+      await refresh();
+      if (stopped) return;
+      const backoff = everyMs * 2 ** Math.min(failures.current, 3);
+      const wait = Math.max(backoff, retryAfterMs.current) * (1 + Math.random() * 0.2);
+      timer = window.setTimeout(() => void loop(), wait);
+    };
+    void loop();
+    const wake = () => { if (failures.current === 0) void refresh(); };
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("online", wake);
-    return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", wake); window.removeEventListener("online", wake); };
+    return () => { stopped = true; if (timer !== undefined) window.clearTimeout(timer); document.removeEventListener("visibilitychange", wake); window.removeEventListener("online", wake); };
   }, [source, slug, everyMs, refresh]);
   return { league, state, offline, updatedAt, refresh };
 }

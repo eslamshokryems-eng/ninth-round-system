@@ -67,7 +67,7 @@ select race_test.throws($$select race_league_set_challenge_status(race_test.id('
 select race_test.throws($$select race_league_set_eligibility(race_test.id('rpb'), false, 'FRAUD', 'x')$$, 'LEAGUE_FORBIDDEN', 'review: ... nor restrict a participant of B');
 select race_test.throws($$select race_league_correct_attempt((select race_test.q('select id from race_league_attempts limit 1')::uuid), 1, 'x')$$, 'LEAGUE_FORBIDDEN|LEAGUE_NOT_FOUND', 'review: ... nor correct B''s results');
 select race_test.throws($$select race_league_lodge_appeal(race_test.id('rca'), race_test.id('rpb'), 'cross')$$, 'LEAGUE_NOT_FOUND|LEAGUE_APPEAL_CLOSED', 'review: an appeal cannot mix seasons');
-select race_test.throws($$select race_league_set_staff(race_test.id('rb'), race_test.id('rv_judge_a'), 'JUDGE', true)$$, 'LEAGUE_FORBIDDEN', 'review: the admin of A cannot appoint staff in B');
+select race_test.throws($$select race_league_set_staff(race_test.id('rb'), race_test.id('rv_judge_a'), 'JUDGE', true, 'test reason')$$, 'LEAGUE_FORBIDDEN', 'review: the admin of A cannot appoint staff in B');
 select race_test.throws($$select race_league_admin_overview(race_test.id('rb'))$$, 'LEAGUE_FORBIDDEN', 'review: ... nor read B''s overview');
 
 -- 3. exactly-once: the same correction cannot be applied twice, and a retry of a decided request fails instead of doubling
