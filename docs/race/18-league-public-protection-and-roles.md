@@ -152,3 +152,39 @@ Existing: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (also read
 | Unauthorized administrator actions | refused; the same checks run in TypeScript and SQL | `39`, `league-roles.test.ts` |
 
 **Findings fixed in this session:** none beyond those in §1–§3 (new surface was built with its tests). **Residual risks:** whoever can read the Vercel environment holds the gate secret (§2b), the CDN behaviour and the gateway's header forwarding unverifiable locally, shared-bucket collateral without a trusted proxy, edge cache hits not counted, Redis as a third-party dependency, an administrator may still correct a result they recorded (by your rule), membership is an attestation.
+
+---
+## 7. Final verification record (what was actually run, on the final code)
+
+**Database harness (full: every existing race suite + the league suites + parallel-session checks + rollback rehearsal + restore comparison)**
+| Run | Result |
+|---|---|
+| PostgreSQL 17.11 | **passed** — 1,447 existing race assertions, 357 league assertions, `ALL RACE MIGRATION TESTS PASSED` |
+| PostgreSQL 16.13, run 1 | **FAILED** in the race engine's final 50-athlete simulation: `Masters hold ms N19: system 44627 — model 47000 (±400)` (1 of 8,710 model checks; 1,447 assertions before it passed). The harness stopped there, so the league suites did not run in this run. Log kept: `/tmp/f16_run1_FAILED.log` (not committed). |
+| PostgreSQL 16.13, run 2 (same code, no change) | **passed** — 1,447 + 357 league assertions, `ALL RACE MIGRATION TESTS PASSED` |
+
+*About the PG 16 run-1 failure, honestly:* the check compares a hold time measured in a wall-clock-driven simulation (326 s, 7,575 driver steps) with an independent model. No race file, migration or helper involved in that check was modified by the league work (verified by diff, §8 item 7), and the same code passed on PG 17 and on the PG 16 rerun. The most likely cause is a timing disturbance in the sandbox (the VM had been restored from a snapshot, and earlier in this effort a similar timing-sensitive assertion in `16_simulation.sql` flaked once and passed on rerun) — but **I did not root-cause it**, and a timing-sensitive assertion that can fail once in three full runs is a risk in its own right. It should be investigated before it is trusted as a gate.
+
+**Application tests**
+| Check | Result |
+|---|---|
+| League unit tests (domain, gateways, roles, parity, differential, server: cache, limiter, sanitiser, API, multi-instance) | **164 passed** |
+| Race unit tests | **270 passed**; every other workspace green |
+| ESLint, TypeScript (all 17 tasks) | clean |
+| `check-isolation.sh` | **0 failures** (15 checks) |
+| Staging shell tests (2) | passed |
+| Production builds (two: standard placeholders; mock database URL) | both succeed; the three public API routes are listed |
+| League browser checks — dev server (fixtures, incl. the Staff & roles screen) | **31 / 31** |
+| League browser checks — production build (public API, cache headers, no private field, query refusal, 429 + Retry-After, browser never calls the database) | **8 / 8** |
+| **Existing race browser suite** (`race-e2e.mjs`), final code | **89 / 96 — NOT a pass.** The same 7 rowing / OCR / evidence-page checks fail as in the pre-league baseline; run again this session on the final code with identical names. (An earlier run this session also had one transient reception timeout that passed on rerun.) |
+| Not run | a real Upstash/Vercel KV instance, a real Vercel CDN (`x-vercel-cache`), a real Supabase gateway forwarding the `x-league-gate` header, load test with the cache in place — all need remote infrastructure |
+
+## 8. Completion checklist (the eight points asked for)
+1. **Both harness runs finished and their real results are reported** — see the table above, including the failed first PG 16 run and the passing rerun.
+2. **Direct Supabase bypass of the rate limiter: closed** by the database gate (§2b). A request without the server's secret header gets `{"available":false}` before any work (SQL suites 34 and 37; a 3,000-athlete season answers inside 300 ms). Participant search has no server endpoint — it filters the already-fetched list in the browser. *Residual:* anyone who can read the Vercel environment has the secret; the gateway's header forwarding is verified only on a real project.
+3. **Multi-instance Vercel:** appropriate with the `upstash-rest` backend (a test shows two instances sharing one budget); **single-instance only** with `memory`; the in-process cache and fallback limiter are per instance by design. Not exercised against a real Redis (§3).
+4. **Cache keys, TTL, invalidation after a correction, unpublished-season protection: tested** (`server.test.ts`: one URL per resource, query/case/percent variants refused, TTL boundary, a corrected score appears after the origin TTL and the edge TTL is the declared window, no cross-season mixing, 404 body identical for unpublished/unknown, errors never cached; SQL `34`; browser check). Consistency window ≈ 18 s server-side plus the client poll interval.
+5. **Role assignment / revocation: enforced in the database** (`race_league_set_staff`, `race_league_find_account`), tested for unauthorized callers, self-promotion, missing accounts, unconfirmed/inactive accounts, duplicates, concurrency (two real parallel sessions) and the two-administrator floor (SQL `39` + parallel check; TypeScript mirror `league-roles.test.ts`; browser check). There is no service-role key and no client-side authority.
+6. **The two intended administrator e-mails have not been granted anything.** They appear in exactly one file (this document, as intended identities); no code, fixture, test, seed or script contains them; no role-granting function was ever run against any real database.
+7. **Race Engine unchanged:** `git diff` of every race source, timing, scoring, route, `supabase/migrations` file, verification and ops script, excluding the league folders, is **empty** against the pre-league base; the 20 existing migration files are untouched; the gym system is identical to `527f705`. The only test-infrastructure edits are the harness hook (`run.sh`), the isolation script (stricter), and the Auth shim (`email_confirmed_at`, as in real Supabase).
+8. **No migration applied, no remote database written, nothing deployed.** The migration stays in `supabase-race/proposed/league/` (not `supabase/migrations`). All databases were throw-away local clusters; web servers were local. No Supabase, Vercel, DNS, SMTP or secret change; no pull request.
