@@ -347,6 +347,12 @@ export function compare(sys) {
   for (const [st, ws] of perStation) { ws.sort((a, b) => a.start - b.start); for (let i = 1; i < ws.length; i++) ok(ws[i].start >= ws[i - 1].end + TR, `no overlap at station ${st}: N${ws[i - 1].n} / N${ws[i].n}`); }
 
   // ---- 3. raw results: model (from the actions actually SENT) vs system ---------------------------------------------------------------
+  // The harness SCHEDULES every action for an instant, but the system stamps it with the moment it really ran (server time). In an offline-queue flush after a blackout
+  // (up to ~180 actions sent one after the other) the two differ by the processing time, and by the whole length of any stall of the machine. The scoring RULE of the Masters hold is a
+  // function of the recorded event times, so the model is given the recorded times of those events (the ledger), not the nominal ones. Window membership / accept-reject keeps using
+  // the scheduled instant (the boundary experiments depend on it). The drift is reported, not hidden.
+  const recordedMs = new Map(sys.ledger.map((e) => [e.id, e.server_ms]));
+  let holdDriftMax = 0;
   const sent = new Map();                                         // "n:station" -> [{...}]
   for (const a of sys.act_log) { const k = `${a.n}:${a.station}`; if (!sent.has(k)) sent.set(k, []); sent.get(k).push(a); }
   const reviewDecision = new Map(sys.review_log.map((r) => [r.cid, r.decision]));
@@ -363,7 +369,12 @@ export function compare(sys) {
         eq(x.sys_status, exp.status, `status of ${x.type} ${x.cid.slice(0, 8)} (N${a.n} S${st}, arrival ${x.arrival - w.start} into the window)`);
         if (exp.code) eq(x.sys_code, exp.code, `rejection code of ${x.cid.slice(0, 8)}`);
         statusChecked++;
-        if (exp.status === "ACCEPTED" || (exp.status === "PENDING_MASTER_REVIEW" && reviewDecision.get(x.cid) === "APPROVED")) counted.push({ id: x.cid, type: x.type, value: x.value, ms: x.arrival, voids: x.voids ?? null });
+        if (exp.status === "ACCEPTED" || (exp.status === "PENDING_MASTER_REVIEW" && reviewDecision.get(x.cid) === "APPROVED")) {
+          const isHoldWindow = st === 1 && a.category === "MASTERS";
+          const recorded = isHoldWindow ? recordedMs.get(x.cid) : undefined;
+          if (recorded !== undefined) holdDriftMax = Math.max(holdDriftMax, Math.abs(recorded - x.arrival));
+          counted.push({ id: x.cid, type: x.type, value: x.value, ms: recorded ?? x.arrival, voids: x.voids ?? null });
+        }
       }
       modelRaw.set(`${a.n}:${st}`, scoreStation({ station: st, category: a.category, style: a.style, events: counted, windowEnd: w.end }));
     }
@@ -441,7 +452,7 @@ export function compare(sys) {
     }
     replayed++;
   }
-  return { checks, fails, summary: { ...summary, rawChecked, statusChecked, replayed, windows: sys.windows.length } };
+  return { checks, fails, summary: { ...summary, rawChecked, statusChecked, replayed, windows: sys.windows.length, holdDriftMaxMs: holdDriftMax } };
 }
 
 /** The evidence rules, applied to the logged sequence of calls for one athlete. Returns the official distance and what every call had to return. */
