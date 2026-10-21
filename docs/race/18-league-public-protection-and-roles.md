@@ -71,8 +71,16 @@ There is **no active invalidation** — consistency is time-based and documented
 
 ### Honest limitations
 * **A response header is not an edge cache.** Vercel's CDN does cache function responses that carry `s-maxage` — that is Vercel's documented behaviour, but it **cannot be verified locally**. After the first preview deploy, verify with `curl -I` twice and check `x-vercel-cache: HIT` (and `X-League-Cache`). Until then, only the per-instance cache is proven.
-* The three public database functions remain callable **directly** at the Supabase REST endpoint with the public anon key (that key is public by design). Anyone who bypasses the API bypasses the cache and the limiter. Mitigations: the functions are bounded (≤ 1,000 rows) and set-based (≈ 0.08 s at 1,000 athletes, 1.9 s at 20,000 — measured), Supabase's platform limits apply, and the screens no longer advertise that endpoint. A durable fix (not built): a **standings snapshot** table refreshed on close / correction / eligibility change, which makes every public read O(1). Recommended before a league beyond ~5,000 athletes.
+* **Direct calls to Supabase are closed by a database-side gate (see §2b)** — they used to be a bypass. What remains outside the cache is only what the gate lets through: nothing.
 * No server-side participant **search** endpoint exists; search filters the already-fetched list in the browser, so there is nothing further to protect.
+
+### 2b. The database gate (closing the direct-Supabase bypass)
+The public anon key is public by design, so the three public functions were callable straight at Supabase's REST endpoint, bypassing the cache and the limiter. They are now **gated**:
+* A Super Admin stores a secret with `race_league_set_public_gate(secret)` (24–200 characters). The database keeps **only its SHA-256 hash** (table `race_league_public_gate`, one row, RLS on, no client privilege); the call is audited without the secret.
+* `race_league_public_season / _challenge_results / _participant` first call `race_league_gate_ok()`: it compares the hash of the request's `x-league-gate` header (PostgREST exposes request headers as the `request.headers` setting) with the stored hash. **No match — or no gate configured, or no/malformed header — returns `{"available": false}` before any work is done** (a direct call on a 3,000-athlete season answers inside 300 ms in a test), the same body as an unpublished season, so nothing is revealed.
+* The same secret is the server-side variable `LEAGUE_PUBLIC_GATE_SECRET`; the API sends it in `x-league-gate` on every upstream call. In production the API **refuses to serve (503) if it is missing or shorter than 24 characters**; it is never returned in a response or logged. Rotation: set a new secret in the database and in the Vercel environment (the old one stops working at once; a short blip between the two changes is expected).
+* So a client that only has the anon key can no longer read the league, cannot bypass the limiter, and cannot make the database do expensive work.
+*Residual:* the secret lives in the Vercel server environment (and as a hash in the database); whoever can read the project's environment can call the database directly. The header relies on Supabase's API gateway forwarding custom request headers to PostgREST — standard, but **only verifiable on a real project** (staging step: a direct `curl` with the anon key and no header must return `{"available":false}`, and the site must still render).
 
 ---
 ## 3. Rate limiting
@@ -83,6 +91,12 @@ There is **no active invalidation** — consistency is time-based and documented
 * **Refusal:** `429 Too Many Requests`, `Retry-After: <seconds to the window end>`, `Cache-Control: no-store`. The browser adapter turns it into a typed retry error; the polling hook waits at least that long, then backs off exponentially (×2 up to ×8) with jitter.
 * **Caller identity:** the address is read **only** from the header a verified proxy sets (`x-vercel-forwarded-for`, then `x-real-ip`) **and only when `LEAGUE_TRUSTED_PROXY=vercel`**. With anything else, every caller shares one bucket (so spoofing `X-Forwarded-For` cannot mint fresh budgets — tested). The address is hashed (HMAC-SHA-256 with `LEAGUE_RATELIMIT_SALT`, 8 bytes) before it becomes a key; **no raw address is stored, sent to the limiter or logged**; log lines never contain client data.
 * **Fail safe, never open:** if the backend errors, times out, or answers nonsense, a **stricter per-instance limiter (¼ of the limit, minimum 1)** decides, the response header says `degraded`, and a redacted fault line is logged. **If the limiter is not configured in production** (no backend, no salt, incomplete credentials, no Supabase variables) the API answers **503 `protection_not_configured`** and serves nothing — it can never run unprotected by accident. `LEAGUE_RATELIMIT_BACKEND=memory` is an explicit per-instance choice (header `…;instance`); it is **not** global protection.
+
+### Multi-instance (Vercel) behaviour
+* **Appropriate for multi-instance deployment when the `upstash-rest` backend is configured:** every serverless instance increments the same counter in the shared Redis-compatible store, so the budget is global. Proven by a test that runs two independent API instances against one shared REST backend (5 requests from one caller alternating between the instances → `200,200,200,429,429`).
+* **Not global with `LEAGUE_RATELIMIT_BACKEND=memory`:** the same test shows each instance keeps its own budget (the caller gets the full budget on each). That mode is for local runs or a single-instance private pilot only.
+* The in-process cache and the degraded-mode fallback limiter are per instance by design (burst absorption); they are not relied on for global protection.
+* The Redis adapter was exercised against a protocol-faithful local fake and fake `fetch` failures — **not against a real Upstash/Vercel KV instance** (no remote service may be touched). Verify on staging.
 
 ### Limits you must know
 * Edge-cache **hits never reach the function**, so they are not counted: the limiter protects the *miss* path, the cache protects the database from the *hit* path. Per-viewer throttling of cache hits is a CDN/WAF feature (see alternatives).
@@ -110,6 +124,7 @@ There is **no active invalidation** — consistency is time-based and documented
 | `LEAGUE_RATELIMIT_BACKEND` | `upstash-rest` \| `memory` | none ⇒ **503 in production** |
 | `LEAGUE_RATELIMIT_REST_URL`, `LEAGUE_RATELIMIT_REST_TOKEN` | the Redis REST endpoint (**secret** token) | — |
 | `LEAGUE_RATELIMIT_SALT` | ≥ 16 chars, hashes client addresses (**secret**) | required in production |
+| `LEAGUE_PUBLIC_GATE_SECRET` | ≥ 24 chars; sent to the database as `x-league-gate`; must equal the secret a Super Admin stored with `race_league_set_public_gate` (**secret**) | required in production |
 | `LEAGUE_TRUSTED_PROXY` | `vercel` to trust the platform's client-address header | `none` (one shared bucket) |
 | `LEAGUE_RATELIMIT_WINDOW_SECONDS`, `…_SEASON_PER_WINDOW`, `…_RESULTS_PER_WINDOW`, `…_ATHLETE_PER_WINDOW` | limits | 60 s, 60, 60, 30 |
 
@@ -120,20 +135,20 @@ Existing: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (also read
 
 | Area | Result | Evidence |
 |---|---|---|
-| RLS | 10 tables, RLS on, **no policy, no client privilege** (select/insert/update/delete/truncate/references/trigger, `anon` and `authenticated`); ledger sequence locked | `32`, `37` |
-| RPCs / grants | `anon` executes exactly the 3 public reads; 26 functions executable by `authenticated`, each re-checks role/season; 18 internal helpers (incl. scoring, correction core, admin count, rules mapper) not executable by any client; all `SECURITY DEFINER` pin `search_path` | `32`, `37`, `39` |
+| RLS | 11 tables, RLS on, **no policy, no client privilege** (select/insert/update/delete/truncate/references/trigger, `anon` and `authenticated`); ledger sequence locked | `32`, `37` |
+| RPCs / grants | `anon` executes exactly the 3 public reads; 27 functions executable by `authenticated`, each re-checks role/season; 19 internal helpers (incl. scoring, correction core, admin count, rules mapper) not executable by any client; all `SECURITY DEFINER` pin `search_path` | `32`, `37`, `39` |
 | Triggers | completed-season lock on every write path (even for the owner), append-only ledger / corrections / eligibility decisions, no deletes | `32`, `36`, `37` |
 | Role assignment / revocation | Super-Admin-only for administrators, reason + audit, idempotent, serialised, two-administrator floor, no self-promotion | `39` (+ parallel-session check) |
-| Public reads | allow-list in the database and again in the API; unpublished = missing = identical; cross-season keys never mix; cookies/Authorization ignored | `34`, `server.test.ts`, browser check |
+| Public reads | **gated** (only the API's secret header is answered), allow-list in the database and again in the API; unpublished = missing = identical; cross-season keys never mix; cookies/Authorization ignored | `34`, `server.test.ts`, browser check |
 | Unpublished season | no data returned or cached (`available:false`, 404, 5 s) | `34`, `server.test.ts` |
 | Result approval / correction | self-review refused; corrections admin-only with reason, previous/new/actor/time, audit; judge requests change nothing; completed season locked | `32`, `36`, differential test |
 | Point-ledger integrity | single scoring path under a lock, append-only, exactly-once under parallel close/recompute, TS ≡ SQL on 150 scenarios | `35`+shell, `38` |
 | Attempt idempotency | one request id × 10 parallel → 1 attempt; limit holds under 8 parallel | shell |
 | Appeals | 48 h window, staff-entered, conflict-of-interest (recorded/corrected/removed), never touches scores, text admin-only | `36` |
 | CSV import | formula characters, size, row, binary, duplicate and unverified-membership rows refused (client and server) | `league.test.ts`, `32`, `36` |
-| Rate-limit bypass | header spoofing, query/case/percent cache-busting, backend outage, hung backend, unconfigured production — all tested | `server.test.ts`, browser check |
+| Rate-limit bypass | header spoofing, query/case/percent cache-busting, backend outage, hung backend, unconfigured production, **direct database calls (gate)**, two instances sharing/not sharing a budget — all tested | `server.test.ts`, `34`, `37`, browser check |
 | Cache poisoning | key derived only from validated path; no request header influences body or key; upstream response sanitised; errors never stored | `server.test.ts` |
 | Cross-season access | refused on every write and read path | `37` |
 | Unauthorized administrator actions | refused; the same checks run in TypeScript and SQL | `39`, `league-roles.test.ts` |
 
-**Findings fixed in this session:** none beyond those in §1–§3 (new surface was built with its tests). **Residual risks:** direct anon RPC bypass of the API (§2), the CDN behaviour unverifiable locally, shared-bucket collateral without a trusted proxy, edge cache hits not counted, Redis as a third-party dependency, an administrator may still correct a result they recorded (by your rule), membership is an attestation.
+**Findings fixed in this session:** none beyond those in §1–§3 (new surface was built with its tests). **Residual risks:** whoever can read the Vercel environment holds the gate secret (§2b), the CDN behaviour and the gateway's header forwarding unverifiable locally, shared-bucket collateral without a trusted proxy, edge cache hits not counted, Redis as a third-party dependency, an administrator may still correct a result they recorded (by your rule), membership is an attestation.

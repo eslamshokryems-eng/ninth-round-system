@@ -55,7 +55,7 @@ Rules: staging and production use **different projects, keys and Vercel environm
 
 ### 1.1b League public-protection variables (added with THE NINTH League — server-side only, NOT set anywhere yet)
 
-Only when the public league launch is approved. Names, purpose, defaults and costs: `docs/race/18-league-public-protection-and-roles.md` §3–§4. Server-side only (never `NEXT_PUBLIC_`, never in the browser): `LEAGUE_RATELIMIT_BACKEND`, `LEAGUE_RATELIMIT_REST_URL`, `LEAGUE_RATELIMIT_REST_TOKEN` (secret), `LEAGUE_RATELIMIT_SALT` (secret), `LEAGUE_TRUSTED_PROXY=vercel`, and the optional tuning variables `LEAGUE_CACHE_TTL_SECONDS`, `LEAGUE_ORIGIN_CACHE_SECONDS`, `LEAGUE_CACHE_NEGATIVE_TTL_SECONDS`, `LEAGUE_RATELIMIT_*`. Without them a production build answers the public league API with 503 (it fails closed).
+Only when the public league launch is approved. Names, purpose, defaults and costs: `docs/race/18-league-public-protection-and-roles.md` §3–§4. Server-side only (never `NEXT_PUBLIC_`, never in the browser): `LEAGUE_RATELIMIT_BACKEND`, `LEAGUE_RATELIMIT_REST_URL`, `LEAGUE_RATELIMIT_REST_TOKEN` (secret), `LEAGUE_RATELIMIT_SALT` (secret), `LEAGUE_PUBLIC_GATE_SECRET` (secret; the same value a Super Admin stores with `race_league_set_public_gate`), `LEAGUE_TRUSTED_PROXY=vercel`, and the optional tuning variables `LEAGUE_CACHE_TTL_SECONDS`, `LEAGUE_ORIGIN_CACHE_SECONDS`, `LEAGUE_CACHE_NEGATIVE_TTL_SECONDS`, `LEAGUE_RATELIMIT_*`. Without them a production build answers the public league API with 503 (it fails closed).
 
 ### 1.2 Pre-deployment variable check (run before every deploy)
 
