@@ -65,6 +65,8 @@ pass "final: audit — complete event reconstructable (check-ins + correction, V
 # EXPORT + INDEPENDENT COMPARISON ------------------------------------------------------------------------------------------------------------------------
 "${PSQL[@]}" -d "$DB" -v exportfile="$WORK/final/system.json" -At -q -f "$FV/export.sql" >/dev/null 2>"$WORK/final/export.err" || { grep -m3 ERROR "$WORK/final/export.err"; fail "final: export failed"; }
 [ -n "${FINAL_ARTIFACTS:-}" ] && { mkdir -p "$FINAL_ARTIFACTS"; cp "$WORK/final/system.json" "$WORK/final/plan.json" "$FINAL_ARTIFACTS/"; }
+node --test "$ROOT/docs/race/scripts/final-model.timing.test.mjs" >"$WORK/final/timing-test.out" 2>&1 || { tail -30 "$WORK/final/timing-test.out"; fail "final: timing-guard boundary tests failed"; }
+pass "final: timing guard — boundary tests (exactly ±1000 ms passes, ±1001 ms fails, report names athlete/action/expected/actual/drift)"
 SUMMARY=$(node "$ROOT/docs/race/scripts/final-model.mjs" compare "$WORK/final/system.json" 2>&1) || { echo "$SUMMARY" | head -50; fail "final: the system disagrees with the independent model"; }
 echo "$SUMMARY" | tail -2
 [ -n "${FINAL_ARTIFACTS:-}" ] && echo "$SUMMARY" > "$FINAL_ARTIFACTS/model-summary.txt"

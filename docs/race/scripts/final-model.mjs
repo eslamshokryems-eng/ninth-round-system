@@ -283,6 +283,37 @@ export function expectedActionStatus(a, win) {
   return { status: "REJECTED", code: "WINDOW_CLOSED" };
 }
 
+/** The largest accepted gap between the instant the harness SCHEDULED an action and the server time the system RECORDED for it. Exactly this much passes; anything more fails. */
+export const DRIFT_LIMIT_MS = 1000;
+
+/**
+ * Timing guard. For every action the harness sent (in the order it ran), compares the scheduled instant (act_log.arrival) with the server race time the system recorded (ledger.server_ms).
+ * drift = actual - expected. Nothing is tolerated silently: every violation names the athlete, station, action, expected, actual and drift, and compare() turns each one into a failure.
+ *
+ * Two cases, because the harness runs actions one after another:
+ *  - the FIRST action at a scheduled instant (the race clock has just been positioned there): |drift| must be <= limit. Absolute, no allowance.
+ *  - a LATER action at the same instant, unless the clock was repositioned (its drift fell by more than the limit: that is a new first action) (an offline-queue flush replays ~180 actions serially, each a few ms behind the previous one, so the last ones are legitimately >1 s behind
+ *    the instant): it may be at most `limit` further behind (or ahead of) the action that ran just before it. Smooth queueing passes; one action that stalls for more than the limit fails.
+ * `maxAbs` is the largest absolute drift seen anywhere, reported even when it is within the rules.
+ */
+export function timingDrift(sys, limitMs = DRIFT_LIMIT_MS) {
+  const recorded = new Map(sys.ledger.map((e) => [e.id, e.server_ms]));
+  const violations = [];
+  let checked = 0, maxAbs = 0, prev = null;
+  for (const a of sys.act_log) {
+    const actual = recorded.get(a.cid);
+    if (actual === undefined || actual === null) continue;   // not recorded (e.g. an ERROR): other checks own that
+    const drift = actual - a.arrival;
+    const sameInstant = prev !== null && prev.arrival === a.arrival && drift - prev.drift >= -limitMs;   // a big drop = the harness repositioned the race clock: a new run, judged absolutely
+    const basis = sameInstant ? drift - prev.drift : drift;  // vs the instant itself, or vs the action that ran just before it
+    checked++;
+    if (Math.abs(drift) > maxAbs) maxAbs = Math.abs(drift);
+    if (Math.abs(basis) > limitMs) violations.push({ n: a.n, station: a.station, type: a.type, cid: a.cid, expected: a.arrival, actual, drift, rule: sameInstant ? "step" : "absolute" });
+    prev = { arrival: a.arrival, drift };
+  }
+  return { checked, maxAbs, limitMs, violations };
+}
+
 export function compare(sys) {
   const roster = buildRoster();
   for (const e of sys.script_log) { if (e.action === "skip") DYN.skipped.add(e.n); if (e.action === "dnf") DYN.dnf.add(e.n); }
@@ -345,6 +376,14 @@ export function compare(sys) {
   const perStation = new Map();
   for (const w of sys.windows) { if (!perStation.has(w.station)) perStation.set(w.station, []); perStation.get(w.station).push(w); }
   for (const [st, ws] of perStation) { ws.sort((a, b) => a.start - b.start); for (let i = 1; i < ws.length; i++) ok(ws[i].start >= ws[i - 1].end + TR, `no overlap at station ${st}: N${ws[i - 1].n} / N${ws[i].n}`); }
+
+  // ---- 2b. timing guard: recorded time vs scheduled time of every action --------------------------------------------------------------
+  const drift = timingDrift(sys);
+  ok(drift.checked > 0, "timing guard: no action could be matched to its ledger row");
+  for (const v of drift.violations) {
+    checks++;
+    fails.push(`timing drift N${String(v.n).padStart(3, "0")} S${v.station} ${v.type} ${v.cid.slice(0, 8)}: scheduled ${v.expected} ms, recorded ${v.actual} ms, drift ${v.drift > 0 ? "+" : ""}${v.drift} ms (${v.rule === "step" ? "more than the limit behind the previous action of the same flush" : "limit"} ±${drift.limitMs})`);
+  }
 
   // ---- 3. raw results: model (from the actions actually SENT) vs system ---------------------------------------------------------------
   // The harness SCHEDULES every action for an instant, but the system stamps it with the moment it really ran (server time). In an offline-queue flush after a blackout
@@ -452,7 +491,7 @@ export function compare(sys) {
     }
     replayed++;
   }
-  return { checks, fails, summary: { ...summary, rawChecked, statusChecked, replayed, windows: sys.windows.length, holdDriftMaxMs: holdDriftMax } };
+  return { checks, fails, summary: { ...summary, rawChecked, statusChecked, replayed, windows: sys.windows.length, holdDriftMaxMs: holdDriftMax, timingChecked: drift.checked, timingDriftMaxMs: drift.maxAbs } };
 }
 
 /** The evidence rules, applied to the logged sequence of calls for one athlete. Returns the official distance and what every call had to return. */
