@@ -6,7 +6,8 @@
  * token handling, staff console, double-click protection, phone-width
  * overflow, and independence from the gym system.
  *
- *   pnpm --filter @9thround/race-web build     # with NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon
+ *   pnpm --filter @9thround/race-web build     # with NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon NEXT_PUBLIC_RACE_E2E_OCR=1
+ *                                              #   (the last one is REQUIRED for the rowing/evidence checks: it enables the scripted-OCR test hook; without it 7 of them fail)
  *   pnpm --filter @9thround/race-web start     # port 3100
  *   node apps/race/scripts/race-e2e.mjs        # needs `playwright` resolvable (e.g. NODE_PATH=$(npm root -g))
  *
@@ -687,7 +688,8 @@ const main = async () => {
     await rec.locator("#race-checkin-search").fill("30");
     await rec.waitForSelector("text=Already In");
     await rec.getByRole("button", { name: "Show check-in" }).click();
-    await rec.waitForSelector("text=Already checked in");
+    // Wait for the RESULT card itself. A looser text match can resolve while the request is still in flight, and its late answer then clears whatever the next step has typed.
+    await rec.locator("[role=status]", { hasText: "Already checked in" }).waitFor();
   });
 
   await step("reception: several matches show a pick list; choosing one opens their card", async () => {
