@@ -95,22 +95,22 @@ export const site = {
       {
         name: { en: "One Month", ar: "شهر" } as Localized,
         note: { en: "Full access to the 9-round circuit", ar: "دخول كامل لدايرة التسع راوندات" } as Localized,
-        price: null as ConfirmedString,
+        price: "2,900 EGP" as ConfirmedString,
       },
       {
         name: { en: "Three Months", ar: "تلات شهور" } as Localized,
         note: { en: "Best for building a real training habit", ar: "الأنسب عشان تبني عادة تمرين حقيقية" } as Localized,
-        price: null as ConfirmedString,
+        price: "6,950 EGP" as ConfirmedString,
       },
       {
         name: { en: "Six Months", ar: "ست شهور" } as Localized,
         note: { en: "Commit to a full training phase", ar: "التزام بمرحلة تدريب كاملة" } as Localized,
-        price: null as ConfirmedString,
+        price: "10,800 EGP" as ConfirmedString,
       },
       {
         name: { en: "Annual", ar: "سنة" } as Localized,
         note: { en: "The full year-long progression", ar: "التدرّج الكامل على مدار سنة" } as Localized,
-        price: null as ConfirmedString,
+        price: "14,900 EGP" as ConfirmedString,
       },
       {
         name: { en: "Personal Training", ar: "تدريب شخصي" } as Localized,
