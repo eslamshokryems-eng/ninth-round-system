@@ -21,6 +21,10 @@ select jsonb_build_object(
   'results', (select jsonb_agg(jsonb_build_object('n', r.n, 'station', r.station, 'score', sr.official_score, 'technique', sr.technique_score, 'status', sr.status, 'evidence_state', race_evidence_state(sr.id)) order by r.n, r.station)
                 from race_final.res r join race_station_results sr on sr.id = r.result_id),
   'act_log', (select jsonb_agg(jsonb_build_object('seq', seq, 'cid', cid, 'n', n, 'station', station, 'type', type, 'value', value, 'voids', voids, 'origin', origin, 'device', device, 'arrival', arrival, 'sys_status', sys_status, 'sys_code', sys_code) order by seq) from race_final.act_log),
+  'clock_run', (select jsonb_build_object('run', r.run, 'markers', (select count(*) from race_final.clock_marks),
+                  'travel_calls', (select case when is_called then last_value else 0 end from race_sim.travel_calls) - r.baseline) from race_final.clock_run r),
+  'clock_marks', (select coalesce(jsonb_agg(jsonb_build_object('no', m.no, 'id', m.id, 'run', m.run, 'kind', m.kind, 'step', m.step, 'logged_before', m.logged_before, 'instant', m.instant,
+                  'before_ms', m.before_ms, 'after_ms', m.after_ms, 'n', m.n, 'station', m.station, 'cid', m.cid) order by m.no), '[]') from race_final.clock_marks m),
   'script_log', (select coalesce(jsonb_agg(jsonb_build_object('action', action, 'n', n, 'at', at_ms)), '[]') from race_final.script_log),
   'review_log', (select coalesce(jsonb_agg(jsonb_build_object('cid', cid, 'decision', decision)), '[]') from race_final.review_log),
   'ocr_log', (select coalesce(jsonb_agg(jsonb_build_object('seq', seq, 'n', n, 'step', step, 'cid', cid, 'distance', distance, 'conf', conf, 'ack', ack, 'decision', decision, 'device', device, 'arrival', arrival, 'sys_result', sys_result) order by seq), '[]') from race_final.ocr_log),

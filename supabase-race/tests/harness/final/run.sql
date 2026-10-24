@@ -11,6 +11,14 @@ create sequence race_final.devseq;
 grant usage on sequence race_final.devseq to public;
 create table race_final.state (event_id uuid not null, done boolean not null default false, end_cap bigint not null default 13000000, steps int not null default 0);
 insert into race_final.state values (race_test.id('ev_f'));
+-- Explicit reposition markers: EVERY move of the race clock the driver makes goes through race_final.reposition() and leaves one row here (nothing is inferred from timestamps later).
+-- run: this run's identity; baseline: race_sim.travel_calls at the start (the independent count of travel_to calls is compared with the markers at export).
+create table race_final.clock_run (run text not null, baseline bigint not null);
+insert into race_final.clock_run select 'final-' || substr(md5(random()::text || clock_timestamp()::text), 1, 12), (select case when is_called then last_value else 0 end from race_sim.travel_calls);
+create table race_final.clock_marks (no int primary key, id text not null unique, run text not null, kind text not null, step int not null, logged_before int not null, instant bigint not null,
+  before_ms bigint not null, after_ms bigint not null, n int, station int, cid uuid);
+grant select, insert on race_final.clock_marks to public;
+grant select on race_final.clock_run to public;
 create table race_final.blackout (id serial, scope text not null, "from" bigint not null, "to" bigint not null, done boolean not null default false);
 insert into race_final.blackout (scope, "from", "to") select b ->> 'scope', (b ->> 'from')::bigint, (b ->> 'to')::bigint from jsonb_array_elements(race_final.p() -> 'blackouts') b;
 create table race_final.script (seq serial, at_ms bigint not null, action text not null, arg text, wall bigint, done boolean not null default false);
@@ -301,6 +309,20 @@ begin
 end $$;
 
 -- ONE step: advance to the next thing that happens, then do everything that is due -------------------------------------------------------------
+-- kind: 'advance' (the clock jumps to the next instant), 'flush-0' / 'flush-1b' (the first action of an instant in the first / second flush loop), 'post-flush-0' (back onto the step's instant after the first loop).
+-- logged_before = how many actions were already in act_log: the marker precedes exactly the (logged_before + 1)-th logged action, if there is one at this instant.
+create function race_final.reposition(p_kind text, p_event uuid, p_instant bigint, p_n int default null, p_station int default null, p_cid uuid default null) returns void language plpgsql as $$
+declare v_before bigint; v_after bigint; v_no int; v_run text;
+begin
+  v_before := coalesce(race_now_ms(p_event), 0);
+  perform race_sim.travel_to(p_event, p_instant);
+  v_after := coalesce(race_now_ms(p_event), 0);
+  select run into v_run from race_final.clock_run;
+  select coalesce(max(no), 0) + 1 into v_no from race_final.clock_marks;
+  insert into race_final.clock_marks (no, id, run, kind, step, logged_before, instant, before_ms, after_ms, n, station, cid)
+  values (v_no, v_run || ':' || v_no, v_run, p_kind, (select steps from race_final.state), (select count(*) from race_final.act_log), p_instant, v_before, v_after, p_n, p_station, p_cid);
+end $$;
+
 create function race_final.step() returns text language plpgsql as $$
 declare
   st race_final.state; t bigint; tick bigint; ev bigint; act bigint; bo bigint; rv bigint; target bigint; b race_final.blackout; a race_final.act; s race_final.script; r race_final.review_due; doticks boolean; fin boolean; v_last bigint;
@@ -322,7 +344,7 @@ begin
   select min(due_ms) into rv from race_final.review_due where not done;
   target := least(tick, coalesce(ev, 9e15::bigint), coalesce(act, 9e15::bigint), coalesce(bo, 9e15::bigint), coalesce(rv, 9e15::bigint), st.end_cap);
   if target < t then target := t; end if;
-  if target > t then perform race_sim.travel_to(st.event_id, target); end if;
+  if target > t then perform race_final.reposition('advance', st.event_id, target); end if;
   t := target;
   -- 0. a device that comes back flushes its offline queue FIRST (inside the very millisecond it reconnects); the reconnect assertions come after
   for a in select * from race_final.act where not done and eff_ms is not null and eff_ms <= t order by eff_ms, abs_ms, id loop
@@ -330,7 +352,7 @@ begin
     -- after the other in real time, so server time can never run backwards between two of them (a queue flush of 150 actions drifts by at most a few hundred ms)
     if v_last is distinct from a.eff_ms then
       v_last := a.eff_ms;
-      if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_sim.travel_to(st.event_id, a.eff_ms); end if;
+      if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_final.reposition('flush-0', st.event_id, a.eff_ms, a.n, a.station, a.cid); end if;
     end if;
     if exists (select 1 from race_final.res rs where rs.n = a.n and rs.station = a.station and rs.status in ('VOID_DNS', 'NOT_REACHED')) then
       -- the athlete was skipped / withdrew since the plan was made: nobody judges an athlete who is not there
@@ -340,7 +362,7 @@ begin
     update race_final.act set done = true where id = a.id;
   end loop;
   -- the harness's own processing time is not race time: put the race clock back on the scripted instant before anything that is time-exact
-  if race_now_ms(st.event_id) > t and race_now_ms(st.event_id) - t < 2000 then perform race_sim.travel_to(st.event_id, t); end if;
+  if race_now_ms(st.event_id) > t and race_now_ms(st.event_id) - t < 2000 then perform race_final.reposition('post-flush-0', st.event_id, t); end if;
   -- 1. reconnects (a blackout ends)
   for b in select * from race_final.blackout where not done and "to" <= t order by "to" loop perform race_final.reconnect(b); perform race_final.refresh(); end loop;
   -- 1b. whatever the reconnect just made visible (a device flushing its queue) is sent in the same instant
@@ -349,7 +371,7 @@ begin
     -- after the other in real time, so server time can never run backwards between two of them (a queue flush of 150 actions drifts by at most a few hundred ms)
     if v_last is distinct from a.eff_ms then
       v_last := a.eff_ms;
-      if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_sim.travel_to(st.event_id, a.eff_ms); end if;
+      if race_now_ms(st.event_id) >= a.eff_ms and race_now_ms(st.event_id) - a.eff_ms < 2000 then perform race_final.reposition('flush-1b', st.event_id, a.eff_ms, a.n, a.station, a.cid); end if;
     end if;
     if exists (select 1 from race_final.res rs where rs.n = a.n and rs.station = a.station and rs.status in ('VOID_DNS', 'NOT_REACHED')) then
       -- the athlete was skipped / withdrew since the plan was made: nobody judges an athlete who is not there

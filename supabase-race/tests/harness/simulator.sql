@@ -30,9 +30,14 @@ begin
   perform set_config('session_replication_role', 'origin', true);
 end $$;
 
+-- Independent count of EVERY call of travel_to (nextval is not rolled back). The final validation compares it with the reposition markers it exports.
+create sequence race_sim.travel_calls;
+grant usage on sequence race_sim.travel_calls to public;
+
 create function race_sim.travel_to(p_event uuid, p_race_ms bigint) returns void language plpgsql as $$
 declare c public.race_clock; v_new timestamptz;
 begin
+  perform nextval('race_sim.travel_calls');
   select * into c from public.race_clock where event_id = p_event;
   if c.paused_at is not null then raise exception 'race_sim: cannot travel while paused'; end if;
   v_new := clock_timestamp() - make_interval(secs => (p_race_ms + c.paused_total_ms) / 1000.0);

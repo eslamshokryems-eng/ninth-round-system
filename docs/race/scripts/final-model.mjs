@@ -286,32 +286,90 @@ export function expectedActionStatus(a, win) {
 /** The largest accepted gap between the instant the harness SCHEDULED an action and the server time the system RECORDED for it. Exactly this much passes; anything more fails. */
 export const DRIFT_LIMIT_MS = 1000;
 
+/** Where the driver moves the race clock (race_final.reposition). Anything else in an artifact is invalid. */
+export const MARK_KINDS = ["advance", "flush-0", "post-flush-0", "flush-1b"];
+
+/**
+ * Validates the reposition markers the harness exported (artifact: `clock_run` + `clock_marks`). Nothing here is inferred from timestamps of actions.
+ * Any problem -> `problems` is non-empty and NO marker is trusted (fail closed): the caller must then treat every would-be reset as a violation and report the problems.
+ *   marker = { no, id, run, kind, step, logged_before, instant, before_ms, after_ms, n?, station?, cid? }
+ *   - clock_run = { run, markers, travel_calls }: the run identity, the marker count, and the INDEPENDENT count of travel_to calls (a counter inside race_sim.travel_to)
+ *   - every marker: run == clock_run.run; no == its 1-based position (in order, no gaps, no repeats); id == `${run}:${no}`; kind in MARK_KINDS; integer fields;
+ *     step and logged_before never decrease; logged_before <= number of logged actions (not stale); instant <= after_ms <= instant + limit (the clock really is on the instant);
+ *     flush-* markers name their action (n, station, cid); the others name none; no two markers share (kind, step, logged_before, instant)
+ *   - markers.length == clock_run.markers == clock_run.travel_calls: every travel_to call has a marker and every marker is a call.
+ */
+export function validateClockMarks(sys, limitMs = DRIFT_LIMIT_MS) {
+  const problems = [];
+  const bad = (code, message, marker = null) => problems.push({ code, message, marker: marker && typeof marker === "object" ? (marker.id ?? null) : null });
+  const run = sys.clock_run, marks = sys.clock_marks;
+  const acts = Array.isArray(sys.act_log) ? sys.act_log : [];
+  if (!run || typeof run !== "object" || typeof run.run !== "string" || run.run === "") { bad("run-missing", "artifact has no valid clock_run (run identity)"); }
+  if (!Array.isArray(marks)) { bad("marks-missing", "artifact has no clock_marks array"); return { problems, marks: [] }; }
+  for (let i = 1; i < acts.length; i++) if (!(acts[i].seq > acts[i - 1].seq)) { bad("acts-unordered", `act_log is not strictly ordered by seq at index ${i}`); break; }
+  const isInt = (v) => Number.isInteger(v);
+  const seenId = new Set(), seenPos = new Set();
+  let prev = null;
+  marks.forEach((m, i) => {
+    if (!m || typeof m !== "object") return bad("malformed", `marker #${i + 1} is not an object`);
+    const fieldsOk = typeof m.id === "string" && typeof m.run === "string" && typeof m.kind === "string" && [m.no, m.step, m.logged_before, m.instant, m.before_ms, m.after_ms].every(isInt);
+    if (!fieldsOk) return bad("malformed", `marker #${i + 1} is missing a field or has a wrong type`, m);
+    if (run && m.run !== run.run) bad("other-run", `marker ${m.id} belongs to run ${m.run}, not ${run.run}`, m);
+    if (m.no !== i + 1) bad("reordered", `marker at position ${i + 1} has no=${m.no} (missing, repeated or reordered)`, m);
+    if (m.id !== `${m.run}:${m.no}`) bad("identity", `marker id ${m.id} is not ${m.run}:${m.no}`, m);
+    if (!MARK_KINDS.includes(m.kind)) bad("kind", `marker ${m.id} has unknown kind ${m.kind}`, m);
+    if (m.logged_before < 0 || m.logged_before > acts.length) bad("stale", `marker ${m.id} precedes action #${m.logged_before + 1} but only ${acts.length} actions exist`, m);
+    if (prev && (m.step < prev.step || m.logged_before < prev.logged_before)) bad("reordered", `marker ${m.id} goes backwards (step ${prev.step}->${m.step}, logged ${prev.logged_before}->${m.logged_before})`, m);
+    if (m.after_ms < m.instant || m.after_ms - m.instant > limitMs) bad("not-on-instant", `marker ${m.id}: clock is at ${m.after_ms} ms after moving to ${m.instant} ms`, m);
+    const flush = m.kind === "flush-0" || m.kind === "flush-1b";
+    const named = [m.n, m.station, m.cid].filter((v) => v !== null && v !== undefined);
+    if (flush && !(isInt(m.n) && isInt(m.station) && typeof m.cid === "string")) bad("binding", `flush marker ${m.id} does not name its athlete, station and action`, m);
+    if (!flush && named.length) bad("binding", `marker ${m.id} (${m.kind}) must not name an action`, m);
+    if (seenId.has(m.id)) bad("duplicate", `marker id ${m.id} appears twice`, m); seenId.add(m.id);
+    const pos = `${m.kind}|${m.step}|${m.logged_before}|${m.instant}`;
+    if (seenPos.has(pos)) bad("duplicate", `marker ${m.id} repeats ${pos}`, m); seenPos.add(pos);
+    prev = m;
+  });
+  if (run && typeof run === "object") {
+    if (run.markers !== marks.length) bad("count", `clock_run says ${run.markers} markers, artifact holds ${marks.length}`);
+    if (run.travel_calls !== marks.length) bad("count", `${run.travel_calls} travel_to calls were made, ${marks.length} markers exist`);
+  }
+  return { problems, marks: problems.length ? [] : marks };
+}
+
 /**
  * Timing guard. For every action the harness sent (in the order it ran), compares the scheduled instant (act_log.arrival) with the server race time the system recorded (ledger.server_ms).
- * drift = actual - expected. Nothing is tolerated silently: every violation names the athlete, station, action, expected, actual and drift, and compare() turns each one into a failure.
+ * drift = actual - expected. Nothing is tolerated silently: every violation names the athlete, station, action, expected, actual, drift, the rule and the marker (if any).
  *
- * Two cases, because the harness runs actions one after another:
- *  - the FIRST action at a scheduled instant (the race clock has just been positioned there): |drift| must be <= limit. Absolute, no allowance.
- *  - a LATER action at the same instant, unless the clock was repositioned (its drift fell by more than the limit: that is a new first action) (an offline-queue flush replays ~180 actions serially, each a few ms behind the previous one, so the last ones are legitimately >1 s behind
- *    the instant): it may be at most `limit` further behind (or ahead of) the action that ran just before it. Smooth queueing passes; one action that stalls for more than the limit fails.
- * `maxAbs` is the largest absolute drift seen anywhere, reported even when it is within the rules.
+ * Rules (the harness runs actions one after another):
+ *  - the FIRST action at a scheduled instant: |drift| <= limit. Absolute.
+ *  - a LATER action of the same instant (an offline-queue flush replays ~180 actions serially, each a few ms behind the previous one): its drift may differ from the previous action's
+ *    by at most `limit` in EITHER direction (smooth queueing passes; a stall, and a drop of the recorded time, both fail) ...
+ *  - ... unless a VALID reposition marker (validateClockMarks) precedes exactly this action (marker.logged_before == its index, marker.instant == its arrival, and for flush markers the same
+ *    athlete, station and action id). The clock was then explicitly put back on the instant, so this one action is judged absolutely instead (|drift| <= limit). One marker, one action.
+ * Invalid or missing marker data -> no marker is trusted, and the problems are returned (compare() fails on them). `maxAbs` is the largest absolute drift seen, reported even when allowed.
  */
 export function timingDrift(sys, limitMs = DRIFT_LIMIT_MS) {
   const recorded = new Map(sys.ledger.map((e) => [e.id, e.server_ms]));
-  const violations = [];
+  const { problems, marks } = validateClockMarks(sys, limitMs);
+  const byPos = new Map();                                    // logged_before -> markers that precede the action at that index
+  for (const m of marks) { if (!byPos.has(m.logged_before)) byPos.set(m.logged_before, []); byPos.get(m.logged_before).push(m); }
+  const violations = [], used = new Set();
   let checked = 0, maxAbs = 0, prev = null;
-  for (const a of sys.act_log) {
+  sys.act_log.forEach((a, idx) => {
     const actual = recorded.get(a.cid);
-    if (actual === undefined || actual === null) continue;   // not recorded (e.g. an ERROR): other checks own that
+    if (actual === undefined || actual === null) return;      // not recorded (e.g. an ERROR): other checks own that
     const drift = actual - a.arrival;
-    const sameInstant = prev !== null && prev.arrival === a.arrival && drift - prev.drift >= -limitMs;   // a big drop = the harness repositioned the race clock: a new run, judged absolutely
-    const basis = sameInstant ? drift - prev.drift : drift;  // vs the instant itself, or vs the action that ran just before it
+    const sameInstant = prev !== null && prev.arrival === a.arrival;
+    const marker = sameInstant ? (byPos.get(idx) ?? []).find((m) => m.instant === a.arrival && (m.kind === "advance" || m.kind === "post-flush-0" || (m.n === a.n && m.station === a.station && m.cid === a.cid))) ?? null : null;
+    if (marker) used.add(marker.id);
+    const basis = sameInstant && !marker ? drift - prev.drift : drift;
     checked++;
     if (Math.abs(drift) > maxAbs) maxAbs = Math.abs(drift);
-    if (Math.abs(basis) > limitMs) violations.push({ n: a.n, station: a.station, type: a.type, cid: a.cid, expected: a.arrival, actual, drift, rule: sameInstant ? "step" : "absolute" });
+    if (Math.abs(basis) > limitMs) violations.push({ n: a.n, station: a.station, type: a.type, cid: a.cid, seq: a.seq, expected: a.arrival, actual, drift, rule: sameInstant && !marker ? "step" : "absolute", marker: marker ? marker.id : null });
     prev = { arrival: a.arrival, drift };
-  }
-  return { checked, maxAbs, limitMs, violations };
+  });
+  return { checked, maxAbs, limitMs, violations, problems, markers: marks.length, markersUsed: used.size };
 }
 
 export function compare(sys) {
@@ -377,12 +435,13 @@ export function compare(sys) {
   for (const w of sys.windows) { if (!perStation.has(w.station)) perStation.set(w.station, []); perStation.get(w.station).push(w); }
   for (const [st, ws] of perStation) { ws.sort((a, b) => a.start - b.start); for (let i = 1; i < ws.length; i++) ok(ws[i].start >= ws[i - 1].end + TR, `no overlap at station ${st}: N${ws[i - 1].n} / N${ws[i].n}`); }
 
-  // ---- 2b. timing guard: recorded time vs scheduled time of every action --------------------------------------------------------------
+  // ---- 2b. timing guard: recorded time vs scheduled time of every action; reposition markers must be valid --------------------------------
   const drift = timingDrift(sys);
   ok(drift.checked > 0, "timing guard: no action could be matched to its ledger row");
+  for (const p of drift.problems) { checks++; fails.push(`timing guard: reposition marker problem [${p.code}] ${p.message}`); }
   for (const v of drift.violations) {
     checks++;
-    fails.push(`timing drift N${String(v.n).padStart(3, "0")} S${v.station} ${v.type} ${v.cid.slice(0, 8)}: scheduled ${v.expected} ms, recorded ${v.actual} ms, drift ${v.drift > 0 ? "+" : ""}${v.drift} ms (${v.rule === "step" ? "more than the limit behind the previous action of the same flush" : "limit"} ±${drift.limitMs})`);
+    fails.push(`timing drift N${String(v.n).padStart(3, "0")} S${v.station} ${v.type} ${v.cid.slice(0, 8)} (act #${v.seq}): scheduled ${v.expected} ms, recorded ${v.actual} ms, drift ${v.drift > 0 ? "+" : ""}${v.drift} ms (rule ${v.rule}${v.marker ? ", marker " + v.marker : ", no marker"}; limit ±${drift.limitMs})`);
   }
 
   // ---- 3. raw results: model (from the actions actually SENT) vs system ---------------------------------------------------------------
@@ -491,7 +550,7 @@ export function compare(sys) {
     }
     replayed++;
   }
-  return { checks, fails, summary: { ...summary, rawChecked, statusChecked, replayed, windows: sys.windows.length, holdDriftMaxMs: holdDriftMax, timingChecked: drift.checked, timingDriftMaxMs: drift.maxAbs } };
+  return { checks, fails, summary: { ...summary, rawChecked, statusChecked, replayed, windows: sys.windows.length, holdDriftMaxMs: holdDriftMax, timingChecked: drift.checked, timingDriftMaxMs: drift.maxAbs, clockMarkers: drift.markers, clockMarkersUsed: drift.markersUsed } };
 }
 
 /** The evidence rules, applied to the logged sequence of calls for one athlete. Returns the official distance and what every call had to return. */
