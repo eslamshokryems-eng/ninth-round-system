@@ -2,7 +2,7 @@
 // The guard never infers a clock reset from timestamps: only explicit, valid reposition markers (artifact: clock_run + clock_marks) can put an action back on an absolute check.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { timingDrift, validateClockMarks, DRIFT_LIMIT_MS, MARK_KINDS } from "./final-model.mjs";
+import { timingDrift, validateClockMarks, groupMarkerProblems, DRIFT_LIMIT_MS, MARK_KINDS } from "./final-model.mjs";
 
 const cid = (i) => `11111111-aaaa-bbbb-cccc-${String(i).padStart(12, "0")}`;
 // rows: { d: drift, at?: scheduled instant, n?, st? } in the order the harness ran them; d === undefined = not in the ledger
@@ -151,4 +151,22 @@ const closed = (name, marks, run, code) => test(`fails closed: ${name}`, () => {
 test("validateClockMarks: a clean artifact has no problems and returns its markers", () => {
   const v = validateClockMarks(sys(RESET, [mark(1, "advance", 0, RESET), mark(2, "flush-1b", IDX, RESET)]));
   assert.deepEqual(v.problems, []); assert.equal(v.marks.length, 2);
+});
+
+// ---- diagnostics: a cascade of marker problems must stay short and must not hide the violations ---------------------------------------------
+test("groupMarkerProblems: one entry per code with count, first and last message", () => {
+  const g = groupMarkerProblems([{ code: "reordered", message: "a" }, { code: "count", message: "c" }, { code: "reordered", message: "b" }, { code: "reordered", message: "z" }]);
+  assert.deepEqual(g, [{ code: "reordered", count: 3, first: "a", last: "z" }, { code: "count", count: 1, first: "c", last: "c" }]);
+  assert.deepEqual(groupMarkerProblems([]), []);
+});
+test("a deleted marker in a long run cascades into thousands of problems, which collapse to a few lines — and the violation is still reported", () => {
+  const rows = [...ramp(60, 1500), { d: 100 }];
+  const marks = Array.from({ length: 3000 }, (_, i) => mark(i + 1, "advance", 0, rows, { step: 1 }));    // 3000 markers, all in front of action 0
+  marks.splice(1500, 1);                                                                                       // one deleted, numbering not repaired
+  const r = timingDrift(sys(rows, marks, { run: "R1", markers: marks.length, travel_calls: marks.length + 1 }));
+  assert.ok(r.problems.length > 1000);
+  const groups = groupMarkerProblems(r.problems);
+  assert.ok(groups.length <= 3, JSON.stringify(groups.map((g) => g.code)));
+  assert.ok(groups.find((g) => g.code === "reordered").first.includes("position 1501"));                      // still names where the numbering broke
+  assert.equal(r.violations.length, 1); assert.equal(r.violations[0].cid, cid(60));                           // the genuine unmarked drop is still a violation
 });

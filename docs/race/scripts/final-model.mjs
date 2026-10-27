@@ -372,6 +372,16 @@ export function timingDrift(sys, limitMs = DRIFT_LIMIT_MS) {
   return { checked, maxAbs, limitMs, violations, problems, markers: marks.length, markersUsed: used.size };
 }
 
+/**
+ * Marker problems can cascade (one deleted or duplicated marker shifts the numbering of every later one: ~10,000 lines). Report ONE entry per problem code with its count and the first and
+ * last message, so the first real problem is still named but the list can never drown the genuine timing violations.
+ */
+export function groupMarkerProblems(problems) {
+  const byCode = new Map();
+  for (const p of problems) { const g = byCode.get(p.code); if (g) { g.count++; g.last = p.message; } else byCode.set(p.code, { code: p.code, count: 1, first: p.message, last: p.message }); }
+  return [...byCode.values()];
+}
+
 export function compare(sys) {
   const roster = buildRoster();
   for (const e of sys.script_log) { if (e.action === "skip") DYN.skipped.add(e.n); if (e.action === "dnf") DYN.dnf.add(e.n); }
@@ -438,10 +448,13 @@ export function compare(sys) {
   // ---- 2b. timing guard: recorded time vs scheduled time of every action; reposition markers must be valid --------------------------------
   const drift = timingDrift(sys);
   ok(drift.checked > 0, "timing guard: no action could be matched to its ledger row");
-  for (const p of drift.problems) { checks++; fails.push(`timing guard: reposition marker problem [${p.code}] ${p.message}`); }
-  for (const v of drift.violations) {
+  for (const v of drift.violations) {                          // genuine timing violations first: the console shows only the first lines of a long failure list
     checks++;
     fails.push(`timing drift N${String(v.n).padStart(3, "0")} S${v.station} ${v.type} ${v.cid.slice(0, 8)} (act #${v.seq}): scheduled ${v.expected} ms, recorded ${v.actual} ms, drift ${v.drift > 0 ? "+" : ""}${v.drift} ms (rule ${v.rule}${v.marker ? ", marker " + v.marker : ", no marker"}; limit ±${drift.limitMs})`);
+  }
+  for (const g of groupMarkerProblems(drift.problems)) {       // one line per problem code, however many markers it touches
+    checks++;
+    fails.push(`timing guard: reposition marker problem [${g.code}] x${g.count} — first: ${g.first}${g.count > 1 ? ` — last: ${g.last}` : ""}`);
   }
 
   // ---- 3. raw results: model (from the actions actually SENT) vs system ---------------------------------------------------------------
