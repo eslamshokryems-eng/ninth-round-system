@@ -14,6 +14,7 @@ export type LeagueErrorCode =
   | "LEAGUE_APPEAL_CLOSED"
   | "LEAGUE_CONFLICT_OF_INTEREST"
   | "LEAGUE_NOT_PUBLISHED"
+  | "LEAGUE_LAYOUT_CHANGED"
   | "LEAGUE_UNAVAILABLE";
 
 export class LeagueError extends Error {
@@ -41,6 +42,7 @@ const MESSAGES: Record<LeagueErrorCode, string> = {
   LEAGUE_APPEAL_CLOSED: "The appeal window for this result is not open.",
   LEAGUE_CONFLICT_OF_INTEREST: "The administrator who recorded this result cannot review its appeal.",
   LEAGUE_NOT_PUBLISHED: "The league is not published yet.",
+  LEAGUE_LAYOUT_CHANGED: "The exercises for this challenge were changed. Reload the form and record again.",
   LEAGUE_UNAVAILABLE: "The league is not available yet.",
 };
 

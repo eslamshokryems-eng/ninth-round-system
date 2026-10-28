@@ -1,6 +1,7 @@
 import { LeagueError } from "../domain/errors";
 import type { AccountLookup, AdminAttempt, AdminOverview, AdminStanding, AuditLine, ChallengeInput, LeagueGateway, MySeason, PublicChallengeResults, PublicParticipantPage, SetStaffInput, SetStaffResult } from "../domain/gateway";
 import { participantIdentityKey, validateParticipantCsv } from "../domain/import";
+import { layoutInputToWire, normalizeLayout, replacedExercises, sameLayout, stationTotal, structureChange, wireToStations, type StationBreakdownRow, type StationLayout, type StationLayoutInput, type StationValue, type WireLayout } from "../domain/layout";
 import { toPublicLeague, type PublicLeague } from "../domain/public";
 import { reconcileChallenge, scoreChallenge, selectCountedAttempt } from "../domain/scoring";
 import { buildStandings, centsToPoints } from "../domain/standings";
@@ -38,6 +39,12 @@ import {
   validateSeasonDates,
 } from "../domain/validation";
 
+/** One immutable layout VERSION of a challenge (mirrors race_league_layouts). */
+interface StoredLayout { id: string; seasonId: string; challengeId: string; version: number; spec: WireLayout; reason: string; createdBy: string; createdAt: string }
+/** One value of one station of one attempt (mirrors race_league_station_results; append-only). */
+interface StationResult { attemptId: string; layoutId: string; position: number; value: number }
+const STATION_RULE = "This challenge has a station layout, so a result needs one value per station; use the station form.";
+
 interface State {
   seasons: Season[];
   challenges: Challenge[];
@@ -53,6 +60,8 @@ interface State {
   corrections: CorrectionRecord[]; // append-only
   appeals: Appeal[];
   eligibilityDecisions: EligibilityDecision[]; // append-only
+  layouts: StoredLayout[]; // append-only versions
+  stationResults: StationResult[]; // append-only
 }
 
 function fail(code: ConstructorParameters<typeof LeagueError>[0], message: string): never {
@@ -75,7 +84,7 @@ function seeded(seed: number): () => number {
  * in a fast unit test. (The SQL equivalents are proven in the harness, including a shared scoring-parity file.)
  */
 export class InMemoryLeague implements LeagueGateway {
-  readonly state: State = { seasons: [], challenges: [], participants: [], attempts: [], ledger: [], audit: [], staff: [], accounts: [], correctionRequests: [], corrections: [], appeals: [], eligibilityDecisions: [] };
+  readonly state: State = { seasons: [], challenges: [], participants: [], attempts: [], ledger: [], audit: [], staff: [], accounts: [], correctionRequests: [], corrections: [], appeals: [], eligibilityDecisions: [], layouts: [], stationResults: [] };
   private actorValue: Actor | null;
 
   private readonly rand: () => number;
@@ -339,6 +348,7 @@ export class InMemoryLeague implements LeagueGateway {
       referenceUrl: input.referenceUrl !== undefined ? input.referenceUrl : (ex?.referenceUrl ?? null), requiresVerification: input.requiresVerification ?? ex?.requiresVerification ?? true,
     };
     validateChallenge(next, se);
+    if (ex && this.latestLayout(ex.id) && (next.metric.kind !== ex.metric.kind || next.metric.unit !== ex.metric.unit)) fail("LEAGUE_INVALID", "The metric and unit are fixed once a challenge has a station layout.");
     if (ex) this.patch(this.state.challenges, ex.id, next); else this.state.challenges.push(next);
     this.log(seasonId, ex ? "league.challenge.update" : "league.challenge.create", { week });
     return next.id;
@@ -413,6 +423,10 @@ export class InMemoryLeague implements LeagueGateway {
 
   // ---- attempts -----------------------------------------------------------------------------------------------------------------------
   async recordAttempt(i: { challengeId: string; participantId: string; value: number; attemptedAt?: string; clientRequestId: string }) {
+    return this.recordAttemptCore(i, null);
+  }
+  /** The ONE attempt path. `stations` carries the per-station values of a station attempt; a plain single-value attempt on a challenge with a layout fails closed (the database refuses it at commit). */
+  private async recordAttemptCore(i: { challengeId: string; participantId: string; value: number; attemptedAt?: string; clientRequestId: string }, stations: { layout: StoredLayout; values: readonly StationValue[] } | null) {
     const ch = this.challenge(i.challengeId);
     if (!this.has(ch.seasonId, ["LEAGUE_ADMIN", "JUDGE"])) fail("LEAGUE_FORBIDDEN", "Only a league judge or administrator can record an attempt.");
     if (!i.clientRequestId) fail("LEAGUE_INVALID", "Every attempt needs its own request id.");
@@ -431,11 +445,13 @@ export class InMemoryLeague implements LeagueGateway {
     const live = mine.filter((a) => a.status === "pending" || a.status === "approved").length;
     const maxNo = mine.reduce((m, a) => Math.max(m, a.attemptNo), 0);
     if (live >= ch.attemptPolicy.maxAttempts || maxNo >= 10) fail("LEAGUE_ATTEMPT_LIMIT", "The attempt limit for this challenge has been reached.");
+    if (!stations && this.latestLayout(ch.id)) fail("LEAGUE_INVALID", STATION_RULE);
     const a: Attempt = {
       id: this.uid("attempt"), seasonId: ch.seasonId, challengeId: ch.id, participantId: p.id, value: i.value, unit: ch.metric.unit, attemptNo: maxNo + 1, attemptedAt: at,
       recordedBy: (this.actorValue as Actor).id, reviewedBy: null, status: ch.requiresVerification ? "pending" : "approved", reason: null, correctedFrom: null, clientRequestId: i.clientRequestId,
     };
     this.state.attempts.push(a);
+    if (stations) for (const v of stations.values) this.state.stationResults.push({ attemptId: a.id, layoutId: stations.layout.id, position: v.position, value: v.value });
     this.log(ch.seasonId, "league.attempt.record", { attempt: a.id });
     return { ...toAdminAttempt(a), replay: false };
   }
@@ -456,26 +472,28 @@ export class InMemoryLeague implements LeagueGateway {
   async correctAttempt(attemptId: string, newValue: number | null, reason: string): Promise<{ ledgerLines: number }> {
     const a = this.state.attempts.find((x) => x.id === attemptId) ?? fail("LEAGUE_NOT_FOUND", "Attempt not found.");
     this.requireAdmin(a.seasonId);
-    return this.applyCorrection(a, newValue, requireReason(reason), null);
+    return { ledgerLines: this.applyCorrection(a, newValue, requireReason(reason), null, null).ledgerLines };
   }
   /** The ONE correction path (direct admin correction and an applied judge request both end here): void + replace, permanent record, re-score, audit. */
-  private applyCorrection(a: Attempt, newValue: number | null, reason: string, requestId: string | null): { ledgerLines: number } {
+  private applyCorrection(a: Attempt, newValue: number | null, reason: string, requestId: string | null, stations: { layout: StoredLayout; values: readonly StationValue[] } | null): { ledgerLines: number; replacementId: string | null } {
     this.lockCompleted(a.seasonId);
     if (a.status !== "pending" && a.status !== "approved") fail("LEAGUE_INVALID", "Only a pending or approved attempt can be corrected.");
     const ch = this.challenge(a.challengeId);
     if (ch.status === "draft" || ch.status === "published") fail("LEAGUE_CHALLENGE_NOT_OPEN", "The challenge has not opened.");
     if (newValue !== null) validateResultValue(newValue, ch.metric);
+    if (newValue !== null && !stations && this.latestLayout(ch.id)) fail("LEAGUE_INVALID", STATION_RULE);   // checked before anything changes: nothing is left half-done
     const actor = this.actorValue as Actor;
     this.patch(this.state.attempts, a.id, { status: "void", reason });
     let replacementId: string | null = null;
     if (newValue !== null) {
       replacementId = this.uid("attempt");
       this.state.attempts.push({ ...a, id: replacementId, value: newValue, recordedBy: actor.id, reviewedBy: actor.id, status: "approved", reason, correctedFrom: a.id, clientRequestId: this.uid("corr") });
+      if (stations) for (const v of stations.values) this.state.stationResults.push({ attemptId: replacementId, layoutId: stations.layout.id, position: v.position, value: v.value });
     }
     this.state.corrections.push({ id: this.uid("correction"), seasonId: a.seasonId, challengeId: a.challengeId, participantId: a.participantId, attemptId: a.id, replacementAttemptId: replacementId, previousValue: a.value, newValue, reason, actor: actor.id, at: this.now().toISOString(), requestId });
     const ledgerLines = ch.status === "closed" ? this.applyScores(ch.id) : 0;
     this.log(a.seasonId, "league.attempt.correct", { attempt: a.id, previousValue: a.value, newValue, reason, ledgerLines });
-    return { ledgerLines };
+    return { ledgerLines, replacementId };
   }
   async requestCorrection(attemptId: string, proposedValue: number | null, reason: string): Promise<string> {
     const a = this.state.attempts.find((x) => x.id === attemptId) ?? fail("LEAGUE_NOT_FOUND", "Attempt not found.");
@@ -502,7 +520,7 @@ export class InMemoryLeague implements LeagueGateway {
     if (r.status !== "pending") fail("LEAGUE_INVALID", "This request has already been decided.");
     const actor = this.actorValue as Actor;
     let ledgerLines = 0;
-    if (decision === "apply") ledgerLines = this.applyCorrection(this.state.attempts.find((x) => x.id === r.attemptId) as Attempt, r.proposedValue, why, r.id).ledgerLines;
+    if (decision === "apply") ledgerLines = this.applyCorrection(this.state.attempts.find((x) => x.id === r.attemptId) as Attempt, r.proposedValue, why, r.id, null).ledgerLines;
     this.patch(this.state.correctionRequests, r.id, { status: decision === "apply" ? "applied" : "declined", decidedBy: actor.id, decidedAt: this.now().toISOString(), decisionReason: why });
     this.log(r.seasonId, `league.correction.${decision}`, { request: r.id, reason: why, ledgerLines });
     return { ledgerLines };
@@ -541,6 +559,84 @@ export class InMemoryLeague implements LeagueGateway {
     this.patch(this.state.appeals, ap.id, { status: decision, decidedBy: actor.id, decidedAt: this.now().toISOString(), decisionReason: why });
     // Deliberately NO scoring call: an appeal never moves a score. An upheld appeal is followed, if warranted, by a normal audited correction.
     this.log(ap.seasonId, `league.appeal.${decision}`, { appeal: ap.id, reason: why });
+  }
+  // ---- station layouts -----------------------------------------------------------------------------------------------------------------
+  private latestLayout(challengeId: string): StoredLayout | null {
+    return this.state.layouts.filter((l) => l.challengeId === challengeId).sort((x, y) => y.version - x.version)[0] ?? null;
+  }
+  private layoutShape(l: StoredLayout) {
+    return { resultType: l.spec.result_type, stations: l.spec.stations.map((x) => ({ position: x.position, maxValue: x.max_value })) };
+  }
+  private versionOf(attemptId: string): number | null {
+    const r = this.state.stationResults.find((x) => x.attemptId === attemptId);
+    return r ? (this.state.layouts.find((l) => l.id === r.layoutId)?.version ?? null) : null;
+  }
+  async getLayout(challengeId: string, version?: number): Promise<StationLayout | null> {
+    const ch = this.challenge(challengeId);
+    if (!this.has(ch.seasonId, ["LEAGUE_ADMIN", "JUDGE", "REVIEWER"])) fail("LEAGUE_FORBIDDEN", "League staff only.");
+    const all = this.state.layouts.filter((l) => l.challengeId === challengeId).sort((x, y) => x.version - y.version);
+    const lay = version === undefined ? all[all.length - 1] : all.find((l) => l.version === version);
+    if (!lay) return null;
+    return { id: lay.id, challengeId, version: lay.version, resultType: lay.spec.result_type, reason: lay.reason, createdAt: lay.createdAt, stations: wireToStations(lay.spec), versions: all.map((l) => ({ version: l.version, createdAt: l.createdAt, reason: l.reason })) };
+  }
+  async setLayout(challengeId: string, layout: StationLayoutInput, reason: string): Promise<{ layoutId: string; version: number }> {
+    const ch = this.challenge(challengeId);
+    this.requireAdmin(ch.seasonId);
+    const why = requireReason(reason);
+    this.lockCompleted(ch.seasonId);
+    if (ch.status === "closed") fail("LEAGUE_INVALID", "A closed challenge can no longer change its layout.");
+    const spec = normalizeLayout(layoutInputToWire(layout), ch.metric);
+    const cur = this.latestLayout(ch.id);
+    const hasAttempts = this.state.attempts.some((a) => a.challengeId === ch.id);
+    if (!cur) {
+      if (hasAttempts) fail("LEAGUE_INVALID", "A layout can only be introduced before the first attempt.");
+    } else {
+      if (sameLayout(spec, cur.spec)) fail("LEAGUE_INVALID", "This is already the current layout.");
+      const changed = hasAttempts ? structureChange(cur.spec, spec) : null;
+      if (changed) fail("LEAGUE_INVALID", `${changed.charAt(0).toUpperCase()}${changed.slice(1)}.`);
+    }
+    const row: StoredLayout = { id: this.uid("layout"), seasonId: ch.seasonId, challengeId: ch.id, version: (cur?.version ?? 0) + 1, spec, reason: why, createdBy: (this.actorValue as Actor).id, createdAt: this.now().toISOString() };
+    this.state.layouts.push(row);
+    this.log(ch.seasonId, cur ? "league.layout.substitute" : "league.layout.create", { version: row.version, resultType: spec.result_type, stations: spec.stations.length, reason: why, replacedExercises: cur ? replacedExercises(cur.spec, spec) : [] });
+    return { layoutId: row.id, version: row.version };
+  }
+  async recordStationAttempt(i: { challengeId: string; participantId: string; layoutVersion: number; values: readonly StationValue[]; attemptedAt?: string; clientRequestId: string }) {
+    const ch = this.challenge(i.challengeId);
+    if (!this.has(ch.seasonId, ["LEAGUE_ADMIN", "JUDGE"])) fail("LEAGUE_FORBIDDEN", "Only a league judge or administrator can record an attempt.");
+    if (!i.clientRequestId) fail("LEAGUE_INVALID", "Every attempt needs its own request id.");
+    const replay = this.state.attempts.find((a) => a.challengeId === ch.id && a.participantId === i.participantId && a.clientRequestId === i.clientRequestId);
+    if (replay) return { ...toAdminAttempt(replay), replay: true, layoutVersion: this.versionOf(replay.id) };
+    const lay = this.latestLayout(ch.id);
+    if (!lay) fail("LEAGUE_INVALID", "This challenge has no station layout; record a single result instead.");
+    if (i.layoutVersion !== lay.version) fail("LEAGUE_LAYOUT_CHANGED", `The exercises were changed (now version ${lay.version}); reload the form and record again.`);
+    const total = stationTotal(this.layoutShape(lay), i.values);
+    const r = await this.recordAttemptCore({ challengeId: i.challengeId, participantId: i.participantId, value: total, ...(i.attemptedAt === undefined ? {} : { attemptedAt: i.attemptedAt }), clientRequestId: i.clientRequestId }, { layout: lay, values: i.values });
+    this.log(ch.seasonId, "league.attempt.stations", { attempt: r.id, layoutVersion: lay.version, total });
+    return { ...r, layoutVersion: lay.version };
+  }
+  async correctStationAttempt(attemptId: string, values: readonly StationValue[], reason: string) {
+    const a = this.state.attempts.find((x) => x.id === attemptId) ?? fail("LEAGUE_NOT_FOUND", "Attempt not found.");
+    this.requireAdmin(a.seasonId);
+    const why = requireReason(reason);
+    const first = this.state.stationResults.find((x) => x.attemptId === a.id);
+    const lay = first ? this.state.layouts.find((l) => l.id === first.layoutId) : undefined;
+    if (!lay) fail("LEAGUE_INVALID", "This result has no station breakdown; correct it as a single result.");
+    const total = stationTotal(this.layoutShape(lay), values);
+    const r = this.applyCorrection(a, total, why, null, { layout: lay, values });
+    this.log(a.seasonId, "league.attempt.stations.correct", { attempt: a.id, layoutVersion: lay.version, total, reason: why });
+    return { ledgerLines: r.ledgerLines, total, layoutVersion: lay.version };
+  }
+  async stationBreakdown(challengeId: string): Promise<readonly StationBreakdownRow[]> {
+    const ch = this.challenge(challengeId);
+    if (!this.has(ch.seasonId, ["LEAGUE_ADMIN", "JUDGE", "REVIEWER"])) fail("LEAGUE_FORBIDDEN", "League staff only.");
+    return this.state.attempts.filter((a) => a.challengeId === challengeId).slice(-500).sort((x, y) => x.attemptedAt.localeCompare(y.attemptedAt) || x.attemptNo - y.attemptNo || (x.id < y.id ? -1 : 1)).map((a) => {
+      const rows = this.state.stationResults.filter((r) => r.attemptId === a.id).sort((x, y) => x.position - y.position);
+      const lay = rows[0] ? this.state.layouts.find((l) => l.id === rows[0]?.layoutId) : undefined;
+      return {
+        attemptId: a.id, participantId: a.participantId, displayName: this.state.participants.find((p) => p.id === a.participantId)?.displayName ?? "", attemptNo: a.attemptNo, status: a.status, value: a.value, layoutVersion: lay?.version ?? null,
+        stations: rows.map((r) => ({ position: r.position, name: lay?.spec.stations.find((x) => x.position === r.position)?.name ?? "", value: r.value })),
+      };
+    });
   }
   async recompute(challengeId: string): Promise<number> {
     const ch = this.challenge(challengeId);

@@ -74,6 +74,15 @@ export async function buildDemoLeague(now: Date = new Date(), participants = 24)
       description: `Week ${i + 1} challenge — demo data.`, instructions: "Full range of motion. A judge counts every repetition.", safetyNotes: "Stop if you feel pain or dizziness.",
     }));
   }
+  // Week 7 (kettlebell swings) gets a SYNTHETIC three-station layout while it is still a draft, so the station editor and judge form can be exercised locally.
+  await league.as(DEMO_USERS.admin).setLayout(ids[6] as string, {
+    resultType: "REPS",
+    stations: [
+      { name: "Swings", maxValue: 120, exercises: [{ name: "Two-hand kettlebell swing", standard: "Hips fully extended at the top", equipment: "Kettlebell", target: "Max reps in 60 s" }] },
+      { name: "Goblet squats", exercises: [{ name: "Goblet squat", standard: "Hip crease below the knee", equipment: "Kettlebell" }, { name: "Air squat" }] },
+      { name: "Push-ups", maxValue: 80, exercises: [{ name: "Push-up", standard: "Chest to the floor" }] },
+    ],
+  }, "demo layout");
   for (let n = 1; n <= participants; n++) await league.addParticipant(seasonId, `Demo Athlete ${String(n).padStart(2, "0")}`, `DEMO-${n}`, true);
   const people = league.state.participants.filter((p) => p.seasonId === seasonId);
 

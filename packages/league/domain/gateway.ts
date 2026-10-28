@@ -1,6 +1,7 @@
 import type { PublicLeague, PublicStandingRow } from "./public";
 import type { Appeal, Attempt, Challenge, ChallengeStatus, CorrectionRecord, CorrectionRequest, EligibilityDecision, EligibilityDecisionCategory, LeagueRole, Season, SeasonRules, SeasonStatus } from "./types";
 import type { ImportResult } from "./import";
+import type { StationBreakdownRow, StationLayout, StationLayoutInput, StationValue } from "./layout";
 
 /** What the league staff screens read. Mirrors race_league_admin_overview(). */
 export interface AdminOverview {
@@ -125,6 +126,17 @@ export interface LeagueGateway {
   /** Administrator who did not record the result: record UPHELD or DISMISSED with a reason. Never changes a score. */
   decideAppeal(appealId: string, decision: "upheld" | "dismissed", reason: string): Promise<void>;
   recompute(challengeId: string): Promise<number>;
+  // ---- station layouts (optional per challenge; the base migration works without them) ------------------------------------------------------------------
+  /** Staff: the latest layout of a challenge (or a given version), with its version history. null = the challenge has no layout. Throws LEAGUE_UNAVAILABLE when the stations migration is not applied. */
+  getLayout(challengeId: string, version?: number): Promise<StationLayout | null>;
+  /** Administrator: introduce a challenge's layout (version 1, before the first attempt) or substitute exercises (version n+1). A reason is mandatory; the structure is frozen after the first attempt. */
+  setLayout(challengeId: string, layout: StationLayoutInput, reason: string): Promise<{ layoutId: string; version: number }>;
+  /** Judge / administrator: record ONE attempt as one value per station. The total goes through the ordinary attempt path (idempotent by request id, eligibility, limits, review). `layoutVersion` is the version the form was built from. */
+  recordStationAttempt(input: { challengeId: string; participantId: string; layoutVersion: number; values: readonly StationValue[]; attemptedAt?: string; clientRequestId: string }): Promise<AdminAttempt & { replay: boolean; layoutVersion: number | null }>;
+  /** Administrator: correct a station attempt station by station, through the one correction path. The replacement stays under the layout version of the attempt it replaces. */
+  correctStationAttempt(attemptId: string, values: readonly StationValue[], reason: string): Promise<{ ledgerLines: number; total: number; layoutVersion: number }>;
+  /** Staff: every attempt of a challenge with its per-station values and the layout version it was recorded under. */
+  stationBreakdown(challengeId: string): Promise<readonly StationBreakdownRow[]>;
   audit(seasonId: string, limit?: number): Promise<readonly AuditLine[]>;
 }
 

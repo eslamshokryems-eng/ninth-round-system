@@ -205,6 +205,70 @@ await stepA("admin: a challenge is saved, a bad one is refused, publishing needs
   assert.equal(await a.locator("[data-testid=toggle-publish]").isDisabled(), true);
   await a.screenshot({ path: `${shots}/32-admin-overview.png` });
 });
+await stepA("admin: a week's own workout layout — League stations with exercises, a bad layout is refused live, and a substitution needs a reason and becomes version 2", async () => {
+  await a.getByRole("tab", { name: "Challenges" }).click(); await a.locator("[data-testid=week-7]").click(); await a.waitForSelector("[data-testid=layout-editor]");
+  await a.waitForSelector("[data-testid=layout-station]");
+  const t = await a.locator("[data-testid=layout-editor]").innerText();
+  assert.match(t, /VERSION 1/); assert.match(t, /nothing to do with the race stations/i);
+  assert.equal(await a.locator("[data-testid=layout-station]").count(), 3);
+  assert.equal(await a.locator("#le-name-1-0").inputValue(), "Goblet squat");
+  // a bad station name is refused as you type, and cannot be saved
+  await a.locator("#ls-name-0").fill("<b>Swings</b>"); await a.locator("#layout-reason").fill("test");
+  await a.waitForSelector("[data-testid=layout-problem]"); assert.match(await a.locator("[data-testid=layout-problem]").innerText(), /without < >/);
+  assert.equal(await a.locator("[data-testid=layout-save]").isDisabled(), true);
+  await a.locator("#ls-name-0").fill("Swings"); await a.locator("#layout-reason").fill("");
+  // substituting an exercise needs a reason; then it is version 2 and version 1 stays in the history
+  await a.locator("#le-name-1-0").fill("Dumbbell goblet squat");
+  assert.equal(await a.locator("[data-testid=layout-save]").isDisabled(), true, "no reason, no save");
+  await a.locator("#layout-reason").fill("the kettlebell is being used by the other group");
+  await a.locator("[data-testid=layout-save]").click(); await a.waitForSelector("[data-testid=ok]");
+  await a.waitForFunction(() => /VERSION 2/.test(document.querySelector("[data-testid=layout-editor]")?.textContent ?? ""));
+  const v = await a.locator("[data-testid=layout-versions]").innerText();
+  assert.match(v, /Version 2/); assert.match(v, /Version 1/); assert.match(v, /kettlebell is being used by the other group/);
+  await a.screenshot({ path: `${shots}/33-admin-layout-editor.png` });
+});
+await stepA("admin: the judge form takes one value per station with a live total; the breakdown lists them; a station correction replaces the attempt", async () => {
+  // week 7 is made a no-second-approver challenge and opened (the season is active)
+  await a.locator("[data-testid=week-7]").click(); await a.waitForSelector("[data-testid=challenge-form]");
+  await a.getByLabel(/second person must approve/).uncheck(); await a.locator("[data-testid=save-challenge]").click(); await a.waitForSelector("[data-testid=ok]");
+  await a.locator("[data-testid=to-published]").click(); await a.waitForSelector("[data-testid=to-open]");
+  await a.locator("[data-testid=to-open]").click(); await a.waitForSelector("text=An open or closed challenge can no longer be edited");
+  await a.getByRole("tab", { name: "Attempts" }).click(); await a.waitForSelector("#r-ch");
+  await a.locator("#r-ch").selectOption({ label: "Week 7 — Kettlebell swings (3 min)" });
+  await a.locator("#r-p").selectOption({ label: "Demo Athlete 03" });
+  await a.waitForSelector("[data-testid=station-form]");
+  assert.equal(await a.locator("[data-testid=record]").count(), 0, "the single-number form is replaced by the station form");
+  assert.match(await a.locator("[data-testid=station-form]").innerText(), /Dumbbell goblet squat/);
+  await a.locator("[data-testid=station-input-1]").fill("30"); await a.locator("[data-testid=station-input-2]").fill("25"); await a.locator("[data-testid=station-input-3]").fill("90");
+  assert.match(await a.locator("[data-testid=station-total]").innerText(), /station 3: the result cannot exceed the station cap of 80/);
+  assert.equal(await a.locator("[data-testid=station-record]").isDisabled(), true);
+  await a.locator("[data-testid=station-input-3]").fill("30");
+  assert.match(await a.locator("[data-testid=station-total]").innerText(), /Total: 85 reps/);
+  await a.locator("[data-testid=station-record]").click(); await a.waitForSelector("[data-testid=ok]");
+  await a.waitForSelector("[data-testid=breakdown-row]");
+  assert.match(await a.locator("[data-testid=breakdown]").innerText(), /Swings: 30/);
+  // (the "All attempts" list shows the oldest 60 of the demo's attempts, so the new row is checked in the breakdown, where an administrator can also correct stations)
+  const row = a.locator("[data-testid=breakdown-row]").filter({ hasText: "Demo Athlete 03" }).first();
+  assert.match(await row.innerText(), /version 2/); assert.match(await row.innerText(), /Swings: 30 · Goblet squats: 25 · Push-ups: 30/);
+  assert.equal(await row.locator("input[aria-label='Corrected value']").count(), 0, "a station attempt has no single-number correction");
+  // an administrator corrects the stations; the original is voided and the replacement keeps the version
+  await a.locator("#r-reason").fill("recount of the station sheet");
+  await row.locator("[data-testid=bd-correct-open]").click(); await a.waitForSelector("[data-testid=bd-correct]");
+  await a.locator("input[aria-label='Corrected Swings']").fill("40");
+  await a.waitForFunction(() => /total 95/.test(document.querySelector("[data-testid=bd-correct]")?.textContent ?? ""));
+  await a.locator("[data-testid=bd-correct-apply]").click(); await a.waitForSelector("[data-testid=ok]");
+  await a.waitForFunction(() => /Swings: 40/.test(document.querySelector("[data-testid=breakdown]")?.textContent ?? ""));
+  assert.match(await a.locator("[data-testid=breakdown]").innerText(), /void/);
+  await a.screenshot({ path: `${shots}/34-admin-station-form.png` });
+});
+await stepA("admin: once attempts exist the number of stations is fixed (the editor says so), and exercises can still be substituted", async () => {
+  await a.getByRole("tab", { name: "Challenges" }).click(); await a.locator("[data-testid=week-7]").click(); await a.waitForSelector("[data-testid=layout-editor]");
+  await a.waitForSelector("[data-testid=layout-station]");
+  assert.match(await a.locator("[data-testid=layout-editor]").innerText(), /the number of stations and the caps are fixed/);
+  assert.equal(await a.locator("[data-testid=add-station]").isDisabled(), true);
+  assert.equal(await a.locator("#ls-cap-0").isDisabled(), true);
+  assert.equal(await a.locator("#le-name-1-0").isDisabled(), false);
+});
 await stepA("admin: registering an athlete needs the membership confirmation; an eligibility restriction needs a documented decision and is listed", async () => {
   await a.getByRole("tab", { name: "Participants" }).click();
   await a.locator("#a-name").fill("Walk In W.");

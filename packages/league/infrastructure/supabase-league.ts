@@ -1,6 +1,8 @@
 import { LeagueError, parseLeagueError } from "../domain/errors";
 import type { AccountLookup, AdminOverview, AuditLine, ChallengeInput, LeagueGateway, MySeason, PublicChallengeResults, PublicParticipantPage, SetStaffInput, SetStaffResult } from "../domain/gateway";
 import { validateParticipantCsv } from "../domain/import";
+import type { StationBreakdownRow, StationLayout, StationLayoutInput, StationValue } from "../domain/layout";
+import { layoutInputToWire } from "../domain/layout";
 import type { PublicLeague } from "../domain/public";
 import type { PublicReader } from "./public-http-league";
 import type { EligibilityDecisionCategory, SeasonRules } from "../domain/types";
@@ -101,5 +103,13 @@ export class SupabaseLeague implements LeagueGateway {
   lodgeAppeal(i: { challengeId: string; participantId: string; reason: string }) { return this.call<string>("race_league_lodge_appeal", { p_challenge: i.challengeId, p_participant: i.participantId, p_reason: i.reason }); }
   async decideAppeal(appealId: string, decision: "upheld" | "dismissed", reason: string) { await this.call("race_league_decide_appeal", { p_appeal: appealId, p_decision: decision, p_reason: reason }); }
   recompute(challengeId: string) { return this.call<number>("race_league_recompute", { p_challenge: challengeId }); }
+  // ---- station layouts: validated again by the database (the same rules as layout.ts); a missing stations migration reads as LEAGUE_UNAVAILABLE -------------------------
+  getLayout(challengeId: string, version?: number) { return this.call<StationLayout | null>("race_league_get_layout", { p_challenge: challengeId, p_version: version ?? null }); }
+  setLayout(challengeId: string, layout: StationLayoutInput, reason: string) { return this.call<{ layoutId: string; version: number }>("race_league_set_layout", { p_challenge: challengeId, p_layout: layoutInputToWire(layout), p_reason: reason }); }
+  recordStationAttempt(i: { challengeId: string; participantId: string; layoutVersion: number; values: readonly StationValue[]; attemptedAt?: string; clientRequestId: string }) {
+    return this.call<never>("race_league_record_station_attempt", { p_challenge: i.challengeId, p_participant: i.participantId, p_layout_version: i.layoutVersion, p_values: i.values, p_attempted_at: i.attemptedAt ?? null, p_client_request_id: i.clientRequestId });
+  }
+  correctStationAttempt(attemptId: string, values: readonly StationValue[], reason: string) { return this.call<{ ledgerLines: number; total: number; layoutVersion: number }>("race_league_correct_station_attempt", { p_attempt: attemptId, p_values: values, p_reason: reason }); }
+  stationBreakdown(challengeId: string) { return this.call<readonly StationBreakdownRow[]>("race_league_station_breakdown", { p_challenge: challengeId }); }
   audit(seasonId: string, limit = 100) { return this.call<readonly AuditLine[]>("race_league_audit", { p_season: seasonId, p_limit: limit }); }
 }

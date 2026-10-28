@@ -6,6 +6,7 @@ import { DEFAULT_ATTEMPT_POLICY, LeagueError, METRIC_UNITS, PROVISIONAL_SEASON_R
 import { describeError, useAction, useCurrentUserId, useOverview } from "../../../../../src/features/league/admin";
 import { DemoBanner, fmtPoints, fmtRank } from "../../../../../src/components/league/league-ui";
 import { RaceBadge, RaceButton, RaceHeader, RaceInput, RaceNotice, RacePage, RaceSelect, RaceSpinner, RaceTextArea } from "../../../../../src/components/race/race-ui";
+import { LayoutEditor, StationBreakdownPanel, StationCorrection, StationRecordForm, StationValues, useChallengeLayout, useStationIndex } from "../../../../../src/components/league/station-layout";
 
 const TABS = ["Overview", "Challenges", "Participants", "Attempts", "Appeals", "Staff & roles", "Points rules", "Standings", "Audit"] as const;
 type Tab = (typeof TABS)[number];
@@ -102,6 +103,7 @@ function Challenges({ d, act }: { d: AdminOverview; act: Act }) {
         })}
       </div>
       {d.isAdmin ? <ChallengeForm key={`${week}-${ch?.id ?? "new"}-${ch?.status ?? ""}`} d={d} week={week} ch={ch} locked={locked} act={act} /> : <RaceNotice>Only a league administrator edits challenges.</RaceNotice>}
+      {d.isAdmin && ch ? <LayoutEditor key={ch.id} d={d} act={act} challenge={ch} /> : null}
     </div>
   );
 }
@@ -228,6 +230,9 @@ function Attempts({ d, act, me }: { d: AdminOverview; act: Act; me: string | nul
   const chName = useMemo(() => new Map(d.challenges.map((c) => [c.id, `W${c.weekNumber} ${c.name}`])), [d.challenges]);
   useEffect(() => { if (!challengeId && open[0]) setChallengeId(open[0].id); }, [open, challengeId]);
   const pending = d.attempts.filter((a) => a.status === "pending");
+  const stationIdx = useStationIndex(d);
+  const L = useChallengeLayout(challengeId, d.attempts.length);
+  const selectedChallenge = open.find((c) => c.id === challengeId);
   return (
     <div className="grid gap-4 md:grid-cols-[22rem_1fr]" data-testid="tab-attempts">
       <div className="race-card flex flex-col gap-2">
@@ -235,9 +240,13 @@ function Attempts({ d, act, me }: { d: AdminOverview; act: Act; me: string | nul
         {open.length === 0 ? <p className="lg-sub">No challenge is open for attempts.</p> : null}
         <RaceSelect id="r-ch" label="Challenge" value={challengeId} onChange={(e) => setChallengeId(e.target.value)}>{open.map((c) => <option key={c.id} value={c.id}>Week {c.weekNumber} — {c.name}</option>)}</RaceSelect>
         <RaceSelect id="r-p" label="Athlete" value={participantId} onChange={(e) => setParticipantId(e.target.value)}><option value="">Choose…</option>{d.participants.filter((p) => p.active && p.eligible).map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}</RaceSelect>
-        <RaceInput id="r-v" inputMode="decimal" label={`Result${open.find((c) => c.id === challengeId) ? ` (${open.find((c) => c.id === challengeId)?.metric.unit})` : ""}`} value={value} onChange={(e) => setValue(e.target.value)} />
-        <RaceButton disabled={act.busy || !challengeId || !participantId || value.trim() === ""} data-testid="record" onClick={() => void act.run("Attempt recorded", async () => { await (await gw()).recordAttempt({ challengeId, participantId, value: Number(value), clientRequestId: requestId }); setValue(""); setRequestId(crypto.randomUUID()); })}>Record</RaceButton>
-        <p className="lg-sub">A retry of the same press is safe: it is recorded once.</p>
+        {L.status === "loading" && challengeId ? <RaceSpinner /> : null}
+        {L.status === "ready" && selectedChallenge ? <StationRecordForm key={`${selectedChallenge.id}-${L.layout.version}-${participantId}`} act={act} challenge={selectedChallenge} participantId={participantId} layout={L.layout} reload={L.reload} /> : null}
+        {L.status !== "ready" && L.status !== "loading" ? <>
+          <RaceInput id="r-v" inputMode="decimal" label={`Result${open.find((c) => c.id === challengeId) ? ` (${open.find((c) => c.id === challengeId)?.metric.unit})` : ""}`} value={value} onChange={(e) => setValue(e.target.value)} />
+          <RaceButton disabled={act.busy || !challengeId || !participantId || value.trim() === ""} data-testid="record" onClick={() => void act.run("Attempt recorded", async () => { await (await gw()).recordAttempt({ challengeId, participantId, value: Number(value), clientRequestId: requestId }); setValue(""); setRequestId(crypto.randomUUID()); })}>Record</RaceButton>
+          <p className="lg-sub">A retry of the same press is safe: it is recorded once.</p>
+        </> : null}
       </div>
       <div className="flex flex-col gap-3">
         <RaceInput id="r-reason" label="Reason (required to reject, correct, request or decide)" value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -245,7 +254,7 @@ function Attempts({ d, act, me }: { d: AdminOverview; act: Act; me: string | nul
         {pending.length === 0 ? <p className="lg-sub">Nothing waiting.</p> : null}
         {pending.map((a) => (
           <div key={a.id} className="race-card race-card--flat flex flex-wrap items-center justify-between gap-2" data-testid="pending-attempt" style={{ padding: "0.6rem 0.9rem" }}>
-            <span>{names.get(a.participantId)} · <strong>{a.value} {a.unit}</strong> <span className="lg-sub">· {chName.get(a.challengeId)}{a.recordedBy === me ? " · you recorded this" : ""}</span></span>
+            <span>{names.get(a.participantId)} · <strong>{a.value} {a.unit}</strong> <span className="lg-sub">· {chName.get(a.challengeId)}{a.recordedBy === me ? " · you recorded this" : ""}</span><StationValues row={stationIdx.get(a.id)} /></span>
             <span className="flex gap-2">
               <RaceButton size="sm" disabled={act.busy} data-testid="approve" onClick={() => void act.run("Approved", async () => (await gw()).reviewAttempt(a.id, "approve"))}>Approve</RaceButton>
               <RaceButton size="sm" variant="danger" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Rejected", async () => (await gw()).reviewAttempt(a.id, "reject", reason))}>Reject</RaceButton>
@@ -253,12 +262,18 @@ function Attempts({ d, act, me }: { d: AdminOverview; act: Act; me: string | nul
           </div>
         ))}
         <CorrectionRequests d={d} act={act} reason={reason} names={names} />
+        {L.status === "ready" && challengeId ? <StationBreakdownPanel challengeId={challengeId} tick={d.attempts.map((a) => `${a.id}${a.status}`).join(",")} admin={d.isAdmin ? { act, reason } : undefined} /> : null}
         <h2 className="race-display mt-2 text-xl">All attempts</h2>
         {d.attempts.filter((a) => a.status !== "pending").slice(0, 60).map((a) => (
           <div key={a.id} className="race-card race-card--flat flex flex-wrap items-center justify-between gap-2" style={{ padding: "0.5rem 0.9rem" }} data-testid="attempt-row">
-            <span>{names.get(a.participantId)} · {a.value} {a.unit} <span className="lg-sub">· {chName.get(a.challengeId)} · attempt {a.attemptNo}{a.correctedFrom ? " · correction" : ""}{a.reason ? ` · ${a.reason}` : ""}</span></span>
+            <span>{names.get(a.participantId)} · {a.value} {a.unit} <span className="lg-sub">· {chName.get(a.challengeId)} · attempt {a.attemptNo}{a.correctedFrom ? " · correction" : ""}{a.reason ? ` · ${a.reason}` : ""}</span><StationValues row={stationIdx.get(a.id)} /></span>
             <span className="flex items-center gap-2"><RaceBadge tone={a.status === "approved" ? "white" : a.status === "rejected" ? "red" : "line"}>{a.status}</RaceBadge>
-              {a.status === "approved" ? <><input aria-label="Corrected value" className="race-input" style={{ width: "6rem", minHeight: 0, padding: "0.3rem" }} placeholder="new value" value={fix} onChange={(e) => setFix(e.target.value)} />
+              {a.status === "approved" && stationIdx.get(a.id) ? <>
+                {d.isAdmin ? <>
+                  <StationCorrection act={act} row={stationIdx.get(a.id)} challengeId={a.challengeId} reason={reason} />
+                  <RaceButton size="sm" variant="danger" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Voided", async () => (await gw()).correctAttempt(a.id, null, reason))}>Void</RaceButton></> : <span className="lg-sub">Station results are corrected station by station, by an administrator.</span>}
+              </> : null}
+              {a.status === "approved" && !stationIdx.get(a.id) ? <><input aria-label="Corrected value" className="race-input" style={{ width: "6rem", minHeight: 0, padding: "0.3rem" }} placeholder="new value" value={fix} onChange={(e) => setFix(e.target.value)} />
                 {d.isAdmin ? <>
                   <RaceButton size="sm" variant="ghost" disabled={act.busy || reason.trim() === "" || fix.trim() === ""} data-testid="correct" onClick={() => void act.run("Corrected", async () => (await gw()).correctAttempt(a.id, Number(fix), reason))}>Correct</RaceButton>
                   <RaceButton size="sm" variant="danger" disabled={act.busy || reason.trim() === ""} onClick={() => void act.run("Voided", async () => (await gw()).correctAttempt(a.id, null, reason))}>Void</RaceButton></> : null}

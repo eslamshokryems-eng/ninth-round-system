@@ -10,6 +10,9 @@ for f in "$PROPOSED"/*.sql; do case "$f" in *.rollback.sql) continue;; esac; lap
 "${PSQL[@]}" -d "$LDB" -f "$HERE/helpers.sql" >/dev/null
 "${PSQL[@]}" -d "$LDB" -c "create table race_test.league_parity (doc jsonb not null); grant select on race_test.league_parity to public" >/dev/null
 "${PSQL[@]}" -d "$LDB" -c "insert into race_test.league_parity values (\$json\$$(cat "$ROOT/packages/league/domain/parity-cases.json")\$json\$::jsonb)" >/dev/null
+"${PSQL[@]}" -d "$LDB" -c "create table race_test.league_layout_cases (d jsonb not null); grant select on race_test.league_layout_cases to public" >/dev/null
+{ printf 'insert into race_test.league_layout_cases values ($json$'; cat "$ROOT/packages/league/domain/layout-cases.json"; printf '$json$::jsonb);\n'; } > "$WORK/layout.sql"
+"${PSQL[@]}" -d "$LDB" -q -f "$WORK/layout.sql" >/dev/null
 "${PSQL[@]}" -d "$LDB" -c "create table race_test.league_differential (doc jsonb not null); grant select on race_test.league_differential to public" >/dev/null
 { printf 'insert into race_test.league_differential values ($json$'; cat "$ROOT/packages/league/domain/differential-cases.json"; printf '$json$::jsonb);\n'; } > "$WORK/diff.sql"   # too large for one argv entry
 "${PSQL[@]}" -d "$LDB" -q -f "$WORK/diff.sql" >/dev/null
@@ -76,6 +79,54 @@ wait; sleep 1
 [ "$(cat "$WORK"/lc/rm1.err "$WORK"/lc/rm2.err | grep -c 'two independent league administrators' || true)" = "1" ] || lfail "league concurrency: the losing removal was not refused with the administrator rule"
 lpass "league concurrency: 2 simultaneous removals from a live season with 3 administrators -> exactly one succeeds, the other is refused, two administrators remain"
 
+# --- station layouts under real parallel sessions (fixtures: suite 42) ---------------------------------------------------------------------------------
+SJ=$(fx sc_judge); SC1=$(fx sc_c1); SC2=$(fx sc_c2); SC3=$(fx sc_c3); SC4=$(fx sc_c4); SP1=$(fx sc_p1); SP2=$(fx sc_p2); SUPER2=$(fx super)
+SV3='[{"position":1,"value":5},{"position":2,"value":6},{"position":3,"value":7}]'
+# 6. one request id submitted as a STATION attempt 10 times at once -> exactly ONE attempt with ONE set of three station rows
+RID=$(lq "select gen_random_uuid()")
+lbarrier 4
+for n in $(seq 1 10); do as_user "$SJ" "select race_league_record_station_attempt('$SC1', '$SP1', 1, '$SV3'::jsonb, null, '$RID')" "sdup$n" & done
+wait; sleep 1
+[ "$(lq "select count(*) from race_league_attempts where challenge_id = '$SC1' and participant_id = '$SP1'")" = "1" ] || lfail "station concurrency: one request id created more than one attempt"
+[ "$(lq "select count(*) from race_league_station_results r join race_league_attempts a on a.id = r.attempt_id where a.challenge_id = '$SC1'")" = "3" ] || lfail "station concurrency: the single attempt does not have exactly three station rows"
+[ "$(cat "$WORK"/lc/sdup*.err | grep -c ERROR || true)" = "0" ] || lfail "station concurrency: a replayed station request failed instead of replaying"
+[ "$(lq "select a.value from race_league_attempts a where a.challenge_id = '$SC1'")" = "18.000" ] || lfail "station concurrency: the attempt value is not the sum of its stations"
+lpass "station concurrency: ONE request id sent 10 times at once -> exactly 1 attempt, 3 station rows, 0 errors (9 idempotent replays)"
+# 7. eight DIFFERENT station requests at once against a limit of 2 -> exactly 2 accepted, 6 refused, no orphan station rows
+lbarrier 4
+for n in $(seq 1 8); do as_user "$SJ" "select race_league_record_station_attempt('$SC2', '$SP2', 1, '[{\"position\":1,\"value\":$n},{\"position\":2,\"value\":2},{\"position\":3,\"value\":3}]'::jsonb, null, gen_random_uuid())" "slim$n" & done
+wait; sleep 1
+[ "$(lq "select count(*) from race_league_attempts where challenge_id = '$SC2' and participant_id = '$SP2'")" = "2" ] || lfail "station concurrency: the attempt limit of 2 was exceeded under parallel station submissions"
+[ "$(cat "$WORK"/lc/slim*.err | grep -c LEAGUE_ATTEMPT_LIMIT || true)" = "6" ] || lfail "station concurrency: expected 6 LEAGUE_ATTEMPT_LIMIT refusals"
+[ "$(lq "select count(*) from race_league_station_results r join race_league_attempts a on a.id = r.attempt_id where a.challenge_id = '$SC2'")" = "6" ] || lfail "station concurrency: a refused submission left station rows behind (or an accepted one has none)"
+lpass "station concurrency: 8 simultaneous station attempts against a limit of 2 -> exactly 2 stored (6 station rows), 6 refused with LEAGUE_ATTEMPT_LIMIT, no orphan rows"
+# 8. six administrators substitute exercises at the same time -> six DISTINCT new versions, none lost, none duplicated
+lbarrier 4
+for n in $(seq 1 6); do as_user "$SUPER2" "select race_league_set_layout('$SC3', '{\"result_type\":\"REPS\",\"stations\":[{\"name\":\"A\",\"exercises\":[{\"name\":\"Variant $n\"}]},{\"name\":\"B\",\"exercises\":[{\"name\":\"Two\"}]},{\"name\":\"C\",\"exercises\":[{\"name\":\"Three\"}]}]}'::jsonb, 'parallel swap $n')" "swap$n" & done
+wait; sleep 1
+[ "$(cat "$WORK"/lc/swap*.err | grep -c ERROR || true)" = "0" ] || lfail "station concurrency: a parallel substitution failed: $(cat "$WORK"/lc/swap*.err | head -3)"
+[ "$(lq "select count(*) from race_league_layouts where challenge_id = '$SC3'")" = "7" ] || lfail "station concurrency: expected 7 layout versions (1 + 6 substitutions), found $(lq "select count(*) from race_league_layouts where challenge_id = '$SC3'")"
+[ "$(lq "select string_agg(version::text, ',' order by version) from race_league_layouts where challenge_id = '$SC3'")" = "1,2,3,4,5,6,7" ] || lfail "station concurrency: layout versions are not 1..7 without gaps or duplicates"
+[ "$(lq "select count(*) from race_league_layouts l where l.challenge_id = '$SC3' and l.station_count <> (select count(*) from race_league_layout_stations s where s.layout_id = l.id)")" = "0" ] || lfail "station concurrency: a version has a different number of station rows than it declares"
+lpass "station concurrency: 6 simultaneous substitutions -> versions 1..7, none lost, none duplicated, every version complete"
+# 9. the FIRST layout races six single-value attempts on the same challenge -> exactly one world: the layout exists and no stray attempt, or the attempts exist and no layout
+PIDS=$(lq "select string_agg(id::text, ' ') from (select id from race_league_participants where season_id = (select season_id from race_league_challenges where id = '$SC4') order by display_name) x")
+lbarrier 4
+as_user "$SUPER2" "select race_league_set_layout('$SC4', '{\"result_type\":\"REPS\",\"stations\":[{\"name\":\"A\",\"exercises\":[{\"name\":\"One\"}]},{\"name\":\"B\",\"exercises\":[{\"name\":\"Two\"}]}]}'::jsonb, 'first layout racing attempts')" "first" &
+n=0; for pid in $PIDS; do n=$((n + 1)); as_user "$SJ" "select race_league_record_attempt('$SC4', '$pid', 10 + $n, null, gen_random_uuid())" "late$n" & done
+wait; sleep 1
+LAY=$(lq "select count(*) from race_league_layouts where challenge_id = '$SC4'"); ATT=$(lq "select count(*) from race_league_attempts where challenge_id = '$SC4'")
+if [ "$LAY" = "1" ]; then
+  [ "$ATT" = "0" ] || lfail "station concurrency: a layout and $ATT attempt(s) without a breakdown coexist on one challenge"
+  [ "$(cat "$WORK"/lc/late*.err | grep -c 'one value per station' || true)" = "6" ] || lfail "station concurrency: the six single-value attempts were not all refused at commit"
+  WORLD="the layout won: 6 single-value attempts refused at commit, 0 stored"
+else
+  [ "$LAY" = "0" ] && [ "$ATT" -ge 1 ] || lfail "station concurrency: inconsistent outcome (layouts $LAY, attempts $ATT)"
+  grep -q "before the first attempt" "$WORK/lc/first.err" || lfail "station concurrency: the layout request lost the race but was not refused with 'before the first attempt'"
+  WORLD="the attempts won: $ATT stored, the layout was refused"
+fi
+lpass "station concurrency: the first layout racing six single-value attempts -> a consistent world ($WORLD)"
+
 # the same isolation checks the main database passes, now with the league objects present (verify_deployment.sql pins exact object counts; its numbers change at activation)
 "${PSQL[@]}" -d "$LDB" -f "$HERE/isolation.sql" 2>&1 | sed -n 's/^.*NOTICE:  //p'
 
@@ -98,3 +149,31 @@ AFTER=$(objects)
 rapply "$PROPOSED/20261101000001_race_league.sql"
 [ "$(objects)" = "$DURING" ] || lfail "league rollback: re-applying the migration after a rollback gives a different schema"
 lpass "league rollback: migration ($BEFORE -> $DURING objects) then rollback restores exactly $AFTER; the migration applies again identically"
+
+# --- station-layout rehearsal: base -> stations -> stations rollback restores the base exactly -> stations again -> base rollback removes EVERYTHING league ---------------------
+SRB=race_league_st_rb_test
+"${PSQL[@]}" -d postgres -c "create database $SRB" >/dev/null
+RDB=$SRB   # rapply / rq / objects above read $RDB when they run
+rapply "$HERE/supabase-shim.sql"
+for f in "$ROOT"/supabase-race/supabase/migrations/*.sql; do rapply "$f"; done
+S0=$(objects)
+rapply "$PROPOSED/20261101000001_race_league.sql"
+S1=$(objects)
+rapply "$PROPOSED/20261101000002_race_league_stations.sql"
+S2=$(objects)
+[ "$S1" != "$S2" ] || lfail "station rollback: the stations migration changed nothing?"
+[ "$(rq "select count(*) from pg_class where relnamespace = 'public'::regnamespace and relname in ('race_league_layouts','race_league_layout_stations','race_league_layout_exercises','race_league_station_results')")" = "4" ] || lfail "station rollback: the four station tables are missing after the migration"
+rapply "$PROPOSED/20261101000002_race_league_stations.rollback.sql"
+S3=$(objects)
+[ "$S1" = "$S3" ] || lfail "station rollback: objects differ after the stations rollback (base $S1, after $S3)"
+[ "$(rq "select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname = 'race_league_record_attempt'")" = "1" ] || lfail "station rollback: the base league lost a function"
+[ "$(rq "select count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relname in ('race_league_attempts','race_league_challenges') and t.tgname in ('trg_race_league_attempt_stations','trg_race_league_challenges_layout_metric')")" = "0" ] || lfail "station rollback: a station trigger remains on a base table"
+rapply "$PROPOSED/20261101000002_race_league_stations.sql"
+[ "$(objects)" = "$S2" ] || lfail "station rollback: re-applying the stations migration after a rollback gives a different schema"
+lpass "station rollback: base ($S1) -> stations ($S2) -> stations rollback restores exactly the base ($S3) -> stations again identical"
+rapply "$PROPOSED/20261101000001_race_league.rollback.sql"
+S4=$(objects)
+[ "$S0" = "$S4" ] || lfail "station rollback: the BASE rollback with the stations applied left objects behind (before any league $S0, after $S4)"
+[ "$(rq "select count(*) from pg_class where relnamespace = 'public'::regnamespace and relname like 'race\\_league\\_%'")" = "0" ] || lfail "station rollback: league tables remain after the base rollback"
+lpass "station rollback: the BASE rollback also removes the station objects ($S2 -> $S4 = the race engine alone, as before any league)"
+

@@ -6,6 +6,7 @@ export * from "./domain/standings";
 export * from "./domain/public";
 export * from "./domain/import";
 export * from "./domain/gateway";
+export * from "./domain/layout";
 export { InMemoryLeague } from "./infrastructure/in-memory-league";
 export { SupabaseLeague } from "./infrastructure/supabase-league";
 export { PublicHttpLeague, LeagueRetryError } from "./infrastructure/public-http-league";
