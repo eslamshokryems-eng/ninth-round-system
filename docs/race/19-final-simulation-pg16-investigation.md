@@ -44,6 +44,26 @@ The 7 deterministic failures (rowing/evidence) were environmental: the build lac
 
 ## Follow-up: reposition markers (harness) and diagnostics
 - The harness now records every `travel_to` the final driver makes (`race_final.reposition()` → `clock_marks`, plus an independent call counter in `race_sim.travel_to`); the guard exempts only the one action a *valid* marker precedes (same position and instant; flush markers also name athlete, station, action). Missing, malformed, duplicate, reordered, stale, other-run or miscounted marker data fails closed: no marker is trusted and any drop is a violation. No reset is inferred from timestamps.
-- Verified on PG 16.13 and 17.11 (full harness, exit 0, 0 mismatches, 0 violations). The earlier intermittent +2377 ms stall did not recur; its cause is still unknown.
+- Verified on PG 16.13 and 17.11 (full harness, exit 0, 0 mismatches, 0 violations). The earlier intermittent +2377 ms stall did not recur in that run; its cause is analysed in "Root cause of the intermittent stall" below.
 - Diagnostics: genuine timing violations are listed first, and marker problems are grouped one line per problem code (a deleted marker used to produce ~10,000 lines that hid the violations from the console).
 - Known limits: `advance` / `post-flush-0` markers bind by position and instant only; the artifact has no dropped-action id (flush markers naming an action absent from `act_log` are OCR steps, dropped judge actions or rowing corrections, and never exempt anything); OCR steps are not timing-checked.
+
+## Probable cause of the intermittent stall (hypothesis, not proven)
+**Status.** This section was rewritten from the investigation's notes after the original write-up and its raw artifacts (instrumented-run logs, row counts, timings) were lost in a container reset. It records the conclusion reached at the time, which is **a working hypothesis, not a proven root cause**: the original numbers are not reproduced, the stall has not been reproduced since, and PostgreSQL 17.11 (where it was instrumented) is no longer available. Treat the mechanism below as unverified until it is reproduced and the fix below is tested.
+
+**Observed (evidence).**
+- On the full harness the final simulation sometimes fails the timing guard with a drift of a few seconds on a *replayed* action. Example from one run: N006 S1 REP, +2.7 s then +5.3 s against the ±1 s limit; the same pattern appeared on PG 16 and on PG 17.
+- The same code passed with 0 violations on other runs, so the failure is intermittent, not a deterministic logic error.
+- The guard failed closed on every such run, as designed.
+
+**Hypothesis (from the instrumented run; not re-verified).**
+1. `race_final.act` (the harness's table of scheduled actions) is loaded in bulk and has no planner statistics until autovacuum's autoanalyze reaches it.
+2. `race_final.refresh()` joins that table on the station number. Without statistics the planner may mis-estimate the join and build a very large intermediate row set, making `refresh()` slow until autoanalyze runs. Whether a given run is hit would then depend on background timing, which would explain why it is intermittent.
+3. The harness clock is wall-driven: while `refresh()` is slow the race clock keeps moving, so the following actions would be *sent* late and the clock would "leap". The engine would still record each action at the instant it receives it, so the drift would be in the harness's pacing, not in the engine.
+4. The driver repositions (`travel_to`) and corrects only a lag of less than 2 s. A longer stall would not be corrected and would appear as drift on the following actions of that flush, which the guard reports.
+
+**Scope.** If the hypothesis holds, this is a harness problem and not a race-timing, scoring or migration defect: the slow step would be a harness query, and nothing in `supabase/migrations`, `packages/race` or the timing rules was changed. That follows from the hypothesis; it has not been independently demonstrated. The guard thresholds were not loosened and must not be.
+
+**Proposed fix: NOT applied and NOT tested; needs approval.** Run `ANALYZE` on the `race_final` tables right after the plan is loaded, so `refresh()` always has statistics. It would be harness tooling only (`supabase-race/tests/harness/final/`), would change no threshold and no marker rule, and would remove the dependency on autoanalyze timing. Until it is applied and the stall is shown not to recur over many runs, the hypothesis stays a hypothesis.
+
+**Later evidence (consistent with the hypothesis, does not confirm it).** On PG 16.15 in a fresh container the full harness passed twice in a row, on the League work tree and on a clean copy of `546068a` (0 violations; 8,704 and 8,721 independent checks, 0 mismatches). The stall did not recur, which is what a timing-dependent cause would predict, but a stall that does not appear in two runs proves nothing about its cause.
