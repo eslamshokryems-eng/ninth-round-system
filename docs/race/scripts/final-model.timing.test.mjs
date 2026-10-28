@@ -130,7 +130,7 @@ const closed = (name, marks, run, code) => test(`fails closed: ${name}`, () => {
 });
 {
   const m = (extra = {}) => mark(1, "flush-1b", IDX, RESET, extra);
-  closed("a duplicate marker (same id twice)", [m(), { ...m(), no: 2 }].map((x, i) => ({ ...x, id: "R1:1" })), undefined, "duplicate");
+  closed("a duplicate marker (same id twice)", [m(), { ...m(), no: 2 }].map((x) => ({ ...x, id: "R1:1" })), undefined, "duplicate");
   closed("a duplicate marker position (same kind/step/position/instant, different id)", [m(), { ...m(), no: 2, id: "R1:2" }], undefined, "duplicate");
   closed("reordered markers (no out of order)", [mark(2, "advance", 0, RESET), m({ no: 1, id: "R1:1" })], undefined, "reordered");
   closed("markers that go backwards in the action sequence", [m({ no: 1, id: "R1:1" }), mark(2, "advance", 3, RESET, { step: 2 })], undefined, "reordered");
@@ -139,7 +139,7 @@ const closed = (name, marks, run, code) => test(`fails closed: ${name}`, () => {
   closed("a wrong marker identity", [m({ id: "R1:77" })], undefined, "identity");
   closed("an unknown flush boundary kind", [m({ kind: "flush-9" })], undefined, "kind");
   closed("a stale marker (precedes an action that does not exist)", [m(), mark(2, "advance", 500, RESET, { step: 9 })], undefined, "stale");
-  closed("a malformed marker (missing field)", [(({ instant, ...rest }) => rest)(m())], undefined, "malformed");
+  closed("a malformed marker (missing field)", [(() => { const x = { ...m() }; delete x.instant; return x; })()], undefined, "malformed");
   closed("a malformed marker (wrong type)", [m({ logged_before: "60" })], undefined, "malformed");
   closed("a null marker", [null], undefined, "malformed");
   closed("a flush marker that does not name its action", [m({ cid: null })], undefined, "binding");
