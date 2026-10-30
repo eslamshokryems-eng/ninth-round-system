@@ -50,6 +50,9 @@ q "select set_config('request.jwt.claim.sub','$MASTERID',false); set role authen
 START_TS=$(date +%s)
 "${PSQL[@]}" -d "$DB" -At -c "select 'select race_final.step();' from generate_series(1, 40000)" | "${PSQL[@]}" -d "$DB" -At -q -f - > "$WORK/final/steps.out" 2> "$WORK/final/steps.err" || true
 if grep -q "ERROR" "$WORK/final/steps.err"; then grep -m3 "ERROR" "$WORK/final/steps.err"; fail "final: the race driver stopped on an error"; fi
+# diagnostics only (never a check): where the wall time of each driver step went
+"${PSQL[@]}" -d "$DB" -At -F, -c "select * from race_final.step_log order by step" > "$WORK/final/step-log.csv" 2>/dev/null || true
+[ -n "${FINAL_ARTIFACTS:-}" ] && { mkdir -p "$FINAL_ARTIFACTS"; cp "$WORK/final/step-log.csv" "$FINAL_ARTIFACTS/" 2>/dev/null || true; }
 STEPS=$(q "select steps from race_final.state"); DONE=$(q "select done from race_final.state")
 echo "final: the race ran in $(( $(date +%s) - START_TS )) s of wall time, $STEPS driver steps"
 [ "$DONE" = "t" ] || fail "final: the race driver did not finish (steps=$STEPS)"

@@ -19,6 +19,10 @@ create table race_final.clock_marks (no int primary key, id text not null unique
   before_ms bigint not null, after_ms bigint not null, n int, station int, cid uuid);
 grant select, insert on race_final.clock_marks to public;
 grant select on race_final.clock_run to public;
+-- Diagnostic only (read by nobody, not exported, not part of any check): where the wall time of each driver step goes. One row per step, written at its end.
+-- w0..w7 are wall-clock instants (clock_timestamp): step start, after the advance, after flush-0, after the post-flush reposition, after the reconnects, after flush-1b, after scripts+reviews, after the ticks.
+create table race_final.step_log (step int primary key, race_ms_before bigint, race_ms_after bigint, actions int, w0 timestamptz, w1 timestamptz, w2 timestamptz, w3 timestamptz, w4 timestamptz, w5 timestamptz, w6 timestamptz, w7 timestamptz);
+grant select, insert on race_final.step_log to public;
 create table race_final.blackout (id serial, scope text not null, "from" bigint not null, "to" bigint not null, done boolean not null default false);
 insert into race_final.blackout (scope, "from", "to") select b ->> 'scope', (b ->> 'from')::bigint, (b ->> 'to')::bigint from jsonb_array_elements(race_final.p() -> 'blackouts') b;
 create table race_final.script (seq serial, at_ms bigint not null, action text not null, arg text, wall bigint, done boolean not null default false);
@@ -326,10 +330,12 @@ end $$;
 create function race_final.step() returns text language plpgsql as $$
 declare
   st race_final.state; t bigint; tick bigint; ev bigint; act bigint; bo bigint; rv bigint; target bigint; b race_final.blackout; a race_final.act; s race_final.script; r race_final.review_due; doticks boolean; fin boolean; v_last bigint;
+  w timestamptz[] := array_fill(null::timestamptz, array[8]); v_acts int := 0; v_t0 bigint;
 begin
+  w[1] := clock_timestamp();
   select * into st from race_final.state;
   if st.done then return 'done'; end if;
-  t := coalesce(race_now_ms(st.event_id), 0);
+  t := coalesce(race_now_ms(st.event_id), 0); v_t0 := t;
   select (finished_at is not null) into fin from race_clock where event_id = st.event_id;
   if fin and not exists (select 1 from race_final.act where not done and eff_ms is not null) and not exists (select 1 from race_final.review_due where not done) and not exists (select 1 from race_final.script where not done) then
     update race_final.state set done = true; return 'done';
@@ -345,7 +351,7 @@ begin
   target := least(tick, coalesce(ev, 9e15::bigint), coalesce(act, 9e15::bigint), coalesce(bo, 9e15::bigint), coalesce(rv, 9e15::bigint), st.end_cap);
   if target < t then target := t; end if;
   if target > t then perform race_final.reposition('advance', st.event_id, target); end if;
-  t := target;
+  t := target; w[2] := clock_timestamp();
   -- 0. a device that comes back flushes its offline queue FIRST (inside the very millisecond it reconnects); the reconnect assertions come after
   for a in select * from race_final.act where not done and eff_ms is not null and eff_ms <= t order by eff_ms, abs_ms, id loop
     -- the harness's own processing time is not race time: the clock is put on the scheduled instant ONCE per instant; the actions of that instant then go out one
@@ -359,12 +365,15 @@ begin
       insert into race_final.dropped values (a.n, a.station, a.kind, 1);
     elsif a.kind = 'perf' then perform race_final.do_perf(a);
     else perform race_final.do_ocr(a); end if;
-    update race_final.act set done = true where id = a.id;
+    update race_final.act set done = true where id = a.id; v_acts := v_acts + 1;
   end loop;
+  w[3] := clock_timestamp();
   -- the harness's own processing time is not race time: put the race clock back on the scripted instant before anything that is time-exact
   if race_now_ms(st.event_id) > t and race_now_ms(st.event_id) - t < 2000 then perform race_final.reposition('post-flush-0', st.event_id, t); end if;
+  w[4] := clock_timestamp();
   -- 1. reconnects (a blackout ends)
   for b in select * from race_final.blackout where not done and "to" <= t order by "to" loop perform race_final.reconnect(b); perform race_final.refresh(); end loop;
+  w[5] := clock_timestamp();
   -- 1b. whatever the reconnect just made visible (a device flushing its queue) is sent in the same instant
   for a in select * from race_final.act where not done and eff_ms is not null and eff_ms <= t order by eff_ms, abs_ms, id loop
     -- the harness's own processing time is not race time: the clock is put on the scheduled instant ONCE per instant; the actions of that instant then go out one
@@ -378,16 +387,20 @@ begin
       insert into race_final.dropped values (a.n, a.station, a.kind, 1);
     elsif a.kind = 'perf' then perform race_final.do_perf(a);
     else perform race_final.do_ocr(a); end if;
-    update race_final.act set done = true where id = a.id;
+    update race_final.act set done = true where id = a.id; v_acts := v_acts + 1;
   end loop;
+  w[6] := clock_timestamp();
   -- 2. the operators (scripted exceptions), then everything due
   for s in select * from race_final.script where not done and at_ms <= t order by at_ms, seq loop
     perform race_final.do_script(s); update race_final.script set done = true where seq = s.seq;
   end loop;
   for r in select * from race_final.review_due where not done and due_ms <= t order by due_ms, id loop perform race_final.do_review(r); end loop;
+  w[7] := clock_timestamp();
   -- 3. the operator's device ticks (unless the Master / every device is disconnected)
   doticks := t % 5000 = 0 and not exists (select 1 from race_final.blackout where scope in ('MASTER', 'ALL') and not done and t >= "from" and t < "to");
   if doticks then perform race_final.tick(); end if;
+  w[8] := clock_timestamp();
+  insert into race_final.step_log values (st.steps + 1, v_t0, t, v_acts, w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8]);
   update race_final.state set steps = steps + 1;
   return 'ok';
 end $$;
