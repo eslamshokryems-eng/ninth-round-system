@@ -23,6 +23,10 @@ grant select on race_final.clock_run to public;
 -- w0..w7 are wall-clock instants (clock_timestamp): step start, after the advance, after flush-0, after the post-flush reposition, after the reconnects, after flush-1b, after scripts+reviews, after the ticks.
 create table race_final.step_log (step int primary key, race_ms_before bigint, race_ms_after bigint, actions int, w0 timestamptz, w1 timestamptz, w2 timestamptz, w3 timestamptz, w4 timestamptz, w5 timestamptz, w6 timestamptz, w7 timestamptz);
 grant select, insert on race_final.step_log to public;
+-- Diagnostic only: the four parts of each race_final.tick() call, in seconds, plus (first 12 ticks only) the plan of the refresh() statement (plain EXPLAIN, nothing is executed twice).
+create table race_final.tick_log (no serial primary key, race_ms bigint, t_advance numeric, t_invariants numeric, t_slots numeric, t_refresh numeric, refresh_plan text);
+grant select, insert, update on race_final.tick_log to public;
+grant usage on sequence race_final.tick_log_no_seq to public;
 create table race_final.blackout (id serial, scope text not null, "from" bigint not null, "to" bigint not null, done boolean not null default false);
 insert into race_final.blackout (scope, "from", "to") select b ->> 'scope', (b ->> 'from')::bigint, (b ->> 'to')::bigint from jsonb_array_elements(race_final.p() -> 'blackouts') b;
 create table race_final.script (seq serial, at_ms bigint not null, action text not null, arg text, wall bigint, done boolean not null default false);
@@ -303,13 +307,22 @@ begin
 end $$;
 
 create function race_final.tick() returns void language plpgsql as $$
-declare j jsonb;
+declare j jsonb; w0 timestamptz := clock_timestamp(); w1 timestamptz; w2 timestamptz; w3 timestamptz; w4 timestamptz; v_plan text; v_no int; v_row record;
 begin
-  perform race_final.as_user('f_master'); j := race_advance(race_final.ev()); perform race_final.back();
-  perform race_sim.check_invariants(race_final.ev(), (j ->> 'race_ms')::bigint);
+  perform race_final.as_user('f_master'); j := race_advance(race_final.ev()); perform race_final.back(); w1 := clock_timestamp();
+  perform race_sim.check_invariants(race_final.ev(), (j ->> 'race_ms')::bigint); w2 := clock_timestamp();
   insert into race_final.slot_seen (heat, idx, reg) select h.number, s.slot_index, s.registration_id from race_start_slots s join race_heats h on h.id = s.heat_id where s.event_id = race_final.ev() and s.status in ('BOUND', 'STARTED') and s.registration_id is not null on conflict do nothing;
-  perform race_final.chk('no start slot changes after binding', not exists (select 1 from race_final.slot_seen ss join race_heats h on h.number = ss.heat and h.event_id = race_final.ev() join race_start_slots s on s.heat_id = h.id and s.slot_index = ss.idx where s.registration_id is distinct from ss.reg));
+  perform race_final.chk('no start slot changes after binding', not exists (select 1 from race_final.slot_seen ss join race_heats h on h.number = ss.heat and h.event_id = race_final.ev() join race_start_slots s on s.heat_id = h.id and s.slot_index = ss.idx where s.registration_id is distinct from ss.reg)); w3 := clock_timestamp();
+  select count(*) + 1 into v_no from race_final.tick_log;
+  if v_no <= 12 then
+    begin
+      for v_row in execute 'explain ' || (select prosrc from pg_proc where oid = 'race_final.refresh'::regproc) loop v_plan := coalesce(v_plan || E'\n', '') || v_row."QUERY PLAN"; end loop;
+    exception when others then v_plan := 'explain failed: ' || sqlerrm; end;
+  end if;
+  w4 := clock_timestamp();
   perform race_final.refresh();
+  insert into race_final.tick_log (race_ms, t_advance, t_invariants, t_slots, t_refresh, refresh_plan)
+  values ((j ->> 'race_ms')::bigint, extract(epoch from w1 - w0), extract(epoch from w2 - w1), extract(epoch from w3 - w2), extract(epoch from clock_timestamp() - w4), v_plan);
 end $$;
 
 -- ONE step: advance to the next thing that happens, then do everything that is due -------------------------------------------------------------
