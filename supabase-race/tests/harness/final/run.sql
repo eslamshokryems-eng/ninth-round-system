@@ -418,4 +418,51 @@ begin
   return 'ok';
 end $$;
 reset role;
+-- Planner statistics for everything refresh() reads, before its first call. Without them refresh() is planned on default estimates (race_final.act = 5 rows)
+-- and takes ~7 s per tick for the first minute of a full run; the race clock then runs past the next action by more than the driver's 2 s repositioning limit.
+-- Fail-closed check: nothing is assumed from the ANALYZE statements having run. For every table in the spec, from the catalogs:
+--   1. it exists and is an ordinary table;  2. pg_class.reltuples >= 0 (PG 14+: -1 = never analyzed or vacuumed);
+--   3. n = 0: reltuples = 0;  n > 0: |reltuples - count(*)| <= max(5, 5 % of n) (10 % above 30 000 rows, where ANALYZE samples);
+--   4. n > 0: every listed column has a pg_stats row (column statistics, which a plain VACUUM does not write; VACUUM ANALYZE does).
+-- Any failure raises one RACE_FINAL_STATS error naming every problem; psql (ON_ERROR_STOP) then stops this script before the first step.
+create function race_final.assert_planner_stats(p_spec jsonb) returns void language plpgsql as $$
+declare t jsonb; v_schema text; v_table text; v_rel regclass; v_n bigint; v_rt real; v_tol numeric; v_col text; v_bad text[] := '{}';
+begin
+  for t in select value from jsonb_array_elements(p_spec) loop
+    v_schema := t ->> 'schema'; v_table := t ->> 'table';
+    v_rel := to_regclass(format('%I.%I', v_schema, v_table));
+    if v_rel is null then v_bad := v_bad || format('%s.%s: table does not exist', v_schema, v_table); continue; end if;
+    if (select relkind from pg_class where oid = v_rel) <> 'r' then v_bad := v_bad || format('%s.%s: not an ordinary table', v_schema, v_table); continue; end if;
+    execute format('select count(*) from %s', v_rel) into v_n;
+    select reltuples into v_rt from pg_class where oid = v_rel;
+    if v_rt < 0 then v_bad := v_bad || format('%s.%s: never analyzed (reltuples %s, rows %s)', v_schema, v_table, v_rt, v_n); continue; end if;
+    if v_n = 0 then
+      if v_rt <> 0 then v_bad := v_bad || format('%s.%s: empty table but reltuples %s', v_schema, v_table, v_rt); end if;
+      continue;
+    end if;
+    v_tol := case when v_n <= 30000 then greatest(5, 0.05 * v_n) else 0.10 * v_n end;
+    if abs(v_rt - v_n) > v_tol then
+      v_bad := v_bad || format('%s.%s: row estimate %s but %s rows (stale)', v_schema, v_table, v_rt, v_n);
+    end if;
+    for v_col in select jsonb_array_elements_text(t -> 'columns') loop
+      if not exists (select 1 from pg_stats where schemaname = v_schema and tablename = v_table and attname = v_col and not inherited) then
+        v_bad := v_bad || format('%s.%s: no column statistics for "%s"', v_schema, v_table, v_col);
+      end if;
+    end loop;
+  end loop;
+  if cardinality(v_bad) > 0 then
+    raise exception 'RACE_FINAL_STATS: required planner statistics are missing or unusable: %', array_to_string(v_bad, '; ');
+  end if;
+end $$;
+analyze race_final.act; analyze race_final.blackout; analyze race_final.script;
+analyze race_stations; analyze race_station_results; analyze race_registrations; analyze race_start_slots;
+select race_final.assert_planner_stats('[
+  {"schema": "race_final", "table": "act", "columns": ["n", "station", "abs_ms", "done"]},
+  {"schema": "race_final", "table": "blackout", "columns": ["scope", "from", "to"]},
+  {"schema": "race_final", "table": "script", "columns": ["at_ms", "done"]},
+  {"schema": "public", "table": "race_stations", "columns": ["id", "number"]},
+  {"schema": "public", "table": "race_station_results", "columns": ["event_id", "registration_id", "station_id", "slot_id", "status", "window_start_race_ms", "window_end_race_ms"]},
+  {"schema": "public", "table": "race_registrations", "columns": ["id", "race_number"]},
+  {"schema": "public", "table": "race_start_slots", "columns": ["id", "slot_index"]}
+]'::jsonb);
 select race_final.refresh();
