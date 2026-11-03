@@ -48,8 +48,8 @@ The 7 deterministic failures (rowing/evidence) were environmental: the build lac
 - Diagnostics: genuine timing violations are listed first, and marker problems are grouped one line per problem code (a deleted marker used to produce ~10,000 lines that hid the violations from the console).
 - Known limits: `advance` / `post-flush-0` markers bind by position and instant only; the artifact has no dropped-action id (flush markers naming an action absent from `act_log` are OCR steps, dropped judge actions or rowing corrections, and never exempt anything); OCR steps are not timing-checked.
 
-## Intermittent stall: cause found (stale planner statistics), fix verified on PG 16.15 only
-**Status.** Established by measurement on PG 16.15 (details below). Not yet verified on PG 17 or PG 16.13. The earlier analysis was lost in a container reset; everything here was re-measured in this repository's own runs (commits `33a5b81`, `834ab5c`, `0b151a1`).
+## Intermittent stall: cause found (stale planner statistics), fix verified on PG 16.15 and PG 17.11
+**Status.** Established by measurement on PG 16.15 and on PG 17.11 (PGDG build 17.11-1.pgdg24.04+2; details below). Not verified on PG 16.13 or on Supabase's managed 17.11.0.003 build. The earlier analysis was lost in a container reset; everything here was re-measured in this repository's own runs (commits `33a5b81`, `834ab5c`, `0b151a1`).
 
 **Symptom.** On the full harness the final simulation sometimes fails the timing guard on *replayed* actions: N006 S1 REP act #2/#3 at +2.1 to +5.6 s (scheduled 74,166 / 81,612 ms), or act #1 at +3.2 s; once also two flush actions at ~3,300 s (+2.6 s, +2.2 s). The final-only mode (`ONLY_FINAL=1`) never showed it. The guard failed closed every time; it was never loosened.
 
@@ -71,10 +71,19 @@ The 7 deterministic failures (rowing/evidence) were environmental: the build lac
 
 The one baseline pass (run 08) had the same 10 slow ticks; the clock happened to land inside the 2 s window. In the experiment arm the first three N006 S1 drifts were 7-14 ms in every run; the largest natural flush drift (rule: at most 1 s behind the previous action) was 1,097-1,352 ms. Earlier runs agree: 3 baseline full runs under the passive sampler (one slip, +3,198 ms; all three showed the same ~5 long early driver statements), and 3 further runs of the experiment (0 slow ticks, 0 violations). The check was proven both ways: it passes after `ANALYZE`, and with the `ANALYZE` lines removed the harness stops at `RACE_FINAL_STATS` before any step (disposable-cluster unit tests: never analysed, `VACUUM` only, missing table, view, stale rows, empty then populated table, column added after `ANALYZE`, unprivileged role).
 
+**Evidence: PostgreSQL 17.11, interleaved A/B (5 full runs per arm, order B1 A1 B2 A2 B3 A3 B4 A4 B5 A5, one at a time).** PGDG packages 17.11-1.pgdg24.04+2 (`postgresql-17`, `postgresql-client-17`, `libpq5`), SHA256-verified against the GPG-signed repository metadata and extracted (not installed) into a scratch directory; every run logged `PostgreSQL 17.11`. JIT was switched off for every session with `PGOPTIONS='-c jit=off'`, because the extracted package set has no LLVM 19 and the first JIT-eligible query of `02_timing.sql` otherwise fails to load `llvmjit.so`; JIT changes how a plan is executed, not which plan is chosen. Two earlier attempts (B1, A1) failed on that missing library before the final stage and are not counted.
+
+| Arm | Runs | Failed the timing guard | Runs with slow ticks (> 0.5 s) | Max `refresh()` | `act` estimate / join at tick 1 |
+|---|---|---|---|---|---|
+| Baseline (no `ANALYZE`) | 5 | **5** (N006 S1 REP act #2 and/or #3, +3.4 to +6.0 s) | 5 (7-8 ticks, 58-63 s in total) | 8.3-9.2 s | 5 rows, nested loops (switches to ~5,900 rows and hash joins at tick 8-9) |
+| With `ANALYZE` + check | 5 | **0** | 0 | 0.012-0.057 s | 6,063 rows, hash join |
+
+First three N006 S1 drifts: baseline 10-13 ms for act #1, then +3,401 to +4,371 ms for act #2 in all five runs and +5,635 / +5,997 ms for act #3 in two of them (7-9 ms in the other three); with `ANALYZE` 7-17 ms for all three actions in every run. The independent model compared 8,707-8,738 checks per run; the only failures were the timing-guard violations of the baseline arm. The largest natural flush drift in the `ANALYZE` arm was 1,014-1,504 ms (rule: at most 1 s behind the previous action). The ~3,300 s flush (about 150 actions) took 2.2 s and 2.3 s in two baseline runs, 0.8 s in the other three, and 0.9-1.3 s in the `ANALYZE` arm; no flush violation occurred on PG 17.
+
 **What is not established.**
-- PG 17 and PG 16.13 are not verified (the container has 16.15 only). The planner may choose different plans there; the catalog check itself needs PG 14+ (`reltuples = -1` for never analysed).
-- 5 runs per arm is a small sample; the baseline failure rate is roughly 1 in 4 to 4 in 5 across the runs seen, not a precise rate.
-- The ~3,300 s flush (about 160 actions) took 2.2-2.6 s in three of five baseline runs and 0.9-1.1 s in all five experiment runs; one baseline run failed the guard there. That is consistent with the same cause, but which statement is slow was not identified.
+- PG 16.13 and Supabase's managed PG 17.11.0.003 are not verified: the PG 17.11 runs used PGDG's build with JIT off, on the same machine as the PG 16.15 runs. The catalog check itself needs PG 14+ (`reltuples = -1` for never analysed).
+- 5 runs per arm and version is a small sample; the baseline failure rate was 4 of 5 on PG 16.15 and 5 of 5 on PG 17.11, not a precise rate. Whether a baseline run slips depends on where the clock lands relative to the next action, so single runs can pass (one PG 16.15 baseline run did).
+- The ~3,300 s flush (about 160 actions) took 2.2-2.6 s in three of five baseline runs and 0.9-1.1 s in all five experiment runs; one baseline run failed the guard there. That is consistent with the same cause (on PG 17.11 the flush took 2.2-2.3 s in two of five baseline runs and about 1 s in the `ANALYZE` arm, with no violation), but which statement is slow was not identified.
 - What made autoanalyze finally arrive (after tick 8 in the run where it was observed) was not investigated.
 - The check detects missing and grossly stale statistics (row-count mismatch beyond max(5 rows, 5 %)), not a skewed value distribution.
 
