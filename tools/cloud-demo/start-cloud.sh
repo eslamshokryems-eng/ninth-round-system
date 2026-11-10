@@ -20,7 +20,7 @@ if [ -f "$ENVF" ] && ! grep -q "$PROJECT_REF" "$ENVF"; then
 fi
 if ! grep -q "$PROJECT_REF" "$ENVF" 2>/dev/null; then
   printf "Paste the service_role key (hidden), then Enter: "; read -rs SVC; echo
-  [ ${#SVC} -gt 100 ] || { echo "That does not look like a service_role key. Nothing written."; exit 1; }
+  if [ ${#SVC} -le 100 ] && [[ "$SVC" != sb_secret_* ]]; then echo "That does not look like a service_role / secret key. Nothing written."; exit 1; fi
   PEPPER="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
   umask 077
   cat > "$ENVF" <<EOT
