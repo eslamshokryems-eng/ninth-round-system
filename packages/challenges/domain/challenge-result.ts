@@ -1,7 +1,7 @@
 export type ChallengeResultStatus = "pending" | "approved" | "rejected" | "correction_pending";
 
 /**
- * One official result per (challengeId, memberId) at any moment — enforced
+ * One official result per (challengeId, participantProfileId) at any moment — enforced
  * at the database level by a partial unique index (see the Phase 1
  * migration), not here. `correctsResultId` / `supersededByResultId` model
  * the correction chain: a correction is always a NEW row (correctsResultId
@@ -14,7 +14,7 @@ export type ChallengeResultStatus = "pending" | "approved" | "rejected" | "corre
 export interface ChallengeResult {
   resultId: string;
   challengeId: string;
-  memberId: string;
+  participantProfileId: string;
   enteredByProfileId: string;
   resultValue: number;
   normalizedResultValue: number | null;
@@ -29,7 +29,7 @@ export interface ChallengeResult {
   updatedAt: string;
 }
 
-/** The one result that currently counts toward rankings/points for its (challenge, member) pair — matches the database's own partial-unique-index condition exactly, so this must never diverge from the SQL definition. */
+/** The one result that currently counts toward rankings/points for its (challenge, participant) pair — matches the database's own partial-unique-index condition exactly, so this must never diverge from the SQL definition. */
 export function isCurrentChallengeResult(result: ChallengeResult): boolean {
   return result.status === "approved" && result.supersededByResultId === null;
 }

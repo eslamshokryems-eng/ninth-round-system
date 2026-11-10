@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { aggregatePointsByMember, sumLedgerPoints, type ChallengePointsLedgerEntry } from "./challenge-points-ledger";
+import { aggregatePointsByParticipant, sumLedgerPoints, type ChallengePointsLedgerEntry } from "./challenge-points-ledger";
 
 function entry(overrides: Partial<ChallengePointsLedgerEntry>): ChallengePointsLedgerEntry {
   return {
     entryId: "entry-1",
     seasonId: "season-1",
     challengeId: "challenge-1",
-    memberId: "member-1",
+    participantProfileId: "profile-1",
     resultId: "result-1",
     pointsDelta: 0,
     reason: "challenge result approved",
@@ -17,7 +17,7 @@ function entry(overrides: Partial<ChallengePointsLedgerEntry>): ChallengePointsL
 }
 
 describe("sumLedgerPoints", () => {
-  it("sums a member's points across every ledger row", () => {
+  it("sums a participant's points across every ledger row", () => {
     expect(sumLedgerPoints([entry({ pointsDelta: 100 }), entry({ pointsDelta: 40 })])).toBe(140);
   });
 
@@ -32,14 +32,14 @@ describe("sumLedgerPoints", () => {
   });
 });
 
-describe("aggregatePointsByMember", () => {
-  it("groups and sums points per member", () => {
-    const totals = aggregatePointsByMember([
-      entry({ memberId: "member-1", pointsDelta: 100 }),
-      entry({ memberId: "member-2", pointsDelta: 90 }),
-      entry({ memberId: "member-1", pointsDelta: 40 }),
+describe("aggregatePointsByParticipant", () => {
+  it("groups and sums points per participant", () => {
+    const totals = aggregatePointsByParticipant([
+      entry({ participantProfileId: "profile-1", pointsDelta: 100 }),
+      entry({ participantProfileId: "profile-2", pointsDelta: 90 }),
+      entry({ participantProfileId: "profile-1", pointsDelta: 40 }),
     ]);
-    expect(totals.get("member-1")).toBe(140);
-    expect(totals.get("member-2")).toBe(90);
+    expect(totals.get("profile-1")).toBe(140);
+    expect(totals.get("profile-2")).toBe(90);
   });
 });

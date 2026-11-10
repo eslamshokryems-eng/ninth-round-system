@@ -32,14 +32,22 @@ describe("validateChallengeWeight", () => {
 });
 
 describe("validateChallengeScope", () => {
-  it("requires branchId to be null for an all-branches competition", () => {
-    expect(validateChallengeScope("ALL_BRANCHES", null).isOk).toBe(true);
-    expect(validateChallengeScope("ALL_BRANCHES", "branch-1").isErr).toBe(true);
+  it("requires branchId and branchIds to be empty for a global competition", () => {
+    expect(validateChallengeScope("GLOBAL", null).isOk).toBe(true);
+    expect(validateChallengeScope("GLOBAL", "branch-1").isErr).toBe(true);
+    expect(validateChallengeScope("GLOBAL", null, ["branch-1"]).isErr).toBe(true);
   });
 
   it("requires a branchId for a branch competition", () => {
     expect(validateChallengeScope("BRANCH", "branch-1").isOk).toBe(true);
     expect(validateChallengeScope("BRANCH", null).isErr).toBe(true);
+  });
+
+  it("requires at least one branchId and no single branchId for a multi-branch competition", () => {
+    expect(validateChallengeScope("MULTI_BRANCH", null, ["branch-1", "branch-2"]).isOk).toBe(true);
+    expect(validateChallengeScope("MULTI_BRANCH", null, []).isErr).toBe(true);
+    expect(validateChallengeScope("MULTI_BRANCH", null, null).isErr).toBe(true);
+    expect(validateChallengeScope("MULTI_BRANCH", "branch-1", ["branch-1"]).isErr).toBe(true);
   });
 });
 

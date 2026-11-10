@@ -9,7 +9,7 @@ import type { Result } from "@9thround/shared-kernel";
 export type ChallengeProgramType = "ninth_round" | "boxing" | "kickboxing" | "mma";
 
 export type ChallengeCategory = "strength" | "endurance" | "boxing" | "kickboxing" | "mma" | "ninth_round" | "hybrid_fitness";
-export type ChallengeScope = "BRANCH" | "ALL_BRANCHES";
+export type ChallengeScope = "BRANCH" | "GLOBAL" | "MULTI_BRANCH";
 export type ChallengeMeasurementType = "NUMERIC" | "TIME" | "COUNT";
 export type ChallengeScoringDirection = "HIGHER_IS_BETTER" | "LOWER_IS_BETTER";
 export type ChallengeStatus = "draft" | "published" | "registration_open" | "active" | "completed" | "archived";
@@ -22,7 +22,7 @@ export interface Challenge {
   category: ChallengeCategory;
   programType: ChallengeProgramType | null;
   scope: ChallengeScope;
-  /** Required when scope is "BRANCH"; must be null when scope is "ALL_BRANCHES" — see validateChallengeScope. */
+  /** Required when scope is "BRANCH"; must be null for "GLOBAL"/"MULTI_BRANCH" — see validateChallengeScope. A MULTI_BRANCH competition's eligible branches live in challenge_branches, never here. */
   branchId: string | null;
   measurementType: ChallengeMeasurementType;
   measurementUnit: string;
@@ -63,16 +63,42 @@ export function validateChallengeWeight(
 }
 
 // ---------------------------------------------------------------------------
-// Scope/branch consistency — a global competition has no single branch; a
-// branch competition must have exactly one.
+// Scope/branch consistency — three scopes, per the approved revised
+// architecture: GLOBAL (one overall leaderboard, no branch at all), BRANCH
+// (exactly one branch, on the challenge itself), MULTI_BRANCH (no single
+// branch on the challenge — its eligible branches are a separate list,
+// `branchIds`, so the schema never needs redesigning as more branches are
+// added later).
 // ---------------------------------------------------------------------------
 
-export function validateChallengeScope(scope: ChallengeScope, branchId: string | null): Result<void> {
-  if (scope === "ALL_BRANCHES" && branchId !== null) {
-    return err(domainError("INVALID_SCOPE", "An all-branches competition cannot be scoped to a single branch."));
+export function validateChallengeScope(
+  scope: ChallengeScope,
+  branchId: string | null,
+  branchIds: string[] | null = null,
+): Result<void> {
+  if (scope === "GLOBAL") {
+    if (branchId !== null) {
+      return err(domainError("INVALID_SCOPE", "A global competition cannot be scoped to a single branch."));
+    }
+    if (branchIds !== null && branchIds.length > 0) {
+      return err(domainError("INVALID_SCOPE", "A global competition has no branch list — it is open globally."));
+    }
+    return ok(undefined);
   }
-  if (scope === "BRANCH" && branchId === null) {
-    return err(domainError("INVALID_SCOPE", "A branch competition must specify its branch."));
+
+  if (scope === "BRANCH") {
+    if (branchId === null) {
+      return err(domainError("INVALID_SCOPE", "A branch competition must specify its branch."));
+    }
+    return ok(undefined);
+  }
+
+  // MULTI_BRANCH
+  if (branchId !== null) {
+    return err(domainError("INVALID_SCOPE", "A multi-branch competition has no single branch — use the branch list instead."));
+  }
+  if (branchIds === null || branchIds.length < 1) {
+    return err(domainError("INVALID_SCOPE", "A multi-branch competition must list at least one eligible branch."));
   }
   return ok(undefined);
 }

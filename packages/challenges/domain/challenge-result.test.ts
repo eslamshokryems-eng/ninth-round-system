@@ -5,7 +5,7 @@ function buildResult(overrides: Partial<ChallengeResult> = {}): ChallengeResult 
   return {
     resultId: "result-1",
     challengeId: "challenge-1",
-    memberId: "member-1",
+    participantProfileId: "profile-1",
     enteredByProfileId: "coach-1",
     resultValue: 42,
     normalizedResultValue: null,

@@ -8,28 +8,17 @@ import {
 
 describe("validateChallengeEligibilityRule", () => {
   it("rejects an unsupported rule type safely, without throwing", () => {
-    const result = validateChallengeEligibilityRule("has_tattoo", {});
-    expect(result.isErr).toBe(true);
-  });
-
-  it("accepts active_membership with no parameters", () => {
-    expect(validateChallengeEligibilityRule("active_membership", {}).isOk).toBe(true);
-  });
-
-  it("requires a programType value for a program_type rule", () => {
-    expect(validateChallengeEligibilityRule("program_type", {}).isErr).toBe(true);
-    expect(validateChallengeEligibilityRule("program_type", { programType: "boxing" }).isOk).toBe(true);
+    expect(validateChallengeEligibilityRule("has_tattoo", {}).isErr).toBe(true);
+    expect(validateChallengeEligibilityRule("active_membership", {}).isErr).toBe(true);
+    expect(validateChallengeEligibilityRule("program_type", { programType: "boxing" }).isErr).toBe(true);
+    expect(validateChallengeEligibilityRule("branch", { branchId: "11111111-1111-1111-1111-111111111111" }).isErr).toBe(true);
   });
 
   it("requires a non-negative integer age for min_age/max_age rules", () => {
     expect(validateChallengeEligibilityRule("min_age", { age: -1 }).isErr).toBe(true);
     expect(validateChallengeEligibilityRule("min_age", { age: 1.5 }).isErr).toBe(true);
     expect(validateChallengeEligibilityRule("min_age", { age: 16 }).isOk).toBe(true);
-  });
-
-  it("requires a branchId for a branch rule", () => {
-    expect(validateChallengeEligibilityRule("branch", {}).isErr).toBe(true);
-    expect(validateChallengeEligibilityRule("branch", { branchId: "branch-1" }).isOk).toBe(true);
+    expect(validateChallengeEligibilityRule("max_age", { age: 60 }).isOk).toBe(true);
   });
 });
 
@@ -38,28 +27,13 @@ function rule(ruleType: ChallengeEligibilityRule["ruleType"], value: Record<stri
 }
 
 const baseContext: ChallengeEligibilityContext = {
-  hasActiveMembership: true,
-  activeProgramTypes: ["boxing"],
   ageYears: 25,
-  branchId: "branch-1",
 };
 
 describe("evaluateChallengeEligibility", () => {
   it("is eligible when all configured rules pass", () => {
-    const decision = evaluateChallengeEligibility([rule("active_membership"), rule("program_type", { programType: "boxing" })], baseContext);
+    const decision = evaluateChallengeEligibility([rule("min_age", { age: 18 }), rule("max_age", { age: 40 })], baseContext);
     expect(decision).toEqual({ eligible: true, reason: null });
-  });
-
-  it("rejects with a clear reason when active_membership fails", () => {
-    const decision = evaluateChallengeEligibility([rule("active_membership")], { ...baseContext, hasActiveMembership: false });
-    expect(decision.eligible).toBe(false);
-    expect(decision.reason).toContain("active membership");
-  });
-
-  it("rejects when the member lacks the required program type", () => {
-    const decision = evaluateChallengeEligibility([rule("program_type", { programType: "mma" })], baseContext);
-    expect(decision.eligible).toBe(false);
-    expect(decision.reason).toContain("mma");
   });
 
   it("rejects when below the minimum age", () => {
@@ -73,12 +47,7 @@ describe("evaluateChallengeEligibility", () => {
   });
 
   it("rejects age rules when date of birth is unknown", () => {
-    const decision = evaluateChallengeEligibility([rule("min_age", { age: 16 })], { ...baseContext, ageYears: null });
-    expect(decision.eligible).toBe(false);
-  });
-
-  it("rejects when the member isn't in the required branch", () => {
-    const decision = evaluateChallengeEligibility([rule("branch", { branchId: "branch-2" })], baseContext);
+    const decision = evaluateChallengeEligibility([rule("min_age", { age: 16 })], { ageYears: null });
     expect(decision.eligible).toBe(false);
   });
 

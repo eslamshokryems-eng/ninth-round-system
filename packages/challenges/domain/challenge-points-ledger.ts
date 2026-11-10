@@ -12,7 +12,7 @@ export interface ChallengePointsLedgerEntry {
   entryId: string;
   seasonId: string;
   challengeId: string;
-  memberId: string;
+  participantProfileId: string;
   resultId: string;
   pointsDelta: number;
   reason: string;
@@ -25,11 +25,11 @@ export function sumLedgerPoints(entries: ChallengePointsLedgerEntry[]): number {
   return entries.reduce((total, entry) => total + entry.pointsDelta, 0);
 }
 
-/** Groups ledger entries by member and sums each — the pure core of a season's aggregate points leaderboard, before the database/infra layer adds branch scoping, nickname lookup, and sorting (Phase 4). */
-export function aggregatePointsByMember(entries: ChallengePointsLedgerEntry[]): Map<string, number> {
+/** Groups ledger entries by participant and sums each — the pure core of a season's aggregate points leaderboard; the actual leaderboard views (this migration's challenge_season_leaderboard_overall/by_branch) perform the same arithmetic in SQL, kept here too so it's independently testable and so the two can never silently disagree. */
+export function aggregatePointsByParticipant(entries: ChallengePointsLedgerEntry[]): Map<string, number> {
   const totals = new Map<string, number>();
   for (const entry of entries) {
-    totals.set(entry.memberId, (totals.get(entry.memberId) ?? 0) + entry.pointsDelta);
+    totals.set(entry.participantProfileId, (totals.get(entry.participantProfileId) ?? 0) + entry.pointsDelta);
   }
   return totals;
 }
