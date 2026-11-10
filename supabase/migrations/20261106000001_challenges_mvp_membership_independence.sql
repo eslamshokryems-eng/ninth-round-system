@@ -29,8 +29,8 @@
 -- Scope enum expansion
 -- ---------------------------------------------------------------------------
 
-alter type challenge_scope rename value 'ALL_BRANCHES' to 'GLOBAL';
-alter type challenge_scope add value 'MULTI_BRANCH';
+-- (the two enum statements that were here now live in 20261106000000_challenge_scope_multi_branch_value.sql:
+--  a new enum value cannot be used in the transaction that added it.)
 
 -- Phase 1's chk_challenge_scope_branch check constraint is an exhaustive
 -- OR of exactly the 2 scopes that existed at the time: it has no clause

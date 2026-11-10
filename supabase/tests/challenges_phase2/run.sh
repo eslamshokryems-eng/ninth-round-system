@@ -198,6 +198,8 @@ echo "=== Applying the REAL Phase 2 migration (unmodified, by relative path) ===
 run_psql "$SCRATCH_DB" "$MIGRATIONS_DIR/20261105000002_challenges_rls_and_rpcs.sql" "$LOG_DIR/02_phase2.log"
 has_sql_error "$LOG_DIR/02_phase2.log" && { echo "  FAIL: Phase 2 migration did not apply cleanly — see $LOG_DIR/02_phase2.log"; FAIL=$((FAIL+1)); } || { echo "  PASS: Phase 2 migration applied cleanly"; PASS=$((PASS+1)); }
 
+run_psql "$SCRATCH_DB" "$MIGRATIONS_DIR/20261106000000_challenge_scope_multi_branch_value.sql" "$LOG_DIR/03_scope_enum.log"
+has_sql_error "$LOG_DIR/03_scope_enum.log" && { echo "  FAIL: scope enum migration did not apply"; FAIL=$((FAIL+1)); }
 echo "=== Applying the REAL Phase 3 migration (unmodified, by relative path) ==="
 run_psql "$SCRATCH_DB" "$MIGRATIONS_DIR/20261106000001_challenges_mvp_membership_independence.sql" "$LOG_DIR/03_phase3.log"
 has_sql_error "$LOG_DIR/03_phase3.log" && { echo "  FAIL: Phase 3 migration did not apply cleanly — see $LOG_DIR/03_phase3.log"; FAIL=$((FAIL+1)); } || { echo "  PASS: Phase 3 migration applied cleanly"; PASS=$((PASS+1)); }
