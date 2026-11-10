@@ -8,7 +8,7 @@
 # Never connects to Supabase or any remote database.
 set -eu
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$HERE/../.."
-RUN="$HERE/.run"; mkdir -p "$RUN"
+RUN="$HERE/.run"; mkdir -p "$RUN"; SETSID="$(command -v setsid || true)"
 stop() { for n in web gateway sink; do [ -f "$RUN/$n.pid" ] && kill "$(cat "$RUN/$n.pid")" 2>/dev/null || true; rm -f "$RUN/$n.pid"; done
          pkill -f "gateway.mjs" 2>/dev/null || true; pkill -f "mail-sink.mjs" 2>/dev/null || true
          pkill -f "next dev -p 3000" 2>/dev/null || true; }
@@ -19,8 +19,8 @@ stop; sleep 1
 [ -d "$ROOT/node_modules" ] || (cd "$ROOT" && pnpm install)
 echo "== Building the demo database with sample competitions (synthetic data) =="; bash "$HERE/acceptance.sh" | grep -E "ACCEPTANCE:|FAIL" || { echo "Demo database build failed"; exit 1; }
 echo "== Starting mail sink + gateway =="
-(cd "$ROOT" && setsid nohup node tools/local-dev-stack/mail-sink.mjs > "$RUN/sink.log" 2>&1 < /dev/null & echo $! > "$RUN/sink.pid") > /dev/null 2>&1
-(cd "$ROOT" && setsid nohup node tools/local-dev-stack/gateway.mjs > "$RUN/gateway.log" 2>&1 < /dev/null & echo $! > "$RUN/gateway.pid") > /dev/null 2>&1
+(cd "$ROOT" && ${SETSID:-} nohup node tools/local-dev-stack/mail-sink.mjs > "$RUN/sink.log" 2>&1 < /dev/null & echo $! > "$RUN/sink.pid") > /dev/null 2>&1
+(cd "$ROOT" && ${SETSID:-} nohup node tools/local-dev-stack/gateway.mjs > "$RUN/gateway.log" 2>&1 < /dev/null & echo $! > "$RUN/gateway.pid") > /dev/null 2>&1
 for i in $(seq 1 30); do grep -q "SERVICE_ROLE_KEY=" "$RUN/gateway.log" 2>/dev/null && break; sleep 1; done
 ENVF="$ROOT/apps/web/.env.local"
 if [ ! -f "$ENVF" ]; then
@@ -45,7 +45,7 @@ EOT
   echo "wrote $ENVF"
 fi
 echo "== Starting the web app =="
-(cd "$ROOT/apps/web" && setsid nohup npx next dev -p 3000 > "$RUN/web.log" 2>&1 < /dev/null & echo $! > "$RUN/web.pid") > /dev/null 2>&1
+(cd "$ROOT/apps/web" && ${SETSID:-} nohup npx next dev -p 3000 > "$RUN/web.log" 2>&1 < /dev/null & echo $! > "$RUN/web.pid") > /dev/null 2>&1
 for i in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:3000/login && break; sleep 1; done
 cat <<'EOT'
 

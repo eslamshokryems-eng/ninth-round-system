@@ -3,7 +3,7 @@
 # (never the live gym project). Staff device-verification codes are captured by a local mail
 # sink, so no email service is needed.
 #   bash tools/cloud-demo/start-cloud.sh          # start
-#   bash tools/cloud-demo/start-cloud.sh stop     # stop
+#   Ctrl+C in this window stops it.
 # You will be asked (hidden input) for the project's service_role key:
 #   Supabase dashboard -> 9th-round-challenges -> Project Settings -> API -> service_role.
 # It is written only to apps/web/.env.local (gitignored). Never paste it into chat.
@@ -12,8 +12,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$HERE/../.."; RUN="$
 PROJECT_REF="qpfbkgooaroknmhkylsu"
 URL="https://$PROJECT_REF.supabase.co"
 ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwZmJrZ29vYXJva25taGt5bHN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyODg2NTUsImV4cCI6MjEwOTg2NDY1NX0.vJOjK7NsodwLIiDTKatBnC8MPWyqj7ZbZngWdlxh1hU"
-stop() { pkill -f "mail-sink.mjs" 2>/dev/null || true; pkill -f "next dev -p 3000" 2>/dev/null || true; pkill -f "next-server" 2>/dev/null || true; }
-[ "${1:-}" = "stop" ] && { stop; echo stopped; exit 0; }
+[ "${1:-}" = "stop" ] && { echo "Press Ctrl+C in the terminal where start-cloud.sh is running."; exit 0; }
 for c in node pnpm; do command -v $c >/dev/null || { echo "Missing: $c"; exit 1; }; done
 ENVF="$ROOT/apps/web/.env.local"
 if [ -f "$ENVF" ] && ! grep -q "$PROJECT_REF" "$ENVF"; then
@@ -37,16 +36,25 @@ RESEND_API_URL=http://127.0.0.1:54325
 EOT
 fi
 grep -q "yjuzjvlmyszutuqpwenn" "$ENVF" && { echo "REFUSING: .env.local mentions the other project."; exit 1; }
-stop; sleep 1
 [ -d "$ROOT/node_modules" ] || (cd "$ROOT" && pnpm install)
-(cd "$ROOT" && setsid nohup node tools/local-dev-stack/mail-sink.mjs > "$RUN/sink.log" 2>&1 < /dev/null &) > /dev/null 2>&1
-(cd "$ROOT/apps/web" && setsid nohup npx next dev -p 3000 > "$RUN/web.log" 2>&1 < /dev/null &) > /dev/null 2>&1
-for i in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:3000/login && break; sleep 1; done
-cat <<'EOT'
+# Portable on Windows Git Bash (no setsid/pkill needed): the mail sink runs in the background and is
+# stopped when you press Ctrl+C; the web app runs in THIS terminal. Keep this window open while you use the app.
+(command -v curl >/dev/null) || { echo "Missing: curl"; exit 1; }
+if curl -s -o /dev/null http://127.0.0.1:54325/messages; then echo "Mail sink already running on :54325"; SINK_PID=""
+else (cd "$ROOT" && nohup node tools/local-dev-stack/mail-sink.mjs > "$RUN/sink.log" 2>&1 < /dev/null & echo $! > "$RUN/sink.pid"); SINK_PID="$(cat "$RUN/sink.pid")"; fi
+cleanup() { [ -n "${SINK_PID:-}" ] && kill "$SINK_PID" 2>/dev/null || true; }
+trap cleanup EXIT INT TERM
+if curl -s -o /dev/null http://127.0.0.1:3000/login; then echo "Something is already serving http://localhost:3000 - close the other terminal first (Ctrl+C there)."; exit 1; fi
+# Print the banner once the app answers (in the background), then run the app in the foreground.
+( for i in $(seq 1 120); do
+    if curl -s -o /dev/null http://127.0.0.1:3000/login; then
+      cat <<'EOT'
 
-READY  ->  open  http://localhost:3000/login
-Accounts (password is in demo-credentials.txt): admin@9thround.local, manager@9thround.local,
-coach.one@9thround.local, member01@9thround.local ... member12@9thround.local
-Staff need a 6-digit code:  curl -s http://127.0.0.1:54325/last
-Stop: bash tools/cloud-demo/start-cloud.sh stop
+READY  ->  open  http://localhost:3000/login   (keep this window open; Ctrl+C stops everything)
+Accounts: admin@9thround.local, manager@9thround.local, coach.one@9thround.local,
+member01@9thround.local ... member12@9thround.local  (password: see demo-credentials.txt)
+Staff need a 6-digit code - in a SECOND terminal run:  curl -s http://127.0.0.1:54325/last
 EOT
+      break
+    fi; sleep 1; done ) &
+cd "$ROOT/apps/web" && npx next dev -p 3000
