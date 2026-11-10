@@ -36,7 +36,7 @@ RESEND_API_URL=http://127.0.0.1:54325
 EOT
 fi
 grep -q "yjuzjvlmyszutuqpwenn" "$ENVF" && { echo "REFUSING: .env.local mentions the other project."; exit 1; }
-[ -d "$ROOT/node_modules" ] || (cd "$ROOT" && pnpm install)
+(cd "$ROOT" && pnpm install)   # always: node_modules from an older checkout lacks newer workspace packages
 # Portable on Windows Git Bash (no setsid/pkill needed): the mail sink runs in the background and is
 # stopped when you press Ctrl+C; the web app runs in THIS terminal. Keep this window open while you use the app.
 (command -v curl >/dev/null) || { echo "Missing: curl"; exit 1; }

@@ -16,7 +16,7 @@ if [ "${1:-}" = "stop" ]; then stop; echo "stopped"; exit 0; fi
 for c in node pnpm psql; do command -v $c >/dev/null || { echo "Missing: $c — install it first (see header of this file)"; exit 1; }; done
 pg_isready >/dev/null 2>&1 || { echo "PostgreSQL is not running/reachable. Start it, then re-run."; exit 1; }
 stop; sleep 1
-[ -d "$ROOT/node_modules" ] || (cd "$ROOT" && pnpm install)
+(cd "$ROOT" && pnpm install)   # always: node_modules from an older checkout lacks newer workspace packages
 echo "== Building the demo database with sample competitions (synthetic data) =="; bash "$HERE/acceptance.sh" | grep -E "ACCEPTANCE:|FAIL" || { echo "Demo database build failed"; exit 1; }
 echo "== Starting mail sink + gateway =="
 (cd "$ROOT" && ${SETSID:-} nohup node tools/local-dev-stack/mail-sink.mjs > "$RUN/sink.log" 2>&1 < /dev/null & echo $! > "$RUN/sink.pid") > /dev/null 2>&1
