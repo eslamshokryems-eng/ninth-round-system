@@ -60,6 +60,11 @@ i=0
 for f in "$MIGRATIONS_DIR"/*.sql; do
   i=$((i+1))
   name="$(basename "$f")"
+  # STOP_BEFORE=<version prefix> builds a baseline database: every migration
+  # strictly before that version, used for before/after regression comparison.
+  if [ -n "${STOP_BEFORE:-}" ] && [[ "$name" > "$STOP_BEFORE" || "$name" == "$STOP_BEFORE"* ]]; then
+    echo "  --   stopping before $name (STOP_BEFORE=$STOP_BEFORE)"; break
+  fi
   log="$LOG_DIR/$(printf '%03d' "$i")_$name.log"
   # 20260809000001 promotes ONE existing profile to super_admin by exact id
   # and raises if that profile is absent. On a real project that account was
