@@ -37,6 +37,23 @@ const ACTIONS = [
   "create_performance_target",
   "update_performance_target",
   "delete_performance_target",
+  // Challenges: competition lifecycle, coaches, eligibility and result history
+  "set_challenge_status",
+  "designate_challenge_coach",
+  "add_challenge_eligibility_rule",
+  "remove_challenge_eligibility_rule",
+  "challenge_result_submitted",
+  "challenge_result_reviewed",
+  "challenge_result_status_changed",
+  "challenge_result_correction_requested",
+  "challenge_result_superseded",
+  // Device verification
+  "device_verification_requested",
+  "device_verification_succeeded",
+  "device_verification_failed",
+  "device_verification_locked",
+  "device_verification_rate_limited",
+  "device_trusted",
 ];
 
 const ENTITY_TYPES = [
@@ -51,6 +68,10 @@ const ENTITY_TYPES = [
   "lead",
   "lead_followup",
   "performance_target",
+  "challenge",
+  "challenge_participant",
+  "challenge_result",
+  "device",
 ];
 
 const ROLES = ["member", "coach", "reception", "sales_employee", "branch_manager", "super_admin"];

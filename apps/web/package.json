@@ -20,6 +20,7 @@
     "@9thround/sales": "workspace:*",
     "@9thround/hr": "workspace:*",
     "@9thround/audit": "workspace:*",
+    "@9thround/challenges": "workspace:*",
     "@9thround/training": "workspace:*",
     "@9thround/nutrition": "workspace:*",
     "@9thround/tracking": "workspace:*",

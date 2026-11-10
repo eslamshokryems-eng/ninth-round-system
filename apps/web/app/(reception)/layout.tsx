@@ -128,7 +128,14 @@ export default function ReceptionLayout({ children }: { children: ReactNode }) {
   // here, so there's no page to navigate to besides this one. Reuses
   // AttendanceTab as-is: it already shows only the self clock-in card to a
   // non-admin role, no separate "coach view" component to keep in sync.
-  if (role === "coach") {
+  // A coach account is Check-In only — with one exception. The Challenges
+  // module makes the participant's designated coach the ONLY account that
+  // may record their result (submit_challenge_result() refuses anyone
+  // else), so a coach who cannot reach /challenges cannot do the one job
+  // the database reserves for them. They are admitted to those routes and
+  // nothing else; every other Reception screen still resolves to the
+  // check-in shell, and the database refuses the rest regardless.
+  if (role === "coach" && !pathname?.startsWith("/challenges")) {
     return <CoachCheckInOnly />;
   }
 
@@ -225,6 +232,12 @@ function CoachCheckInOnly() {
             <p className="mt-1 text-sm text-muted">{fullName ?? "—"}</p>
           </div>
           <AttendanceTab />
+          <a
+            href="/challenges"
+            className="block rounded-lg border border-gold/40 px-4 py-3 text-center text-sm font-medium text-gold hover:bg-gold/10"
+          >
+            Competitions — record your athletes&rsquo; results
+          </a>
         </div>
       </main>
     </div>

@@ -223,6 +223,9 @@ importers:
       '@9thround/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@9thround/challenges':
+        specifier: workspace:*
+        version: link:../../packages/challenges
       '@9thround/database-types':
         specifier: workspace:*
         version: link:../../packages/database-types
