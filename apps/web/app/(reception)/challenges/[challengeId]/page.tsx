@@ -60,7 +60,6 @@ export default function ChallengeDetailPage() {
   const [results, setResults] = useState<ChallengeResultRow[]>([]);
   const [reviews, setReviews] = useState<ChallengeResultReviewRow[]>([]);
   const [leaderboard, setLeaderboard] = useState<ChallengeLeaderboardEntry[]>([]);
-  const [coaches, setCoaches] = useState<TrainerSummary[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -105,15 +104,50 @@ export default function ChallengeDetailPage() {
 
   // Coach options for designation come from the existing Reception trainers
   // read (coaches at a branch) — no second source of coach data.
+  //
+  // The database rule is per PARTICIPANT, not per competition: a participant
+  // with a branch may only be given a coach from that same branch, and a
+  // participant with no branch (joined a GLOBAL competition without choosing
+  // one) may be given any active coach — by a super admin only. So coaches are
+  // loaded per participant branch; a super admin also gets every branch's
+  // coaches for branch-less participants. (Loading only the viewer's / the
+  // competition's branch left a super admin on a GLOBAL competition with an
+  // empty "Select a coach" list.)
+  const [coachesByBranch, setCoachesByBranch] = useState<Record<string, TrainerSummary[]>>({});
   useEffect(() => {
     if (!mayDesignate) return;
-    const targetBranch = detail?.branchId ?? branchId;
-    if (!targetBranch) return;
+    const wanted = new Set<string>();
+    let needsEveryBranch = false;
+    for (const participant of participants) {
+      if (participant.branchId) wanted.add(participant.branchId);
+      else needsEveryBranch = true;
+    }
+    if (detail?.branchId) wanted.add(detail.branchId);
+    if (branchId && !needsEveryBranch) wanted.add(branchId);
     void (async () => {
-      const result = await getReceptionModule().listTrainers.execute(targetBranch);
-      if (result.isOk) setCoaches(result.value);
+      if (needsEveryBranch && role === "super_admin") {
+        const branchesResult = await getChallengesModule().listChallengeBranches.execute();
+        if (branchesResult.isOk) for (const branch of branchesResult.value) wanted.add(branch.id);
+      }
+      const entries = await Promise.all(
+        [...wanted].map(async (id) => {
+          const result = await getReceptionModule().listTrainers.execute(id);
+          return [id, result.isOk ? result.value : []] as const;
+        }),
+      );
+      setCoachesByBranch(Object.fromEntries(entries));
     })();
-  }, [mayDesignate, detail?.branchId, branchId]);
+  }, [mayDesignate, participants, detail?.branchId, branchId, role]);
+
+  function coachesFor(participantBranchId: string | null): TrainerSummary[] {
+    if (participantBranchId) return coachesByBranch[participantBranchId] ?? [];
+    // No branch: every active coach, de-duplicated, by name.
+    const seen = new Set<string>();
+    return Object.values(coachesByBranch)
+      .flat()
+      .filter((coach) => (seen.has(coach.trainerId) ? false : (seen.add(coach.trainerId), true)))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
 
   const pendingResults = useMemo(() => results.filter((r) => r.status === "pending"), [results]);
   const pendingCorrections = useMemo(() => results.filter((r) => r.status === "correction_pending"), [results]);
@@ -444,7 +478,7 @@ export default function ChallengeDetailPage() {
                       designatedToViewer={participant.designatedCoachId === profileId}
                       resultState={resultStateFor(participant.participantProfileId, results, reviews)}
                       participant={participant}
-                      coaches={coaches}
+                      coaches={coachesFor(participant.branchId)}
                       mayDesignate={mayDesignate}
                       busyKey={busyKey}
                       onDesignate={(coachId, reason) =>
