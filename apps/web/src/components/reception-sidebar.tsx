@@ -128,6 +128,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/memberships", label: "Memberships" },
   { href: "/expiring", label: "Expiring" },
   { href: "/trainers", label: "Trainers", icon: TrainersIcon },
+  { href: "/challenges", label: "Competitions" },
   { href: "/hr", label: "HR", icon: HrIcon },
   { href: "/reports", label: "Reports" },
   { href: "/profile", label: "Profile" },

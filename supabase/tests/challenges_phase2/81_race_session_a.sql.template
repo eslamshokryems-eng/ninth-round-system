@@ -1,0 +1,6 @@
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002'; -- branch_manager
+begin;
+select approve_challenge_result('__RESULT_ID__', 'Session A approved first.');
+select pg_sleep(3); -- hold the row lock open for 3s so session B is guaranteed to race against it
+commit;

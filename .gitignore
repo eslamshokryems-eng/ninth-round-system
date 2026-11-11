@@ -39,3 +39,8 @@ pnpm-debug.log*
 
 # Coverage
 coverage/
+
+# Local dev stack: generated logs, screenshots, videos (may contain local-only keys)
+tools/local-dev-stack/.apply-logs/
+tools/local-dev-stack/browser/screenshots/
+tools/local-dev-stack/browser/videos/

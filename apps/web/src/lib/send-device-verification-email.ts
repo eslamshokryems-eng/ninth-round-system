@@ -17,6 +17,19 @@ interface SendDeviceVerificationEmailInput {
   expiresInMinutes: number;
 }
 
+/**
+ * Resend's API base URL. `RESEND_API_URL` lets a developer machine point this
+ * at a local mail sink (tools/local-dev-stack/mail-sink.mjs), so the real send
+ * path can be exercised without an email provider. It is IGNORED in a
+ * production build: a stray value there must never redirect where an
+ * administrator's verification codes are sent.
+ */
+function resendBaseUrl(): string {
+  const override = process.env.RESEND_API_URL;
+  if (override && process.env.NODE_ENV !== "production") return override.replace(/\/+$/, "");
+  return "https://api.resend.com";
+}
+
 export async function sendDeviceVerificationEmail(
   input: SendDeviceVerificationEmailInput,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -35,7 +48,7 @@ export async function sendDeviceVerificationEmail(
     `If you weren't expecting this, ignore this email — the code will simply expire.`;
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch(`${resendBaseUrl()}/emails`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,

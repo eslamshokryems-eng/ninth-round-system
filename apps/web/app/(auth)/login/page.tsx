@@ -23,8 +23,18 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (status === "signedIn" && role && STAFF_ROLES.has(role)) {
+    if (status !== "signedIn" || !role) return;
+    if (STAFF_ROLES.has(role)) {
       router.replace("/dashboard");
+      return;
+    }
+    // A `member` account has no Reception screens, but it does have the
+    // athlete area: display name, competitions to join, and its own
+    // submission status. Everything there is the same RLS-filtered data
+    // the member could read anyway — the redirect is routing, not a
+    // privilege.
+    if (role === "member") {
+      router.replace("/my-challenges");
     }
   }, [status, role, router]);
 

@@ -1,0 +1,8 @@
+-- Concurrency round, session A. Claims __NAME_A__ and holds the transaction
+-- open so session B is guaranteed to race against the uncommitted insert.
+set role authenticated;
+set request.jwt.claim.sub = '__SUB_A__';
+begin;
+select set_challenge_display_name('__NAME_A__');
+select pg_sleep(3);
+commit;

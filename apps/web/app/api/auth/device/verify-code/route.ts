@@ -8,8 +8,10 @@ import {
   DEVICE_COOKIE_NAME,
   TRUSTED_DEVICE_TTL_MS,
   generateDeviceToken,
+  hashDeviceCode,
   hashSecret,
   hashesMatch,
+  hasDeviceCodePepper,
 } from "../../../../../src/lib/device-verification-crypto";
 
 /**
@@ -39,47 +41,76 @@ export async function POST(request: Request) {
     return errorResponse("INVALID_INPUT", "Enter the 6-digit code.", 400);
   }
 
+  // Fail closed: with no pepper no code can be checked, and no unkeyed fallback exists.
+  if (!hasDeviceCodePepper()) {
+    return errorResponse("SERVER_MISCONFIGURED", "Device verification is not configured on the server.", 500);
+  }
+
   const adminClient = createClient<Database>(env.supabaseUrl ?? "", serviceRoleKey);
 
-  const { data: pending, error: pendingError } = await adminClient
-    .from("device_verification_codes")
-    .select("id, code_hash, attempts, max_attempts, expires_at, consumed_at")
-    .eq("user_id", callerId)
-    .is("consumed_at", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (pendingError) {
-    return errorResponse("VERIFY_CODE_FAILED", pendingError.message, 500);
+  // Step 1 — ask the database for permission to evaluate ONE guess. The check
+  // (expiry, attempts left, cumulative failure lockout) and the increment that
+  // records the attempt are a single atomic step under a per-user lock, and the
+  // stored hash comes back ONLY when the attempt was granted. However many
+  // requests arrive at once, the number of comparisons that can ever happen is
+  // bounded by max_attempts.
+  const { data: beginData, error: beginError } = await adminClient.rpc("begin_device_code_attempt", {
+    p_user_id: callerId,
+  });
+  if (beginError) {
+    return errorResponse("VERIFY_CODE_FAILED", "Could not verify that code.", 500);
   }
-  if (!pending) {
+  const attempt = (Array.isArray(beginData) ? beginData[0] : beginData) as
+    | { status: string; code_id: string | null; code_hash: string | null; attempts_used: number | null; attempts_max: number | null }
+    | undefined;
+  if (!attempt) {
+    return errorResponse("VERIFY_CODE_FAILED", "Could not verify that code.", 500);
+  }
+
+  if (attempt.status === "not_found") {
     return errorResponse("CODE_NOT_FOUND", "No pending verification code. Request a new one.", 400);
   }
-  if (new Date(pending.expires_at).getTime() <= Date.now()) {
+  if (attempt.status === "expired") {
     return errorResponse("CODE_EXPIRED", "This code has expired. Request a new one.", 400);
   }
-  if (pending.attempts >= pending.max_attempts) {
+  if (attempt.status === "locked") {
+    await adminClient.rpc("log_audit_event_as", {
+      p_actor_id: callerId,
+      p_action: "device_verification_locked",
+      p_entity_type: "device",
+      p_entity_id: callerId,
+      p_new_value: { reason: "attempts_exhausted" },
+    });
     return errorResponse("TOO_MANY_ATTEMPTS", "Too many incorrect attempts. Request a new code.", 429);
   }
+  if (attempt.status !== "ok" || !attempt.code_id || !attempt.code_hash) {
+    return errorResponse("VERIFY_CODE_FAILED", "Could not verify that code.", 500);
+  }
 
-  const isMatch = hashesMatch(hashSecret(code), pending.code_hash);
+  // Step 2 — compare, in the server, with the keyed hash (constant time).
+  const isMatch = hashesMatch(hashDeviceCode(callerId, attempt.code_id, code), attempt.code_hash);
+
+  // Step 3 — record the outcome. A correct code is consumed with a WHERE
+  // clause on "still unconsumed and unexpired", so of any number of
+  // simultaneous correct submissions exactly one gets through.
+  const { data: outcome, error: outcomeError } = await adminClient.rpc("complete_device_code_attempt", {
+    p_user_id: callerId,
+    p_code_id: attempt.code_id,
+    p_matched: isMatch,
+  });
+  if (outcomeError) {
+    return errorResponse("VERIFY_CODE_FAILED", "Could not verify that code.", 500);
+  }
 
   if (!isMatch) {
-    const nextAttempts = pending.attempts + 1;
-    const lockedOut = nextAttempts >= pending.max_attempts;
-    await adminClient
-      .from("device_verification_codes")
-      .update({ attempts: nextAttempts, ...(lockedOut ? { consumed_at: new Date().toISOString() } : {}) })
-      .eq("id", pending.id);
-
+    const lockedOut = outcome === "locked";
     await adminClient.rpc("log_audit_event_as", {
       p_actor_id: callerId,
       p_action: "device_verification_failed",
       p_entity_type: "device",
       p_entity_id: callerId,
-      p_new_value: { attempts: nextAttempts, locked_out: lockedOut },
+      p_new_value: { attempts: attempt.attempts_used, locked_out: lockedOut },
     });
-
     return errorResponse(
       lockedOut ? "TOO_MANY_ATTEMPTS" : "INVALID_CODE",
       lockedOut ? "Too many incorrect attempts. Request a new code." : "Incorrect code.",
@@ -87,10 +118,11 @@ export async function POST(request: Request) {
     );
   }
 
-  await adminClient
-    .from("device_verification_codes")
-    .update({ consumed_at: new Date().toISOString() })
-    .eq("id", pending.id);
+  if (outcome !== "verified") {
+    // The code was correct but had already been used, superseded or expired by
+    // the time it was recorded: a replay. Nothing is trusted.
+    return errorResponse("CODE_NOT_FOUND", "No pending verification code. Request a new one.", 400);
+  }
 
   await adminClient.rpc("log_audit_event_as", {
     p_actor_id: callerId,

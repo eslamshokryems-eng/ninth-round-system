@@ -1,0 +1,12 @@
+-- Concurrency round, session B. Claims __NAME_B__, which normalizes to the
+-- same value as session A's. B's `exists` pre-check cannot see A's
+-- uncommitted row, so B proceeds to the insert, blocks on
+-- uq_challenge_display_names_normalized, and must then receive the GENERIC
+-- validation error — never a raw unique-violation.
+set role authenticated;
+set request.jwt.claim.sub = '__SUB_B__';
+select clock_timestamp() as b_started;
+begin;
+select set_challenge_display_name('__NAME_B__');
+commit;
+select clock_timestamp() as b_finished;

@@ -1,0 +1,7 @@
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002'; -- branch_manager, same reviewer as session A for this test
+select clock_timestamp() as b_started;
+begin;
+select approve_challenge_result('__RESULT_ID__', 'Session B approved second — must fail if the FOR UPDATE lock (M-3) is working.');
+select clock_timestamp() as b_unblocked;
+commit;
