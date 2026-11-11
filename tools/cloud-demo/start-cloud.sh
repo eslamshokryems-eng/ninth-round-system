@@ -20,6 +20,7 @@ if [ -f "$ENVF" ] && ! grep -q "$PROJECT_REF" "$ENVF"; then
 fi
 if ! grep -q "$PROJECT_REF" "$ENVF" 2>/dev/null; then
   printf "Paste the service_role key (hidden), then Enter: "; read -rs SVC; echo
+  SVC="$(printf %s "$SVC" | tr -d '\r\n\t ')"   # pasted text on Windows can carry a hidden CR/space that breaks every request
   if [ ${#SVC} -le 100 ] && [[ "$SVC" != sb_secret_* ]]; then echo "That does not look like a service_role / secret key. Nothing written."; exit 1; fi
   PEPPER="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
   umask 077
@@ -35,6 +36,7 @@ RESEND_FROM_EMAIL=9th Round Local <noreply@9thround.local>
 RESEND_API_URL=http://127.0.0.1:54325
 EOT
 fi
+sed -i 's/\r$//' "$ENVF" 2>/dev/null || true
 grep -q "yjuzjvlmyszutuqpwenn" "$ENVF" && { echo "REFUSING: .env.local mentions the other project."; exit 1; }
 (cd "$ROOT" && pnpm install)   # always: node_modules from an older checkout lacks newer workspace packages
 # Portable on Windows Git Bash (no setsid/pkill needed): the mail sink runs in the background and is
