@@ -535,6 +535,79 @@ export interface Database {
         Args: { p_payment_id: string; p_reason: string };
         Returns: undefined;
       };
+      get_my_worklist: {
+        Args: { p_owner?: string | null; p_limit?: number; p_offset?: number };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_worklist_summary: {
+        Args: { p_owner?: string | null };
+        Returns: Array<Record<string, unknown>>;
+      };
+      log_lead_interaction: {
+        Args: { p_lead_id: string; p_kind: string; p_outcome: string; p_note: string | null; p_next_kind?: string | null; p_next_at?: string | null; p_lost_reason?: string | null; p_interest_level?: string | null };
+        Returns: string;
+      };
+      set_lead_next_action: {
+        Args: { p_lead_id: string; p_kind: string; p_at: string; p_note?: string | null };
+        Returns: string;
+      };
+      add_lead_note: {
+        Args: { p_lead_id: string; p_note: string };
+        Returns: string;
+      };
+      set_lead_interest: {
+        Args: { p_lead_id: string; p_level: string };
+        Returns: undefined;
+      };
+      assign_leads: {
+        Args: { p_lead_ids: string[]; p_new_owner: string; p_reason: string };
+        Returns: number;
+      };
+      mark_lead_lost: {
+        Args: { p_lead_id: string; p_reason: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      reopen_lead: {
+        Args: { p_lead_id: string; p_next_kind: string; p_next_at: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      convert_lead: {
+        Args: {
+          p_lead_id: string; p_membership_type_id: string; p_receipt_number: string; p_price: number; p_discount: number; p_start_date: string;
+          p_payment_method: string; p_notes?: string | null; p_national_id?: string | null; p_date_of_birth?: string | null; p_address?: string | null;
+          p_emergency_contact_name?: string | null; p_emergency_contact_phone?: string | null; p_photo_url?: string | null; p_coach_id?: string | null;
+          p_session_count?: number | null; p_program_type?: string | null;
+        };
+        Returns: Array<{ member_id: string; membership_id: string | null; membership_number: string | null; member_qr_code: string | null; already_converted: boolean }>;
+      };
+      get_lead_conversion: {
+        Args: { p_lead_id: string };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_lead_activities: {
+        Args: { p_lead_id: string };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_lead_assignments: {
+        Args: { p_lead_id: string };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_lead_workspace_state: {
+        Args: { p_lead_id: string };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_sales_team_summary: {
+        Args: { p_branch_id?: string | null; p_start?: string | null; p_end?: string | null };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_sales_team_overview: {
+        Args: { p_branch_id?: string | null; p_start?: string | null; p_end?: string | null };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_attention_leads: {
+        Args: { p_kind: string; p_branch_id?: string | null; p_owner?: string | null; p_limit?: number; p_offset?: number };
+        Returns: Array<Record<string, unknown>>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

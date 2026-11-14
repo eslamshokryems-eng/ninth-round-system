@@ -3,23 +3,23 @@ import { AssignLeadUseCase } from "./assign-lead";
 import { fakeLeadRepository } from "./test-helpers";
 
 describe("AssignLeadUseCase", () => {
-  it("assigns a lead to a salesperson", async () => {
+  it("assigns a lead to a salesperson with the reason (audited)", async () => {
     const leads = fakeLeadRepository();
-    const useCase = new AssignLeadUseCase(leads);
-
-    const result = await useCase.execute({ leadId: "lead-1", assignedToId: "profile-2" });
-
+    const result = await new AssignLeadUseCase(leads).execute({ leadId: "lead-1", assignedToId: "profile-2", reason: " new owner " });
     expect(result.isOk).toBe(true);
-    expect(leads.lastAssign).toEqual({ leadId: "lead-1", assignedToId: "profile-2" });
+    expect(leads.lastAssign).toEqual({ leadId: "lead-1", assignedToId: "profile-2", reason: "new owner" });
   });
 
-  it("also covers unassigning (null) — puts the lead back in the shared pickup queue", async () => {
+  it("refuses without a reason — every reassignment must say why", async () => {
     const leads = fakeLeadRepository();
-    const useCase = new AssignLeadUseCase(leads);
+    const result = await new AssignLeadUseCase(leads).execute({ leadId: "lead-1", assignedToId: "profile-2", reason: "  " });
+    expect(result.isErr && result.error.code).toBe("ASSIGN_REASON_REQUIRED");
+    expect(leads.lastAssign).toBeNull();
+  });
 
-    const result = await useCase.execute({ leadId: "lead-1", assignedToId: null });
-
-    expect(result.isOk).toBe(true);
-    expect(leads.lastAssign).toEqual({ leadId: "lead-1", assignedToId: null });
+  it("refuses without an owner (leads are not unassigned back to the pool)", async () => {
+    const leads = fakeLeadRepository();
+    const result = await new AssignLeadUseCase(leads).execute({ leadId: "lead-1", assignedToId: "", reason: "x" });
+    expect(result.isErr && result.error.code).toBe("ASSIGNEE_REQUIRED");
   });
 });

@@ -18,4 +18,6 @@ export interface CreateFollowupInput {
   branchId: string;
   dueAt: string;
   note: string | null;
+  /** What the next action is; defaults to a call. */
+  kind?: "call" | "whatsapp" | "visit" | "other";
 }

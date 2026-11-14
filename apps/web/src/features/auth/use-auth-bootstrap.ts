@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { resolveSessionProfile } from "@9thround/identity";
 import { getIdentityModule, getSupabaseClient } from "../../lib/composition-root";
 import { useAuthStore } from "./store";
 
@@ -14,6 +15,7 @@ export function useAuthBootstrap(): void {
 
   useEffect(() => {
     let isMounted = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const client = getSupabaseClient();
 
     async function syncFromSession(userId: string | undefined) {
@@ -22,19 +24,29 @@ export function useAuthBootstrap(): void {
         return;
       }
 
-      const result = await getIdentityModule().getCurrentProfile.execute({ profileId: userId });
+      // A failure to LOAD the profile (slow mobile data, a 5xx, a database timeout) is not a reason to sign the employee out:
+      // the session itself is valid. Retry; only a profile that definitively does not exist ends the session.
+      const outcome = await resolveSessionProfile(
+        () => getIdentityModule().getCurrentProfile.execute({ profileId: userId }),
+        { isCancelled: () => !isMounted },
+      );
       if (!isMounted) return;
 
-      if (result.isErr) {
+      if (outcome.kind === "signed-out") {
         setSignedOut();
+        return;
+      }
+      if (outcome.kind === "unavailable") {
+        // Keep whatever state we have (signed in stays signed in) and try again shortly; the page is never replaced by the login screen.
+        retryTimer = setTimeout(() => void syncFromSession(userId), 10_000);
         return;
       }
 
       setSignedIn({
-        profileId: result.value.profileId,
-        fullName: result.value.fullName,
-        role: result.value.role,
-        branchId: result.value.branchId,
+        profileId: outcome.profile.profileId,
+        fullName: outcome.profile.fullName,
+        role: outcome.profile.role,
+        branchId: outcome.profile.branchId,
       });
     }
 
@@ -46,6 +58,7 @@ export function useAuthBootstrap(): void {
 
     return () => {
       isMounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
       subscription.subscription.unsubscribe();
     };
   }, [setSignedIn, setSignedOut]);

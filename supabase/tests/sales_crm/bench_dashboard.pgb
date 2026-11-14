@@ -1,0 +1,12 @@
+begin;
+select set_config('request.jwt.claims','{"role":"authenticated","sub":"00000000-0000-0000-0000-0000000000a4"}',true);
+set local role authenticated;
+select count(*) from public.leads;
+select count(*) from public.leads where created_at >= date_trunc('day', now());
+select count(*) from public.lead_followups where status='pending' and due_at >= date_trunc('day', now()) and due_at < date_trunc('day', now()) + interval '1 day';
+select count(*) from public.lead_followups where status='pending' and due_at < date_trunc('day', now());
+select count(*) from public.leads where status='converted' and converted_at >= date_trunc('month', now());
+select count(*) from public.leads where status='lost' and lost_at >= date_trunc('month', now());
+select id, full_name, phone, status, source, assigned_to, created_at from public.leads order by created_at desc limit 300;
+select f.id, f.lead_id, f.due_at from public.lead_followups f where f.status='pending' and f.due_at < now() order by f.due_at limit 100;
+commit;

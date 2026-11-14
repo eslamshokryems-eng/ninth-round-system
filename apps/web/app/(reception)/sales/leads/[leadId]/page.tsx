@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type {
+  LeadConversion,
   LeadDetail,
-  LeadFollowup,
   LeadGender,
   LeadLostReason,
   LeadSource,
   LeadTimelineEntry,
+  ProgramType,
 } from "@9thround/sales";
 import type { MembershipType, PaymentMethod } from "@9thround/reception";
 import type { StaffCandidate } from "@9thround/identity";
@@ -23,6 +24,8 @@ import { OptionCard } from "../../../../../src/components/ui/option-card";
 import { SelectField } from "../../../../../src/components/ui/select-field";
 import { QrCodeImage } from "../../../../../src/components/ui/qr-code";
 import { StaffPicker } from "../../../../../src/components/staff-picker";
+import { LeadWorkspacePanel } from "../../../../../src/components/sales/lead-workspace-panel";
+import { toLocalInput } from "../../../../../src/components/sales/interaction-form";
 import { SALES_ROLES } from "../../../../../src/lib/staff-roles";
 
 const GENDERS: { value: LeadGender; label: string }[] = [
@@ -66,6 +69,20 @@ const ACTION_LABEL: Record<string, string> = {
 
 const CAN_ASSIGN_OTHERS = new Set(["branch_manager", "super_admin"]);
 
+const PROGRAMS: { value: ProgramType; label: string }[] = [
+  { value: "ninth_round", label: "9th Round" },
+  { value: "boxing", label: "Boxing" },
+  { value: "kickboxing", label: "Kickboxing" },
+  { value: "mma", label: "MMA" },
+];
+
+const NEXT_KINDS: { value: "call" | "whatsapp" | "visit" | "other"; label: string }[] = [
+  { value: "call", label: "Call" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "visit", label: "Gym visit" },
+  { value: "other", label: "Other" },
+];
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -94,15 +111,10 @@ export default function LeadDetailPage() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const [assignee, setAssignee] = useState<StaffCandidate | null>(null);
+  const [assignReason, setAssignReason] = useState("");
   const [assignError, setAssignError] = useState<string | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
 
-  const [followups, setFollowups] = useState<LeadFollowup[]>([]);
-  const [isLoadingFollowups, setIsLoadingFollowups] = useState(true);
-  const [newDueAt, setNewDueAt] = useState("");
-  const [newNote, setNewNote] = useState("");
-  const [followupError, setFollowupError] = useState<string | null>(null);
-  const [isCreatingFollowup, setIsCreatingFollowup] = useState(false);
 
   const [timeline, setTimeline] = useState<LeadTimelineEntry[]>([]);
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(true);
@@ -113,6 +125,12 @@ export default function LeadDetailPage() {
   const [lostError, setLostError] = useState<string | null>(null);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isReopenOpen, setIsReopenOpen] = useState(false);
+  const [reopenKind, setReopenKind] = useState<"call" | "whatsapp" | "visit" | "other">("call");
+  const [reopenAt, setReopenAt] = useState(() => toLocalInput(new Date(Date.now() + 86_400_000)));
+  const [reopenNote, setReopenNote] = useState("");
+  const [reopenError, setReopenError] = useState<string | null>(null);
+  const [conversion, setConversion] = useState<LeadConversion | null>(null);
 
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [convertTypeId, setConvertTypeId] = useState<string | null>(null);
@@ -123,9 +141,11 @@ export default function LeadDetailPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [nationalId, setNationalId] = useState("");
+  const [programType, setProgramType] = useState<ProgramType | null>(null);
+  const [convertNotes, setConvertNotes] = useState("");
   const [convertError, setConvertError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
-  const [convertSuccess, setConvertSuccess] = useState<{ membershipNumber: string; qrCode: string } | null>(null);
+  const [convertSuccess, setConvertSuccess] = useState<{ membershipNumber: string | null; qrCode: string | null; alreadyConverted: boolean } | null>(null);
 
   const loadDetail = useCallback(async () => {
     setIsLoading(true);
@@ -145,6 +165,10 @@ export default function LeadDetailPage() {
     setSource(value.source);
     setInterestedTypeId(value.interestedMembershipTypeId);
     setInterestNotes(value.interestNotes ?? "");
+    if (value.status === "converted") {
+      const c = await getSalesModule().getLeadConversion.execute(leadId);
+      setConversion(c.isOk ? c.value : null);
+    }
   }, [leadId]);
 
   useEffect(() => {
@@ -197,73 +221,24 @@ export default function LeadDetailPage() {
   async function handleAssign() {
     if (!assignee) return;
     setAssignError(null);
+    if (!assignReason.trim()) { setAssignError("Enter a reason for the assignment."); return; }
     setIsAssigning(true);
 
-    const result = await getSalesModule().assignLead.execute({ leadId, assignedToId: assignee.profileId });
+    // Release B: the assignment goes through assign_leads() — role, branch, active-employee and reason are enforced in the database,
+    // and the change is written to the append-only ownership history.
+    const result = await getSalesModule().assignLeads.execute({ leadIds: [leadId], newOwnerId: assignee.profileId, reason: assignReason });
 
     setIsAssigning(false);
 
     if (result.isErr) {
-      setAssignError(translateErrorCode(result.error.code));
+      setAssignError(result.error.message);
       return;
     }
     setAssignee(null);
+    setAssignReason("");
     void loadDetail();
   }
 
-  async function handleCreateFollowup() {
-    if (!newDueAt || !detail) return;
-    setFollowupError(null);
-    setIsCreatingFollowup(true);
-
-    const result = await getSalesModule().createFollowup.execute({
-      leadId,
-      branchId: detail.branchId,
-      dueAt: new Date(newDueAt).toISOString(),
-      note: newNote.trim() || null,
-    });
-
-    setIsCreatingFollowup(false);
-
-    if (result.isErr) {
-      setFollowupError(translateErrorCode(result.error.code));
-      return;
-    }
-    setNewDueAt("");
-    setNewNote("");
-    void reloadFollowupsList();
-  }
-
-  const reloadFollowupsList = useCallback(async () => {
-    // Reuses the same pglite-verified RLS scoping every other list already
-    // relies on — filtered to this one lead client-side rather than adding
-    // a dedicated per-lead follow-up RPC for what's a handful of rows.
-    setIsLoadingFollowups(true);
-    const [today, overdue] = await Promise.all([
-      getSalesModule().listTodaysFollowups.execute(),
-      getSalesModule().listOverdueFollowups.execute(),
-    ]);
-    setIsLoadingFollowups(false);
-    const merged = [...(today.isOk ? today.value : []), ...(overdue.isOk ? overdue.value : [])].filter(
-      (f) => f.leadId === leadId,
-    );
-    setFollowups(merged);
-  }, [leadId]);
-
-  useEffect(() => {
-    void reloadFollowupsList();
-  }, [reloadFollowupsList]);
-
-  async function handleCompleteFollowup(followupId: string) {
-    await getSalesModule().completeFollowup.execute({ followupId, note: null });
-    void reloadFollowupsList();
-    void loadTimeline();
-  }
-
-  async function handleCancelFollowup(followupId: string) {
-    await getSalesModule().cancelFollowup.execute(followupId);
-    void reloadFollowupsList();
-  }
 
   async function handleMarkLost() {
     if (!lostReason) return;
@@ -275,7 +250,7 @@ export default function LeadDetailPage() {
     setIsMarkingLost(false);
 
     if (result.isErr) {
-      setLostError(translateErrorCode(result.error.code));
+      setLostError(result.error.message || translateErrorCode(result.error.code));
       return;
     }
     setIsLostFormOpen(false);
@@ -284,15 +259,22 @@ export default function LeadDetailPage() {
   }
 
   async function handleRestore() {
+    setReopenError(null);
     setIsRestoring(true);
-    await getSalesModule().restoreLead.execute(leadId);
+    const result = await getSalesModule().restoreLead.execute({ leadId, nextKind: reopenKind, nextAt: new Date(reopenAt), note: reopenNote.trim() || null });
     setIsRestoring(false);
+    if (result.isErr) {
+      setReopenError(result.error.message || translateErrorCode(result.error.code));
+      return;
+    }
+    setIsReopenOpen(false);
+    setReopenNote("");
     void loadDetail();
     void loadTimeline();
   }
 
   async function handleConvert() {
-    if (!convertTypeId || !paymentMethod) return;
+    if (!convertTypeId || !paymentMethod || isConverting) return;
     setConvertError(null);
     setIsConverting(true);
 
@@ -304,7 +286,7 @@ export default function LeadDetailPage() {
       discount: Number(discountText) || 0,
       startDate,
       paymentMethod,
-      notes: null,
+      notes: convertNotes.trim() || null,
       nationalId: nationalId.trim() || null,
       dateOfBirth: dateOfBirth.trim() || null,
       address: null,
@@ -313,16 +295,18 @@ export default function LeadDetailPage() {
       photoUrl: null,
       coachId: null,
       sessionCount: null,
+      programType,
     });
 
     setIsConverting(false);
 
     if (result.isErr) {
-      setConvertError(translateErrorCode(result.error.code));
+      // the database explains what to fix (receipt already used, phone already a member, lead not assigned, …)
+      setConvertError(result.error.message || translateErrorCode(result.error.code));
       return;
     }
 
-    setConvertSuccess({ membershipNumber: result.value.membershipNumber, qrCode: result.value.memberQrCode });
+    setConvertSuccess({ membershipNumber: result.value.membershipNumber, qrCode: result.value.memberQrCode, alreadyConverted: result.value.alreadyConverted });
     setIsConvertOpen(false);
     void loadDetail();
     void loadTimeline();
@@ -359,8 +343,16 @@ export default function LeadDetailPage() {
       </div>
 
       {isConverted ? (
-        <Card className="border-green-500/40">
+        <Card className="border-green-500/40" data-testid="conversion-details">
           <p className="text-sm font-semibold text-green-400">This lead has been converted to a member.</p>
+          {conversion ? (
+            <dl className="mt-2 grid gap-1 text-xs text-muted sm:grid-cols-2">
+              <div>Membership: <span className="text-ink">{conversion.membershipNumber ?? "—"}</span></div>
+              <div>Converted: <span className="text-ink">{conversion.convertedAt.toLocaleString()}</span></div>
+              <div>Sold by (credited): <span className="text-ink" data-testid="sold-by">{conversion.leadOwnerName ?? "—"}</span></div>
+              <div>Registered by: <span className="text-ink">{conversion.convertedByName ?? "—"}</span></div>
+            </dl>
+          ) : null}
           {detail.convertedMemberId ? (
             <Link href={`/members/${detail.convertedMemberId}`} className="mt-1 inline-block text-xs text-gold hover:text-gold-soft">
               View member profile →
@@ -369,10 +361,12 @@ export default function LeadDetailPage() {
         </Card>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => setIsConvertOpen((open) => !open)}>{isConvertOpen ? "Cancel Conversion" : "Convert to Member"}</Button>
+          {isLost ? null : (
+            <Button onClick={() => setIsConvertOpen((open) => !open)}>{isConvertOpen ? "Cancel Conversion" : "Convert to Member"}</Button>
+          )}
           {isLost ? (
-            <Button variant="secondary" onClick={() => void handleRestore()} isLoading={isRestoring}>
-              Restore to Follow-up
+            <Button variant="secondary" onClick={() => setIsReopenOpen((open) => !open)}>
+              {isReopenOpen ? "Cancel" : "Reopen lead"}
             </Button>
           ) : (
             <Button variant="danger" onClick={() => setIsLostFormOpen((open) => !open)}>
@@ -383,9 +377,31 @@ export default function LeadDetailPage() {
       )}
 
       {convertSuccess ? (
-        <Card className="flex flex-col items-center gap-2 border-gold/40 text-center">
-          <p className="text-sm font-semibold text-gold">Converted — membership {convertSuccess.membershipNumber} created.</p>
-          <QrCodeImage value={convertSuccess.qrCode} />
+        <Card className="flex flex-col items-center gap-2 border-gold/40 text-center" data-testid="convert-success">
+          <p className="text-sm font-semibold text-gold">
+            {convertSuccess.alreadyConverted
+              ? `This lead was already converted${convertSuccess.membershipNumber ? ` (membership ${convertSuccess.membershipNumber})` : ""}. Nothing new was created.`
+              : `Converted — membership ${convertSuccess.membershipNumber ?? ""} created.`}
+          </p>
+          {convertSuccess.qrCode ? <QrCodeImage value={convertSuccess.qrCode} /> : null}
+        </Card>
+      ) : null}
+
+      {isLost && isReopenOpen ? (
+        <Card className="space-y-3" data-testid="reopen-form">
+          <h2 className="text-sm font-semibold text-ink">Reopen lead</h2>
+          <p className="text-xs text-muted">A reopened lead needs its next action — choose what and when.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SelectField label="Next action" value={reopenKind} onChange={(e) => setReopenKind(e.target.value as typeof reopenKind)}>
+              {NEXT_KINDS.map((k) => (
+                <option key={k.value} value={k.value}>{k.label}</option>
+              ))}
+            </SelectField>
+            <TextField label="When" type="datetime-local" value={reopenAt} onChange={(e) => setReopenAt(e.target.value)} />
+          </div>
+          <TextAreaField label="Note (optional)" value={reopenNote} onChange={(e) => setReopenNote(e.target.value)} />
+          {reopenError ? <p className="text-sm text-red-400" role="alert">{reopenError}</p> : null}
+          <Button onClick={() => void handleRestore()} isLoading={isRestoring} disabled={!reopenAt}>Reopen and schedule</Button>
         </Card>
       ) : null}
 
@@ -410,6 +426,16 @@ export default function LeadDetailPage() {
       {isConvertOpen ? (
         <Card className="space-y-4">
           <h2 className="text-sm font-semibold text-ink">Convert to Member</h2>
+          {detail.assignedToId ? (
+            <p className="text-xs text-muted" data-testid="convert-credit">
+              Sold by (credited): <span className="text-ink">{detail.assignedToName ?? "the lead owner"}</span> — the lead owner. You are recorded as the
+              employee who registered the membership and received the payment.
+            </p>
+          ) : (
+            <p className="text-sm text-amber-300" role="alert">
+              This lead has no owner. A manager must assign it to the sales employee who will be credited before it can be converted.
+            </p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             {membershipTypes.map((type) => (
               <OptionCard
@@ -425,22 +451,31 @@ export default function LeadDetailPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="Receipt Number" value={receiptNumber} onChange={(e) => setReceiptNumber(e.target.value)} />
-            <TextField label="Start Date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             <TextField label="Price" type="number" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
             <TextField label="Discount" type="number" value={discountText} onChange={(e) => setDiscountText(e.target.value)} />
-            <TextField label="Date of Birth" placeholder="YYYY-MM-DD" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
+            <TextField label="Date of Birth" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
             <TextField label="National ID" value={nationalId} onChange={(e) => setNationalId(e.target.value)} />
           </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted">Program (optional)</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PROGRAMS.map((option) => (
+                <OptionCard key={option.value} label={option.label} isSelected={programType === option.value} onClick={() => setProgramType(programType === option.value ? null : option.value)} />
+              ))}
+            </div>
+          </div>
+          <TextAreaField label="Notes (optional)" value={convertNotes} onChange={(e) => setConvertNotes(e.target.value)} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {PAYMENT_METHODS.map((option) => (
               <OptionCard key={option.value} label={option.label} isSelected={paymentMethod === option.value} onClick={() => setPaymentMethod(option.value)} />
             ))}
           </div>
-          {convertError ? <p className="text-sm text-red-400">{convertError}</p> : null}
+          {convertError ? <p className="text-sm text-red-400" role="alert">{convertError}</p> : null}
           <Button
             onClick={() => void handleConvert()}
             isLoading={isConverting}
-            disabled={!convertTypeId || !paymentMethod || !receiptNumber.trim()}
+            disabled={isConverting || !detail.assignedToId || !convertTypeId || !paymentMethod || !receiptNumber.trim() || !startDate}
           >
             Confirm Conversion
           </Button>
@@ -492,6 +527,8 @@ export default function LeadDetailPage() {
         </Button>
       </Card>
 
+      <LeadWorkspacePanel leadId={leadId} leadName={detail.fullName} isClosed={isConverted || isLost} onChanged={() => void loadDetail()} />
+
       <Card className="space-y-3">
         <h2 className="text-sm font-semibold text-ink">Assignment</h2>
         <p className="text-sm text-muted">Currently assigned to: {detail.assignedToName ?? "Unassigned"}</p>
@@ -505,44 +542,10 @@ export default function LeadDetailPage() {
             </Button>
           </div>
         ) : null}
+        {CAN_ASSIGN_OTHERS.has(role) ? (
+          <TextAreaField label="Reason for assigning / reassigning" value={assignReason} onChange={(e) => setAssignReason(e.target.value)} />
+        ) : null}
         {assignError ? <p className="text-sm text-red-400">{assignError}</p> : null}
-      </Card>
-
-      <Card className="space-y-4">
-        <h2 className="text-sm font-semibold text-ink">Follow-ups</h2>
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <TextField label="Due" type="datetime-local" value={newDueAt} onChange={(e) => setNewDueAt(e.target.value)} />
-          <TextField label="Note (optional)" value={newNote} onChange={(e) => setNewNote(e.target.value)} />
-          <Button className="self-end" onClick={() => void handleCreateFollowup()} isLoading={isCreatingFollowup} disabled={!newDueAt}>
-            Schedule
-          </Button>
-        </div>
-        {followupError ? <p className="text-sm text-red-400">{followupError}</p> : null}
-
-        {isLoadingFollowups ? (
-          <p className="text-sm text-muted">Loading…</p>
-        ) : followups.length === 0 ? (
-          <p className="text-sm text-muted">No pending follow-ups for today or overdue.</p>
-        ) : (
-          <ul className="space-y-2">
-            {followups.map((followup) => (
-              <li key={followup.followupId} className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-                <div>
-                  <p className="text-sm text-ink">{followup.dueAt.toLocaleString()}</p>
-                  {followup.note ? <p className="text-xs text-muted">{followup.note}</p> : null}
-                </div>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => void handleCompleteFollowup(followup.followupId)} className="text-xs font-medium text-gold hover:text-gold-soft">
-                    Complete
-                  </button>
-                  <button type="button" onClick={() => void handleCancelFollowup(followup.followupId)} className="text-xs font-medium text-red-400 hover:text-red-300">
-                    Cancel
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
       </Card>
 
       <Card>

@@ -7,6 +7,8 @@ import type {
   LeadLostReason,
   LeadSummary,
   UpdateLeadInput,
+  ReopenLeadInput,
+  LeadConversion,
 } from "./lead";
 
 export interface LeadRepository {
@@ -17,9 +19,11 @@ export interface LeadRepository {
   getDetail(leadId: string): Promise<Result<LeadDetail>>;
   create(input: CreateLeadInput): Promise<Result<{ leadId: string }>>;
   update(input: UpdateLeadInput): Promise<Result<void>>;
-  assign(leadId: string, assignedToId: string | null): Promise<Result<void>>;
+  /** Through assign_leads(): audited, reason required, manager / Super Admin only. */
+  assign(leadId: string, assignedToId: string, reason: string): Promise<Result<void>>;
   markLost(leadId: string, reason: LeadLostReason, note: string | null): Promise<Result<void>>;
-  restore(leadId: string): Promise<Result<void>>;
+  restore(input: ReopenLeadInput): Promise<Result<void>>;
+  getConversion(leadId: string): Promise<Result<LeadConversion | null>>;
   convert(input: ConvertLeadInput): Promise<Result<ConvertLeadOutput>>;
   /** Same-branch leads sharing this phone number — a non-blocking duplicate warning, never a hard reject. */
   findDuplicatesByPhone(branchId: string, phone: string): Promise<Result<LeadSummary[]>>;

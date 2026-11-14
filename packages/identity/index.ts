@@ -2,6 +2,8 @@ import type { TypedSupabaseClient } from "@9thround/supabase-client";
 import { CompleteOnboardingUseCase } from "./application/complete-onboarding";
 import { AssignStaffRoleUseCase } from "./application/assign-staff-role";
 import { GetCurrentProfileUseCase } from "./application/get-current-profile";
+export { resolveSessionProfile } from "./application/resolve-session-profile";
+export type { SessionProfileOutcome } from "./application/resolve-session-profile";
 import { SignUpUseCase } from "./application/sign-up";
 import { SignInUseCase } from "./application/sign-in";
 import { RequestPasswordResetUseCase } from "./application/request-password-reset";

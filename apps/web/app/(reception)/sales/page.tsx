@@ -13,6 +13,7 @@ import { PageHeader } from "../../../src/components/ui/page-header";
 import { EmptyState } from "../../../src/components/ui/empty-state";
 import { SkeletonCardRow } from "../../../src/components/ui/loading-skeleton";
 import { SALES_ROLES } from "../../../src/lib/staff-roles";
+import { SalesWorkspace } from "./workspace";
 
 /** Sales Dashboard (Phase 6) — real counts from `leads`/`lead_followups`, RLS-scoped: a sales_employee sees only their own numbers, branch_manager/super_admin see the whole branch. */
 export default function SalesDashboardPage() {
@@ -22,6 +23,7 @@ export default function SalesDashboardPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (role === "sales_employee") return; // the employee workspace loads its own data
     setIsLoading(true);
     setErrorMessage(null);
     const result = await getSalesModule().getSalesDashboardStats.execute();
@@ -31,7 +33,7 @@ export default function SalesDashboardPage() {
       return;
     }
     setStats(result.value);
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     void load();
@@ -47,6 +49,9 @@ export default function SalesDashboardPage() {
     );
   }
 
+  // A sales employee's first screen is their own workspace ("what should I do now?"); managers keep the branch dashboard.
+  if (role === "sales_employee") return <SalesWorkspace />;
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
@@ -60,6 +65,11 @@ export default function SalesDashboardPage() {
             <Link href="/sales/leads">
               <Button variant="secondary">View Leads</Button>
             </Link>
+            {role === "branch_manager" || role === "super_admin" ? (
+              <Link href="/sales/team">
+                <Button variant="secondary">Team dashboard</Button>
+              </Link>
+            ) : null}
           </div>
         }
       />
