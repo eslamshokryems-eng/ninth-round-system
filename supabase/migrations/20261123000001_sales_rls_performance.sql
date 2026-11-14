@@ -9,7 +9,7 @@
 --   * can_manage_leads(): SECURITY DEFINER, search_path empty. Identity is auth.uid(); the argument is a BRANCH, never a user; it only answers
 --     "does the CALLER manage leads of this branch?"; fully schema-qualified; no dynamic SQL. EXECUTE grants intentionally unchanged.
 --   * my_sales_branch(): same idea as a scalar — the caller's branch if (and only if) they are an ACTIVE branch_manager / sales_employee, else NULL.
---   * The six leads/lead_followups policies that used can_manage_leads()/auth_role() per row are re-created with
+--   * The four leads/lead_followups policies that used can_manage_leads()/auth_role() per row are re-created with
 --     ( select … ) sub-queries, which PostgreSQL evaluates ONCE per statement (initPlan). The predicates are logically identical:
 --       can_manage_leads(b)  ≡  auth_role() = 'super_admin'  OR  b = my_sales_branch()
 -- Insert policies and everything else are untouched. Rollback: supabase/rollback/sales_rls_performance_rollback.sql.

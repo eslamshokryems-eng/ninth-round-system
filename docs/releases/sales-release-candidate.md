@@ -43,7 +43,7 @@ Related documents:
 ## 4. Database changes (all additive; four migrations, each in one transaction)
 | File (sha256 prefix) | Content |
 |---|---|
-| `20261123000001_sales_rls_performance.sql` (`129ddcc58d0503f8`) | `can_manage_leads` → SECURITY DEFINER, `search_path=''`; new `my_sales_branch()`; the four leads/follow-up read/update policies re-created with initPlans. **Behaviour identical** (45 checks before = after) |
+| `20261123000001_sales_rls_performance.sql` (`ea0c516d36102115`) | `can_manage_leads` → SECURITY DEFINER, `search_path=''`; new `my_sales_branch()`; the four leads/follow-up read/update policies re-created with initPlans. **Behaviour identical** (45 checks before = after) |
 | `20261124000001_sales_workspace.sql` (`15061e0b19f9aab8`) | columns `lead_followups.kind/outcome` and `leads.interest_level/last_contacted_at`; append-only `lead_activities`, `lead_assignments`; insert rules (F4); workspace RPCs; owner-only employee policies |
 | `20261125000001_sales_manager_dashboard.sql` (`caad59e73cd9dba1`) | read-only `get_sales_team_summary`, `get_sales_team_overview`, `get_attention_leads` |
 | `20261126000001_sales_conversion_and_integrity.sql` (`33848c3331a2c35e`) | `lead_conversions` (append-only link, no amounts); `convert_lead`, `finalize_lead_conversion`, `mark_lead_lost`, `reopen_lead`, `get_lead_conversion`; `convert_lead_to_member` delegates; direct-write guards on `leads` and `lead_followups` |
