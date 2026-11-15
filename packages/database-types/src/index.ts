@@ -563,27 +563,6 @@ export interface Database {
         Args: { p_lead_ids: string[]; p_new_owner: string; p_reason: string };
         Returns: number;
       };
-      mark_lead_lost: {
-        Args: { p_lead_id: string; p_reason: string; p_note?: string | null };
-        Returns: undefined;
-      };
-      reopen_lead: {
-        Args: { p_lead_id: string; p_next_kind: string; p_next_at: string; p_note?: string | null };
-        Returns: undefined;
-      };
-      convert_lead: {
-        Args: {
-          p_lead_id: string; p_membership_type_id: string; p_receipt_number: string; p_price: number; p_discount: number; p_start_date: string;
-          p_payment_method: string; p_notes?: string | null; p_national_id?: string | null; p_date_of_birth?: string | null; p_address?: string | null;
-          p_emergency_contact_name?: string | null; p_emergency_contact_phone?: string | null; p_photo_url?: string | null; p_coach_id?: string | null;
-          p_session_count?: number | null; p_program_type?: string | null;
-        };
-        Returns: Array<{ member_id: string; membership_id: string | null; membership_number: string | null; member_qr_code: string | null; already_converted: boolean }>;
-      };
-      get_lead_conversion: {
-        Args: { p_lead_id: string };
-        Returns: Array<Record<string, unknown>>;
-      };
       get_lead_activities: {
         Args: { p_lead_id: string };
         Returns: Array<Record<string, unknown>>;
@@ -594,18 +573,6 @@ export interface Database {
       };
       get_lead_workspace_state: {
         Args: { p_lead_id: string };
-        Returns: Array<Record<string, unknown>>;
-      };
-      get_sales_team_summary: {
-        Args: { p_branch_id?: string | null; p_start?: string | null; p_end?: string | null };
-        Returns: Array<Record<string, unknown>>;
-      };
-      get_sales_team_overview: {
-        Args: { p_branch_id?: string | null; p_start?: string | null; p_end?: string | null };
-        Returns: Array<Record<string, unknown>>;
-      };
-      get_attention_leads: {
-        Args: { p_kind: string; p_branch_id?: string | null; p_owner?: string | null; p_limit?: number; p_offset?: number };
         Returns: Array<Record<string, unknown>>;
       };
     };

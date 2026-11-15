@@ -1,7 +1,10 @@
--- Rollback for 20261124000001_sales_workspace.sql. SAFETY: refuses to run if it would destroy history or data entered through the workspace:
+-- FULL REMOVAL of 20261124000001_sales_workspace.sql (DESTRUCTIVE: drops the Release B tables, columns, triggers and functions).
+-- Use ONLY when no one has used Release B yet; otherwise use sales_workspace_rollback_behavioral.sql (keeps all history). SAFETY: refuses to run if it would destroy history or data entered through the workspace:
 -- any lead_activities / lead_assignments row, any lead with a contact date or a non-default interest level, any follow-up with an outcome
 -- or a non-default kind. With none of that present it restores the Release A policies exactly and removes the objects.
 begin;
+set local lock_timeout = '5s';
+set local statement_timeout = '30s';
 do $$
 begin
   if exists (select 1 from public.lead_activities) or exists (select 1 from public.lead_assignments) then
@@ -22,15 +25,13 @@ drop function if exists public.record_lead_assignment();
 drop function if exists public.guard_lead_last_contacted();
 drop function if exists public.enforce_lead_insert_rules();
 
--- restore the Release A policies (pool visible to branch employees again)
-drop policy "sales staff read leads" on public.leads;
-create policy "sales staff read leads" on public.leads for select
+-- restore the Release A policies in place (ALTER POLICY; pool visible to branch employees again)
+alter policy "sales staff read leads" on public.leads
   using (
     ((select public.auth_role()) = 'super_admin' or branch_id = (select public.my_sales_branch()))
     and ((select public.auth_role()) in ('branch_manager', 'super_admin') or assigned_to = (select auth.uid()) or assigned_to is null)
   );
-drop policy "sales staff update leads" on public.leads;
-create policy "sales staff update leads" on public.leads for update
+alter policy "sales staff update leads" on public.leads
   using (
     ((select public.auth_role()) = 'super_admin' or branch_id = (select public.my_sales_branch()))
     and ((select public.auth_role()) in ('branch_manager', 'super_admin') or assigned_to = (select auth.uid()) or assigned_to is null)

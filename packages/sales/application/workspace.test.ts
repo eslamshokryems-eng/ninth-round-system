@@ -105,20 +105,3 @@ describe("suggestions and links (suggestions are editable defaults; WhatsApp is 
   });
 });
 
-import { needsSupport } from "../domain/team";
-import type { TeamEmployeeRow } from "../domain/team";
-
-describe("needsSupport — an explainable rule, not a score", () => {
-  const row = (o: Partial<TeamEmployeeRow>): TeamEmployeeRow => ({
-    employeeId: "e1", employeeName: "E", branchId: "b1", activeLeads: 10, overdueLeads: 0, dueToday: 0, hotLeads: 0, noNextAction: 0, noRecentContact: 0,
-    newInPeriod: 0, interactionsInPeriod: 5, convertedInPeriod: 0, lostInPeriod: 0, ...o,
-  });
-  it("is empty for a healthy workload", () => expect(needsSupport(row({}))).toEqual([]));
-  it("names every reason that applies", () => {
-    expect(needsSupport(row({ overdueLeads: 3 }))).toEqual(["30% or more of their leads are overdue"]);
-    expect(needsSupport(row({ noNextAction: 5 }))).toEqual(["half or more of their leads have no next action"]);
-    expect(needsSupport(row({ interactionsInPeriod: 0 }))).toEqual(["no contact recorded in the period"]);
-    expect(needsSupport(row({ overdueLeads: 4, noNextAction: 6, interactionsInPeriod: 0 }))).toHaveLength(3);
-  });
-  it("never flags an employee with no active leads", () => expect(needsSupport(row({ activeLeads: 0, interactionsInPeriod: 0 }))).toEqual([]));
-});

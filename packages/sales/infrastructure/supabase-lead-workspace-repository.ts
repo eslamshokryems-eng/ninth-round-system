@@ -7,7 +7,6 @@ import type {
   NextActionKind, SetNextActionInput, WorklistBucket, WorklistItem, WorklistSummary,
 } from "../domain/workspace";
 import type { LeadSource, LeadStatus } from "../domain/lead";
-import type { AttentionLead, AttentionQuery, TeamEmployeeRow, TeamPeriod, TeamSummary } from "../domain/team";
 
 type Row = Record<string, unknown>;
 const str = (v: unknown): string => (v == null ? "" : String(v));
@@ -108,39 +107,4 @@ export class SupabaseLeadWorkspaceRepository implements LeadWorkspaceRepository 
     })));
   }
 
-  async getTeamSummary(period: TeamPeriod): Promise<Result<TeamSummary>> {
-    const { data, error } = await this.client.rpc("get_sales_team_summary", { p_branch_id: period.branchId, p_start: period.startDate ?? null, p_end: period.endDate ?? null });
-    if (error) return err(domainError("TEAM_SUMMARY_FAILED", error.message));
-    const r = (data as unknown as Row[])[0];
-    if (!r) return err(domainError("TEAM_SUMMARY_FAILED", "The team summary returned no data."));
-    return ok({
-      activeLeads: num(r.active_leads), unassignedLeads: num(r.unassigned_leads), newInPeriod: num(r.new_in_period), dueToday: num(r.due_today),
-      overdueLeads: num(r.overdue_leads), hotLeads: num(r.hot_leads), noNextAction: num(r.no_next_action), noRecentContact: num(r.no_recent_contact),
-      interactionsInPeriod: num(r.interactions_in_period), convertedInPeriod: num(r.converted_in_period), lostInPeriod: num(r.lost_in_period),
-      conversionRateDecided: r.conversion_rate_decided == null ? null : Number(r.conversion_rate_decided),
-      conversionRateCohort: r.conversion_rate_cohort == null ? null : Number(r.conversion_rate_cohort),
-    });
-  }
-
-  async getTeamOverview(period: TeamPeriod): Promise<Result<TeamEmployeeRow[]>> {
-    const { data, error } = await this.client.rpc("get_sales_team_overview", { p_branch_id: period.branchId, p_start: period.startDate ?? null, p_end: period.endDate ?? null });
-    if (error) return err(domainError("TEAM_OVERVIEW_FAILED", error.message));
-    return ok((data as unknown as Row[]).map((r) => ({
-      employeeId: strOrNull(r.employee_id), employeeName: str(r.employee_name), branchId: strOrNull(r.branch_id), activeLeads: num(r.active_leads),
-      overdueLeads: num(r.overdue_leads), dueToday: num(r.due_today), hotLeads: num(r.hot_leads), noNextAction: num(r.no_next_action),
-      noRecentContact: num(r.no_recent_contact), newInPeriod: num(r.new_in_period), interactionsInPeriod: num(r.interactions_in_period),
-      convertedInPeriod: num(r.converted_in_period), lostInPeriod: num(r.lost_in_period),
-    })));
-  }
-
-  async listAttentionLeads(query: AttentionQuery): Promise<Result<AttentionLead[]>> {
-    const { data, error } = await this.client.rpc("get_attention_leads", { p_kind: query.kind, p_branch_id: query.branchId, p_owner: query.ownerId ?? null, p_limit: query.limit ?? 100, p_offset: query.offset ?? 0 });
-    if (error) return err(domainError("ATTENTION_LEADS_FAILED", error.message));
-    return ok((data as unknown as Row[]).map((r) => ({
-      leadId: str(r.lead_id), fullName: str(r.full_name), phone: str(r.phone), status: str(r.status), interestLevel: str(r.interest_level),
-      assignedTo: strOrNull(r.assigned_to), ownerName: strOrNull(r.owner_name), lastContactedAt: dateOrNull(r.last_contacted_at),
-      nextActionAt: dateOrNull(r.next_action_at), daysSinceContact: r.days_since_contact == null ? null : num(r.days_since_contact),
-      createdAt: new Date(str(r.created_at)), branchId: str(r.branch_id), source: str(r.source),
-    })));
-  }
 }

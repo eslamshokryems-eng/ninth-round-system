@@ -9,8 +9,6 @@ import type {
   LeadLostReason,
   LeadSummary,
   UpdateLeadInput,
-  ReopenLeadInput,
-  LeadConversion,
 } from "../domain/lead";
 import type { LeadFollowupRepository } from "../domain/lead-followup-repository";
 import type { CreateFollowupInput, LeadFollowup } from "../domain/lead-followup";
@@ -117,7 +115,6 @@ export class FakeLeadRepository implements LeadRepository {
   public lastAssign: { leadId: string; assignedToId: string; reason: string } | null = null;
   public lastMarkLost: { leadId: string; reason: LeadLostReason; note: string | null } | null = null;
   public lastRestoreLeadId: string | null = null;
-  public lastRestore: ReopenLeadInput | null = null;
   public list_: LeadSummary[] = [];
   public duplicates: LeadSummary[] = [];
 
@@ -166,13 +163,8 @@ export class FakeLeadRepository implements LeadRepository {
     return this.results.markLost ?? ok(undefined);
   }
 
-  async getConversion(): Promise<Result<LeadConversion | null>> {
-    return ok(null);
-  }
-
-  async restore(input: ReopenLeadInput): Promise<Result<void>> {
-    this.lastRestoreLeadId = input.leadId;
-    this.lastRestore = input;
+  async restore(leadId: string): Promise<Result<void>> {
+    this.lastRestoreLeadId = leadId;
     return this.results.restore ?? ok(undefined);
   }
 
@@ -180,7 +172,7 @@ export class FakeLeadRepository implements LeadRepository {
     this.lastConvertInput = input;
     return (
       this.results.convert ??
-      ok({ memberId: "member-1", membershipId: "membership-1", membershipNumber: "9R-000001", memberQrCode: "qr-1", alreadyConverted: false })
+      ok({ memberId: "member-1", membershipId: "membership-1", membershipNumber: "9R-000001", memberQrCode: "qr-1" })
     );
   }
 

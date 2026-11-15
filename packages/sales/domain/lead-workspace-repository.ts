@@ -1,5 +1,4 @@
 import type { Result } from "@9thround/shared-kernel";
-import type { AttentionLead, AttentionQuery, TeamEmployeeRow, TeamPeriod, TeamSummary } from "./team";
 import type {
   AssignLeadsInput, InterestLevel, LeadActivity, LeadWorkspaceState, LeadAssignmentRecord, LogInteractionInput, SetNextActionInput, WorklistItem, WorklistSummary,
 } from "./workspace";
@@ -19,7 +18,4 @@ export interface LeadWorkspaceRepository {
   listActivities(leadId: string): Promise<Result<LeadActivity[]>>;
   getLeadState(leadId: string): Promise<Result<LeadWorkspaceState | null>>;
   listAssignments(leadId: string): Promise<Result<LeadAssignmentRecord[]>>;
-  getTeamSummary(period: TeamPeriod): Promise<Result<TeamSummary>>;
-  getTeamOverview(period: TeamPeriod): Promise<Result<TeamEmployeeRow[]>>;
-  listAttentionLeads(query: AttentionQuery): Promise<Result<AttentionLead[]>>;
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LOCAL ONLY. Sales CRM performance at scale with ALL Sales migrations (A, B, C1, C2): 20,000 leads in one branch over 10 employees, a pending
+# LOCAL ONLY. Sales CRM performance at scale with Release A + B (and the Production assignment trigger): 20,000 leads in one branch over 10 employees, a pending
 # follow-up on most, ~60,000 history rows. Times the employee and manager screens' queries (median of 7 runs) and runs pgbench with 8
 # concurrent clients. Local hardware: the numbers show scale behaviour and ratios, NOT Production latency.
 set -u
@@ -9,6 +9,7 @@ for f in "$ROOT"/supabase/migrations/*.sql; do b=$(basename "$f"); case "$b" in 
 $SU "psql -q -d postgres -c 'drop database if exists $DB'" >/dev/null 2>&1
 MIGRATIONS_DIR="$LOG/m" LOCAL_DB="$DB" SKIP_SEED=1 bash "$ROOT/tools/local-dev-stack/apply.sh" > "$LOG/apply.log" 2>&1 || { echo "build failed"; tail -5 "$LOG/apply.log"; exit 1; }
 $SU "psql -v ON_ERROR_STOP=1 -q -d $DB -f $ROOT/tools/local-dev-stack/regression/00_seed.sql" > "$LOG/seed.log" 2>&1 || { echo seed failed; exit 1; }
+cp "$HERE/prodshape_lead_assignment_trigger.sql" "$LOG/prodshape.sql"; chmod 644 "$LOG/prodshape.sql"; $SU "psql -v ON_ERROR_STOP=1 -q -d $DB -f $LOG/prodshape.sql" > "$LOG/prodshape.log" 2>&1 || { echo prodshape failed; exit 1; }
 cp "$HERE/release_a_setup.sql" "$LOG/setup.sql"; chmod 644 "$LOG/setup.sql"
 $SU "psql -v ON_ERROR_STOP=1 -q -d $DB -f $LOG/setup.sql" > "$LOG/setup.log" 2>&1 || { echo setup failed; tail -3 "$LOG/setup.log"; exit 1; }
 cat > "$LOG/bulk.sql" <<'SQL'
@@ -57,20 +58,15 @@ select 'employee  | overdue follow-ups (RLS)                | '||pg_temp.med('00
 select 'employee  | lead history (one lead)                 | '||pg_temp.med('00000000-0000-0000-0000-0000000000a4','select count(*) from public.get_lead_activities((select id from public.leads where assigned_to=''00000000-0000-0000-0000-0000000000a4'' limit 1))')||' ms';
 select 'employee  | search leads by name (ILIKE)            | '||pg_temp.med('00000000-0000-0000-0000-0000000000a4','select count(*) from (select id from public.leads where full_name ilike ''%Lead 12%'' or phone ilike ''%12%'' limit 50) x')||' ms';
 select 'manager   | branch leads page (50, newest)          | '||pg_temp.med('00000000-0000-0000-0000-0000000000a2','select count(*) from (select id from public.leads order by created_at desc limit 50) x')||' ms';
-select 'manager   | get_sales_team_summary                  | '||pg_temp.med('00000000-0000-0000-0000-0000000000a2','select * from public.get_sales_team_summary()')||' ms';
-select 'manager   | get_sales_team_overview (10 employees)  | '||pg_temp.med('00000000-0000-0000-0000-0000000000a2','select count(*) from public.get_sales_team_overview()')||' ms';
-select 'manager   | get_attention_leads(overdue, 100)       | '||pg_temp.med('00000000-0000-0000-0000-0000000000a2','select count(*) from public.get_attention_leads(''overdue'')')||' ms';
-select 'manager   | get_attention_leads(no_recent_contact)  | '||pg_temp.med('00000000-0000-0000-0000-0000000000a2','select count(*) from public.get_attention_leads(''no_recent_contact'')')||' ms';
 select 'manager   | worklist of one employee                | '||pg_temp.med('00000000-0000-0000-0000-0000000000a2','select count(*) from public.get_my_worklist(''00000000-0000-0000-0000-0000000000a4'',100,0)')||' ms';
 SQL
 chmod 644 "$LOG/time.sql"
 $SU "psql -q -d $DB -f $LOG/time.sql" 2>&1 | grep -v '^$' | tee "$LOG/times.txt"
-# writes (single, real commits): one interaction and one conversion
+# writes (single, real commits): one interaction
 cat > "$LOG/write.sql" <<'SQL'
 select set_config('request.jwt.claims','{"role":"authenticated","sub":"00000000-0000-0000-0000-0000000000a4"}',false); set role authenticated;
 \timing on
 select public.log_lead_interaction((select id from public.leads where assigned_to='00000000-0000-0000-0000-0000000000a4' and status in ('new','contacted','follow_up') limit 1), 'call','interested','perf','call', now()+interval '1 day') is not null as interaction;
-select already_converted from public.convert_lead(p_lead_id => (select id from public.leads where assigned_to='00000000-0000-0000-0000-0000000000a4' and status in ('new','contacted','follow_up') offset 5 limit 1), p_membership_type_id => 'cccccccc-0000-0000-0000-0000000000c1', p_receipt_number => 'PERF-1', p_price => 1000, p_discount => 0, p_start_date => current_date, p_payment_method => 'cash');
 SQL
 chmod 644 "$LOG/write.sql"
 $SU "psql -q -d $DB -f $LOG/write.sql" 2>&1 | grep -E "Time|^ ?[tf]$" | paste - - | sed 's/^/write     | /' | tee -a "$LOG/times.txt"

@@ -79,38 +79,11 @@ export interface ConvertLeadInput {
   photoUrl: string | null;
   coachId: string | null;
   sessionCount: number | null;
-  /** Training program of the new membership (same values as Add Member). */
-  programType?: ProgramType | null;
 }
-
-export type ProgramType = "ninth_round" | "boxing" | "kickboxing" | "mma";
 
 export interface ConvertLeadOutput {
   memberId: string;
-  /** null only for a lead converted before conversions were recorded (legacy). */
-  membershipId: string | null;
-  membershipNumber: string | null;
-  memberQrCode: string | null;
-  /** true = the lead was already converted (retry / double click): nothing new was created, the existing result is returned. */
-  alreadyConverted: boolean;
-}
-
-/** Reopening a lost lead always schedules its next action (an active lead must have one). */
-export interface ReopenLeadInput {
-  leadId: string;
-  nextKind: "call" | "whatsapp" | "visit" | "other";
-  nextAt: Date;
-  note: string | null;
-}
-
-/** Who was credited and who registered the sale (memberships.sold_by / created_by), recorded at conversion. */
-export interface LeadConversion {
-  memberId: string;
   membershipId: string;
-  membershipNumber: string | null;
-  leadOwnerId: string | null;
-  leadOwnerName: string | null;
-  convertedById: string | null;
-  convertedByName: string | null;
-  convertedAt: Date;
+  membershipNumber: string;
+  memberQrCode: string;
 }

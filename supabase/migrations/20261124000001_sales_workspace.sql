@@ -103,15 +103,14 @@ create trigger trg_guard_lead_assignments_truncate before truncate on public.lea
 -- ---------------------------------------------------------------------------
 -- 3. leads: policies (employee = own leads only), insert guard (F4), last_contacted_at guard, assignment history trigger
 -- ---------------------------------------------------------------------------
-drop policy "sales staff read leads" on public.leads;
-create policy "sales staff read leads" on public.leads for select
+-- ALTER POLICY (no DROP): the policy never disappears; name, command (SELECT / UPDATE), roles and permissive-ness are unchanged.
+alter policy "sales staff read leads" on public.leads
   using (
     (select public.auth_role()) = 'super_admin'
     or (branch_id = (select public.my_sales_branch())
         and ((select public.auth_role()) = 'branch_manager' or assigned_to = (select auth.uid())))
   );
-drop policy "sales staff update leads" on public.leads;
-create policy "sales staff update leads" on public.leads for update
+alter policy "sales staff update leads" on public.leads
   using (
     (select public.auth_role()) = 'super_admin'
     or (branch_id = (select public.my_sales_branch())

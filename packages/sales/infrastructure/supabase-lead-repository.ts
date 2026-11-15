@@ -9,8 +9,6 @@ import type {
   LeadLostReason,
   LeadSummary,
   UpdateLeadInput,
-  ReopenLeadInput,
-  LeadConversion,
 } from "../domain/lead";
 import type { LeadRepository } from "../domain/lead-repository";
 
@@ -202,45 +200,43 @@ export class SupabaseLeadRepository implements LeadRepository {
     return ok(undefined);
   }
 
+  /** assign_leads(): manager / Super Admin only, active same-branch sales employee, reason required; recorded in lead_assignments. */
   async assign(leadId: string, assignedToId: string, reason: string): Promise<Result<void>> {
     const { error } = await this.client.rpc("assign_leads", { p_lead_ids: [leadId], p_new_owner: assignedToId, p_reason: reason });
+
     if (error) {
       return err(domainError("LEAD_ASSIGN_FAILED", error.message));
     }
     return ok(undefined);
   }
 
-  /** mark_lead_lost(): closes the lead, cancels its pending follow-up and records the change in the lead history. */
   async markLost(leadId: string, reason: LeadLostReason, note: string | null): Promise<Result<void>> {
-    const { error } = await this.client.rpc("mark_lead_lost", { p_lead_id: leadId, p_reason: reason, p_note: note });
+    const { error } = await this.client
+      .from("leads")
+      .update({ status: "lost", lost_reason: reason, lost_note: note, lost_at: new Date().toISOString() })
+      .eq("id", leadId);
+
     if (error) {
       return err(domainError("LEAD_MARK_LOST_FAILED", error.message));
     }
     return ok(undefined);
   }
 
-  /** reopen_lead(): lost -> follow-up, with its next action scheduled in the same step. */
-  async restore(input: ReopenLeadInput): Promise<Result<void>> {
-    const { error } = await this.client.rpc("reopen_lead", {
-      p_lead_id: input.leadId,
-      p_next_kind: input.nextKind,
-      p_next_at: input.nextAt.toISOString(),
-      p_note: input.note,
-    });
+  async restore(leadId: string): Promise<Result<void>> {
+    const { error } = await this.client
+      .from("leads")
+      .update({ status: "follow_up", lost_reason: null, lost_note: null, lost_at: null })
+      .eq("id", leadId);
+
     if (error) {
       return err(domainError("LEAD_RESTORE_FAILED", error.message));
     }
     return ok(undefined);
   }
 
-  /**
-   * convert_lead(): one transaction — validates the lead, registers the member + membership + payment through the existing
-   * register_membership() (sold_by = the lead owner), then marks the lead converted. Safe to retry: an already converted lead returns
-   * its existing result with alreadyConverted = true and nothing new is created.
-   */
   async convert(input: ConvertLeadInput): Promise<Result<ConvertLeadOutput>> {
     const { data, error } = await this.client
-      .rpc("convert_lead", {
+      .rpc("convert_lead_to_member", {
         p_lead_id: input.leadId,
         p_membership_type_id: input.membershipTypeId,
         p_receipt_number: input.receiptNumber,
@@ -257,7 +253,6 @@ export class SupabaseLeadRepository implements LeadRepository {
         p_photo_url: input.photoUrl,
         p_coach_id: input.coachId,
         p_session_count: input.sessionCount,
-        p_program_type: input.programType ?? null,
       })
       .single();
 
@@ -265,48 +260,12 @@ export class SupabaseLeadRepository implements LeadRepository {
       return err(domainError("LEAD_CONVERT_FAILED", error.message));
     }
 
-    const row = data as {
-      member_id: string;
-      membership_id: string | null;
-      membership_number: string | null;
-      member_qr_code: string | null;
-      already_converted: boolean;
-    };
+    const row = data as { member_id: string; membership_id: string; membership_number: string; member_qr_code: string };
     return ok({
       memberId: row.member_id,
       membershipId: row.membership_id,
       membershipNumber: row.membership_number,
       memberQrCode: row.member_qr_code,
-      alreadyConverted: row.already_converted,
-    });
-  }
-
-  async getConversion(leadId: string): Promise<Result<LeadConversion | null>> {
-    const { data, error } = await this.client.rpc("get_lead_conversion", { p_lead_id: leadId });
-    if (error) {
-      return err(domainError("LEAD_CONVERSION_LOAD_FAILED", error.message));
-    }
-    const rows = (data ?? []) as {
-      member_id: string;
-      membership_id: string;
-      membership_number: string | null;
-      lead_owner: string | null;
-      lead_owner_name: string | null;
-      converted_by: string | null;
-      converted_by_name: string | null;
-      converted_at: string;
-    }[];
-    const r = rows[0];
-    if (!r) return ok(null);
-    return ok({
-      memberId: r.member_id,
-      membershipId: r.membership_id,
-      membershipNumber: r.membership_number,
-      leadOwnerId: r.lead_owner,
-      leadOwnerName: r.lead_owner_name,
-      convertedById: r.converted_by,
-      convertedByName: r.converted_by_name,
-      convertedAt: new Date(r.converted_at),
     });
   }
 }

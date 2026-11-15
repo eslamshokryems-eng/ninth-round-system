@@ -1,7 +1,6 @@
 import { domainError, err } from "@9thround/shared-kernel";
 import type { Result, UseCase } from "@9thround/shared-kernel";
 import type { LeadWorkspaceRepository } from "../domain/lead-workspace-repository";
-import type { AttentionLead, AttentionQuery, TeamEmployeeRow, TeamPeriod, TeamSummary } from "../domain/team";
 import {
   INTERACTION_KINDS, INTERACTION_OUTCOMES, NEXT_ACTION_KINDS, isTerminalOutcome,
 } from "../domain/workspace";
@@ -97,19 +96,4 @@ export class ListLeadAssignmentsUseCase implements UseCase<string, LeadAssignmen
 export class GetLeadWorkspaceStateUseCase implements UseCase<string, LeadWorkspaceState | null> {
   constructor(private readonly workspace: LeadWorkspaceRepository) {}
   execute(leadId: string): Promise<Result<LeadWorkspaceState | null>> { return this.workspace.getLeadState(leadId); }
-}
-
-export class GetTeamSummaryUseCase implements UseCase<TeamPeriod, TeamSummary> {
-  constructor(private readonly workspace: LeadWorkspaceRepository) {}
-  execute(period: TeamPeriod): Promise<Result<TeamSummary>> { return this.workspace.getTeamSummary(period); }
-}
-
-export class GetTeamOverviewUseCase implements UseCase<TeamPeriod, TeamEmployeeRow[]> {
-  constructor(private readonly workspace: LeadWorkspaceRepository) {}
-  execute(period: TeamPeriod): Promise<Result<TeamEmployeeRow[]>> { return this.workspace.getTeamOverview(period); }
-}
-
-export class ListAttentionLeadsUseCase implements UseCase<AttentionQuery, AttentionLead[]> {
-  constructor(private readonly workspace: LeadWorkspaceRepository) {}
-  execute(query: AttentionQuery): Promise<Result<AttentionLead[]>> { return this.workspace.listAttentionLeads(query); }
 }

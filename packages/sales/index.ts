@@ -6,7 +6,7 @@ import { CreateLeadUseCase } from "./application/create-lead";
 import { UpdateLeadUseCase } from "./application/update-lead";
 import { AssignLeadUseCase } from "./application/assign-lead";
 import { MarkLeadLostUseCase } from "./application/mark-lead-lost";
-import { RestoreLeadUseCase, GetLeadConversionUseCase } from "./application/restore-lead";
+import { RestoreLeadUseCase } from "./application/restore-lead";
 import { ConvertLeadUseCase } from "./application/convert-lead";
 import { CheckDuplicateLeadsUseCase } from "./application/check-duplicate-leads";
 import { GetLeadTimelineUseCase } from "./application/get-lead-timeline";
@@ -20,7 +20,7 @@ import { ListTodaysFollowupsUseCase } from "./application/list-todays-followups"
 import { ListOverdueFollowupsUseCase } from "./application/list-overdue-followups";
 import {
   GetMyWorklistUseCase, GetWorklistSummaryUseCase, LogLeadInteractionUseCase, SetLeadNextActionUseCase, AddLeadNoteUseCase,
-  SetLeadInterestUseCase, AssignLeadsUseCase, ListLeadActivitiesUseCase, ListLeadAssignmentsUseCase, GetLeadWorkspaceStateUseCase, GetTeamSummaryUseCase, GetTeamOverviewUseCase, ListAttentionLeadsUseCase,
+  SetLeadInterestUseCase, AssignLeadsUseCase, ListLeadActivitiesUseCase, ListLeadAssignmentsUseCase, GetLeadWorkspaceStateUseCase,
 } from "./application/workspace";
 import { SupabaseLeadWorkspaceRepository } from "./infrastructure/supabase-lead-workspace-repository";
 import { SupabaseLeadRepository } from "./infrastructure/supabase-lead-repository";
@@ -40,9 +40,6 @@ export type {
   UpdateLeadInput,
   ConvertLeadInput,
   ConvertLeadOutput,
-  ProgramType,
-  ReopenLeadInput,
-  LeadConversion,
 } from "./domain/lead";
 export type { FollowupStatus, LeadFollowup, CreateFollowupInput } from "./domain/lead-followup";
 export type { LeadTimelineEntry } from "./domain/lead-timeline-entry";
@@ -55,12 +52,10 @@ export type {
 export {
   INTERACTION_KINDS, NEXT_ACTION_KINDS, INTERACTION_OUTCOMES, WORKLIST_BUCKET_ORDER, isTerminalOutcome, suggestNextActionAt, whatsappLink, telLink,
 } from "./domain/workspace";
-export type { TeamPeriod, TeamSummary, TeamEmployeeRow, AttentionKind, AttentionLead, AttentionQuery } from "./domain/team";
-export { needsSupport } from "./domain/team";
 export type { LeadWorkspaceRepository } from "./domain/lead-workspace-repository";
 export {
   GetMyWorklistUseCase, GetWorklistSummaryUseCase, LogLeadInteractionUseCase, SetLeadNextActionUseCase, AddLeadNoteUseCase,
-  SetLeadInterestUseCase, AssignLeadsUseCase, ListLeadActivitiesUseCase, ListLeadAssignmentsUseCase, GetLeadWorkspaceStateUseCase, GetTeamSummaryUseCase, GetTeamOverviewUseCase, ListAttentionLeadsUseCase,
+  SetLeadInterestUseCase, AssignLeadsUseCase, ListLeadActivitiesUseCase, ListLeadAssignmentsUseCase, GetLeadWorkspaceStateUseCase,
 } from "./application/workspace";
 export { SupabaseLeadWorkspaceRepository } from "./infrastructure/supabase-lead-workspace-repository";
 export type { LeadRepository } from "./domain/lead-repository";
@@ -73,7 +68,7 @@ export { CreateLeadUseCase } from "./application/create-lead";
 export { UpdateLeadUseCase } from "./application/update-lead";
 export { AssignLeadUseCase, type AssignLeadInput } from "./application/assign-lead";
 export { MarkLeadLostUseCase, type MarkLeadLostInput } from "./application/mark-lead-lost";
-export { RestoreLeadUseCase, GetLeadConversionUseCase } from "./application/restore-lead";
+export { RestoreLeadUseCase } from "./application/restore-lead";
 export { ConvertLeadUseCase } from "./application/convert-lead";
 export { CheckDuplicateLeadsUseCase, type CheckDuplicateLeadsInput } from "./application/check-duplicate-leads";
 export { GetLeadTimelineUseCase } from "./application/get-lead-timeline";
@@ -117,7 +112,6 @@ export function createSalesModule(client: TypedSupabaseClient) {
     assignLead: new AssignLeadUseCase(leadRepository),
     markLeadLost: new MarkLeadLostUseCase(leadRepository),
     restoreLead: new RestoreLeadUseCase(leadRepository),
-    getLeadConversion: new GetLeadConversionUseCase(leadRepository),
     convertLead: new ConvertLeadUseCase(leadRepository),
     checkDuplicateLeads: new CheckDuplicateLeadsUseCase(leadRepository),
     getLeadTimeline: new GetLeadTimelineUseCase(timelineRepository),
@@ -140,9 +134,5 @@ export function createSalesModule(client: TypedSupabaseClient) {
     listLeadActivities: new ListLeadActivitiesUseCase(workspaceRepository),
     listLeadAssignments: new ListLeadAssignmentsUseCase(workspaceRepository),
     getLeadWorkspaceState: new GetLeadWorkspaceStateUseCase(workspaceRepository),
-    // Manager dashboard (Release C part 1, read-only)
-    getTeamSummary: new GetTeamSummaryUseCase(workspaceRepository),
-    getTeamOverview: new GetTeamOverviewUseCase(workspaceRepository),
-    listAttentionLeads: new ListAttentionLeadsUseCase(workspaceRepository),
   };
 }

@@ -93,43 +93,46 @@ export class SupabaseLeadFollowupRepository implements LeadFollowupRepository {
     return ok((data as unknown as FollowupRow[]).map(toFollowup));
   }
 
-  /**
-   * Scheduling a follow-up = setting the lead's next action (set_lead_next_action): the previous pending follow-up, if any, is
-   * replaced and the change is recorded in the lead history. An active lead always has exactly one next action.
-   */
   async create(input: CreateFollowupInput): Promise<Result<{ followupId: string }>> {
-    const { data, error } = await this.client.rpc("set_lead_next_action", {
-      p_lead_id: input.leadId,
-      p_kind: input.kind ?? "call",
-      p_at: input.dueAt,
-      p_note: input.note,
-    });
+    const { data, error } = await this.client
+      .from("lead_followups")
+      .insert({ lead_id: input.leadId, branch_id: input.branchId, due_at: input.dueAt, note: input.note })
+      .select("id")
+      .single();
+
     if (error) {
       return err(domainError("FOLLOWUP_CREATE_FAILED", error.message));
     }
-    return ok({ followupId: data as unknown as string });
+    return ok({ followupId: data.id });
   }
 
-  /** A follow-up is completed by recording what happened (Record contact), which also schedules the next action. */
-  async complete(): Promise<Result<void>> {
-    return err(domainError("FOLLOWUP_USE_RECORD_CONTACT", "Use Record contact: it completes the follow-up and schedules the next one."));
+  async complete(followupId: string, note: string | null): Promise<Result<void>> {
+    const { error } = await this.client
+      .from("lead_followups")
+      .update({ status: "completed", completed_at: new Date().toISOString(), completed_note: note })
+      .eq("id", followupId);
+
+    if (error) {
+      return err(domainError("FOLLOWUP_COMPLETE_FAILED", error.message));
+    }
+    return ok(undefined);
   }
 
   async reschedule(followupId: string, dueAt: string): Promise<Result<void>> {
-    const { data: row, error: readError } = await this.client.from("lead_followups").select("lead_id, kind, note").eq("id", followupId).single();
-    if (readError || !row) {
-      return err(domainError("FOLLOWUP_RESCHEDULE_FAILED", readError?.message ?? "Follow-up not found."));
-    }
-    const r = row as unknown as { lead_id: string; kind: string | null; note: string | null };
-    const { error } = await this.client.rpc("set_lead_next_action", { p_lead_id: r.lead_id, p_kind: r.kind ?? "call", p_at: dueAt, p_note: r.note });
+    const { error } = await this.client.from("lead_followups").update({ due_at: dueAt }).eq("id", followupId);
+
     if (error) {
       return err(domainError("FOLLOWUP_RESCHEDULE_FAILED", error.message));
     }
     return ok(undefined);
   }
 
-  /** Not allowed on its own: it would leave an active lead without a next action. Reschedule it, or mark the lead lost. */
-  async cancel(): Promise<Result<void>> {
-    return err(domainError("FOLLOWUP_CANCEL_NOT_ALLOWED", "An active lead must keep a next action. Reschedule it, or mark the lead as lost."));
+  async cancel(followupId: string): Promise<Result<void>> {
+    const { error } = await this.client.from("lead_followups").update({ status: "cancelled" }).eq("id", followupId);
+
+    if (error) {
+      return err(domainError("FOLLOWUP_CANCEL_FAILED", error.message));
+    }
+    return ok(undefined);
   }
 }

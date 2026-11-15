@@ -24,12 +24,6 @@ export class ConvertLeadUseCase implements UseCase<ConvertLeadInput, ConvertLead
     if (input.discount < 0 || input.discount > input.price) {
       return err(domainError("INVALID_DISCOUNT", "Discount must be between 0 and the price."));
     }
-    if (!input.membershipTypeId) {
-      return err(domainError("MEMBERSHIP_TYPE_REQUIRED", "Choose the membership."));
-    }
-    if (!input.startDate) {
-      return err(domainError("START_DATE_REQUIRED", "Choose the start date."));
-    }
 
     return this.leads.convert(input);
   }

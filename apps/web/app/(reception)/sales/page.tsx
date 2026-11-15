@@ -65,11 +65,6 @@ export default function SalesDashboardPage() {
             <Link href="/sales/leads">
               <Button variant="secondary">View Leads</Button>
             </Link>
-            {role === "branch_manager" || role === "super_admin" ? (
-              <Link href="/sales/team">
-                <Button variant="secondary">Team dashboard</Button>
-              </Link>
-            ) : null}
           </div>
         }
       />
