@@ -189,3 +189,20 @@ For each migration:
 - [ ] **Your approval** for each Production migration (§10)
 - [ ] **Your approval** to promote the deployment
 - [ ] Post-deployment checks (§10.4, §10.6) on Production
+
+## 13. Production execution log
+### Release A — applied 2026-11-15 05:37 UTC (Production `yjuzjvlmyszutuqpwenn`, PostgreSQL 17.6)
+* Migration: `20261123000001_sales_rls_performance.sql` (ALTER POLICY version, sha256 `c834c13d5481e9c1e070f3aa44afbd4fb534aa0725f03b8d3c620eb058962b40`), run through `apply_migration` with `SET LOCAL lock_timeout = '5s'` / `statement_timeout = '30s'` in one transaction. Recorded in Production history as **`20261115053707 sales_rls_performance`** (39 migrations).
+* Before: P10 identical to pre-flight (05:36:47 UTC). Earlier DROP/CREATE attempts (4×) never ran: the server's destructive-statement confirmation could not be displayed in this session; Production verified unchanged after each.
+* After (05:37:16 UTC): `can_manage_leads` DEFINER / `search_path=""` / body, ACL unchanged; `my_sales_branch()` created; policy fingerprints = the locally expected ones (8/8); insert policies untouched.
+* P8 visibility (7 personas: 3 sales employees, 2 managers, Super Admin, anon): **all identical to baseline** (58/139/633 + 830/830/830 leads; 101/244/31 + 376×3 follow-ups; anon 0/0).
+* P7 performance (EXPLAIN ANALYZE, read-only):
+
+  | Query | Before | After |
+  |---|---|---|
+  | employee: all own leads (633) | 850.7 ms | 9.9 ms |
+  | employee: overdue follow-ups | 756.2 ms | 4.4 ms |
+  | manager: leads page (300 of 830) | 1,549.7 ms | 3.0 ms |
+  | manager: follow-ups due today | 34.1 ms | 15.2 ms |
+* Logs since 05:37: no 5xx, no statement timeout, no permission/RLS errors (no user traffic yet — re-check after a working day).
+* Rollback ready: `supabase/rollback/sales_rls_performance_rollback_alter.sql` (sha256 `c4076a55…74f2a4`, exact restore verified on PostgreSQL 17).
