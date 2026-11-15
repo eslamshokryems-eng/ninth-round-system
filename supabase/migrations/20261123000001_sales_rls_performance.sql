@@ -9,10 +9,12 @@
 --   * can_manage_leads(): SECURITY DEFINER, search_path empty. Identity is auth.uid(); the argument is a BRANCH, never a user; it only answers
 --     "does the CALLER manage leads of this branch?"; fully schema-qualified; no dynamic SQL. EXECUTE grants intentionally unchanged.
 --   * my_sales_branch(): same idea as a scalar — the caller's branch if (and only if) they are an ACTIVE branch_manager / sales_employee, else NULL.
---   * The four leads/lead_followups policies that used can_manage_leads()/auth_role() per row are re-created with
---     ( select … ) sub-queries, which PostgreSQL evaluates ONCE per statement (initPlan). The predicates are logically identical:
+--   * The four leads/lead_followups policies that used can_manage_leads()/auth_role() per row are altered IN PLACE (ALTER POLICY: no
+--     DROP, the policy never disappears, name/command/roles unchanged) to use ( select … ) sub-queries, which PostgreSQL evaluates
+--     ONCE per statement (initPlan). The predicates are logically identical:
 --       can_manage_leads(b)  ≡  auth_role() = 'super_admin'  OR  b = my_sales_branch()
--- Insert policies and everything else are untouched. Rollback: supabase/rollback/sales_rls_performance_rollback.sql.
+-- Insert policies and everything else are untouched. Rollback: supabase/rollback/sales_rls_performance_rollback_alter.sql
+-- (ALTER POLICY, preferred) or supabase/rollback/sales_rls_performance_rollback.sql (DROP/CREATE; same end state).
 -- Verified by supabase/tests/sales_crm/release_a_run.sh: identical behaviour before/after/rollback/re-apply for every persona.
 
 alter function public.can_manage_leads(uuid) security definer set search_path = '';
@@ -35,23 +37,20 @@ $$;
 comment on function public.my_sales_branch() is
   'The CALLER''s branch when they are an ACTIVE branch_manager or sales_employee, else NULL. Identity = auth.uid(); used as a once-per-statement initPlan in the leads/lead_followups policies.';
 
-drop policy "sales staff read leads" on public.leads;
-create policy "sales staff read leads" on public.leads for select
+alter policy "sales staff read leads" on public.leads
   using (
     ((select public.auth_role()) = 'super_admin' or branch_id = (select public.my_sales_branch()))
     and ((select public.auth_role()) in ('branch_manager', 'super_admin') or assigned_to = (select auth.uid()) or assigned_to is null)
   );
 
-drop policy "sales staff update leads" on public.leads;
-create policy "sales staff update leads" on public.leads for update
+alter policy "sales staff update leads" on public.leads
   using (
     ((select public.auth_role()) = 'super_admin' or branch_id = (select public.my_sales_branch()))
     and ((select public.auth_role()) in ('branch_manager', 'super_admin') or assigned_to = (select auth.uid()) or assigned_to is null)
   )
   with check (public.can_manage_leads(branch_id));
 
-drop policy "sales staff read followups" on public.lead_followups;
-create policy "sales staff read followups" on public.lead_followups for select
+alter policy "sales staff read followups" on public.lead_followups
   using (
     ((select public.auth_role()) = 'super_admin' or branch_id = (select public.my_sales_branch()))
     and exists (
@@ -61,8 +60,7 @@ create policy "sales staff read followups" on public.lead_followups for select
     )
   );
 
-drop policy "sales staff update followups" on public.lead_followups;
-create policy "sales staff update followups" on public.lead_followups for update
+alter policy "sales staff update followups" on public.lead_followups
   using (
     ((select public.auth_role()) = 'super_admin' or branch_id = (select public.my_sales_branch()))
     and exists (
