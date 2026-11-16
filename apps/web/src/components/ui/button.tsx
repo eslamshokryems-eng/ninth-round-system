@@ -18,10 +18,13 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
 
 /** The one solid-gold-fill variant ("primary") is reserved for the single primary action on a screen — matches packages/ui/native/button.tsx's "gold is earned" rule. */
 export function Button({ variant = "primary", isLoading, disabled, className = "", children, ...rest }: ButtonProps) {
-  const isDisabled = disabled ?? isLoading ?? false;
+  // A button is unusable while its action is running, whatever `disabled` says. (`disabled ?? isLoading` ignored isLoading whenever
+  // a caller passed disabled={false}, so a pending save could be clicked or Enter-repeated again: incident 2026-11-09, 586 duplicate leads.)
+  const isDisabled = Boolean(disabled) || Boolean(isLoading);
   return (
     <button
       disabled={isDisabled}
+      aria-busy={isLoading ? true : undefined}
       className={`inline-flex items-center justify-center gap-2 rounded-pill px-5 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASS[variant]} ${className}`}
       {...rest}
     >

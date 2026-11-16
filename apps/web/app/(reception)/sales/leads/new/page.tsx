@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { LeadGender, LeadSource, LeadSummary } from "@9thround/sales";
@@ -57,6 +57,9 @@ export default function NewLeadPage() {
   const [duplicates, setDuplicates] = useState<LeadSummary[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // Synchronous re-entry guard: React state updates are async, so a burst of clicks / Enter auto-repeats can all pass an
+  // `isSaving` check before the re-render disables the button. The ref flips in the same tick as the first click.
+  const saveInFlight = useRef(false);
 
   useEffect(() => {
     void (async () => {
@@ -80,7 +83,8 @@ export default function NewLeadPage() {
   const isFormComplete = fullName.trim().length > 0 && phone.trim().length > 0;
 
   async function handleSave() {
-    if (!branchId) return;
+    if (!branchId || saveInFlight.current) return;
+    saveInFlight.current = true;
     setErrorMessage(null);
     setIsSaving(true);
 
@@ -98,12 +102,14 @@ export default function NewLeadPage() {
       assignedToId,
     });
 
-    setIsSaving(false);
-
     if (result.isErr) {
+      // the save failed: unlock so the employee can correct the form and try again
+      saveInFlight.current = false;
+      setIsSaving(false);
       setErrorMessage(translateErrorCode(result.error.code));
       return;
     }
+    // success: stay locked while navigating to the new lead, so nothing can be submitted twice
 
     router.replace(`/sales/leads/${result.value.leadId}`);
   }
@@ -190,7 +196,7 @@ export default function NewLeadPage() {
 
       <div className="flex gap-3">
         <Button onClick={() => void handleSave()} isLoading={isSaving} disabled={!isFormComplete}>
-          Save Lead
+          {isSaving ? "Saving…" : "Save Lead"}
         </Button>
         <Link href="/sales/leads">
           <Button variant="secondary" type="button">
