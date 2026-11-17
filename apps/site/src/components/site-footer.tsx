@@ -4,11 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "../i18n/language-provider";
+import { whatsappHref } from "../lib/whatsapp-link";
 import { CONTACT } from "../data/contact";
 import { trackPhoneClick, trackSocialClick, trackTrialCtaClick, trackWhatsAppClick } from "../lib/analytics";
 
 export function SiteFooter() {
-  const { dict } = useLanguage();
+  const { dict, locale } = useLanguage();
   const pathname = usePathname();
 
   const navLinks = [
@@ -59,7 +60,7 @@ export function SiteFooter() {
           <ul className="mt-3 space-y-2 text-sm text-grey">
             <li>
               <a
-                href={CONTACT.whatsappHref}
+                href={whatsappHref(locale, "general")}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => trackWhatsAppClick(pathname, "footer")}

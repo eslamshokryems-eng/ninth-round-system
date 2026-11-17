@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { CONTACT } from "../data/contact";
+import { whatsappHrefWithText } from "../lib/whatsapp-link";
 import { PROGRAMS } from "../data/programs";
 import { useLanguage } from "../i18n/language-provider";
 import { trackTrialFormStart, trackTrialFormSubmit, trackWhatsAppClick } from "../lib/analytics";
@@ -44,7 +44,7 @@ export function TrialForm() {
       locale === "ar"
         ? `أهلاً، أنا ${fullName || ""} وعايز أحجز أول حصة مجانية (${programName}) — من الموقع.`
         : `Hi, I'm ${fullName || ""} and I'd like to book my free trial (${programName}) — from the website.`;
-    return `https://wa.me/${CONTACT.whatsappNumber}?text=${encodeURIComponent(text)}`;
+    return whatsappHrefWithText(text);
   }
 
   async function handleSubmit(event: FormEvent) {

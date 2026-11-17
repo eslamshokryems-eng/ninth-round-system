@@ -3,10 +3,10 @@
 import { useLanguage } from "../i18n/language-provider";
 import { PACKAGES } from "../data/packages";
 import { ExternalCta } from "./cta-buttons";
-import { CONTACT } from "../data/contact";
+import { whatsappHref } from "../lib/whatsapp-link";
 
 export function PackagesTable() {
-  const { dict } = useLanguage();
+  const { dict, locale } = useLanguage();
 
   return (
     <div>
@@ -32,7 +32,7 @@ export function PackagesTable() {
       </div>
 
       <div className="mt-6 flex justify-center">
-        <ExternalCta href={CONTACT.whatsappHref} placement="section">{dict.packages.cta}</ExternalCta>
+        <ExternalCta href={whatsappHref(locale, "packages")} placement="section">{dict.packages.cta}</ExternalCta>
       </div>
     </div>
   );
