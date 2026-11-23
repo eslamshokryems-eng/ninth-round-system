@@ -90,8 +90,10 @@ export function SalesWorkspace() {
         title="My Sales Workspace"
         subtitle="Your leads, ordered by what needs attention first."
         action={
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link href="/sales/leads/new"><Button>+ New Lead</Button></Link>
+            <Link href="/sales/followups?tab=today" data-testid="workspace-followups-today"><Button variant="secondary">Today&apos;s Follow-ups</Button></Link>
+            <Link href="/sales/followups?tab=overdue" data-testid="workspace-followups-overdue"><Button variant="secondary">Overdue Follow-ups</Button></Link>
             <Link href="/sales/leads"><Button variant="secondary">All my leads</Button></Link>
           </div>
         }

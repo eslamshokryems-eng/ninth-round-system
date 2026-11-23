@@ -18,6 +18,7 @@ for i in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:3000/login && bre
 SHOTS_DIR="${SHOTS_DIR:-$RUN/shots}"; mkdir -p "$SHOTS_DIR"
 SHOTS_DIR="$SHOTS_DIR" LOCAL_DB="$DB" node "$ROOT/tools/local-dev-stack/browser/sales-workspace.mjs"; RC=$?
 SHOTS_DIR="$SHOTS_DIR" LOCAL_DB="$DB" LABEL=regression node "$ROOT/tools/local-dev-stack/browser/lead-double-submit.mjs"; RC2=$?; [ "$RC" = 0 ] && RC=$RC2
+SHOTS_DIR="$SHOTS_DIR" LOCAL_DB="$DB" node "$ROOT/tools/local-dev-stack/browser/followups-buttons.mjs"; RC3=$?; [ "$RC" = 0 ] && RC=$RC3
 pkill -f gateway.mjs 2>/dev/null; pkill -f mail-sink.mjs 2>/dev/null; pkill -f "next dev" 2>/dev/null
 su postgres -c "psql -q -d postgres -c 'drop database if exists $DB'" 2>/dev/null
 exit $RC
