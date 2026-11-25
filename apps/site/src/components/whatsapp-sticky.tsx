@@ -2,17 +2,17 @@
 
 import { usePathname } from "next/navigation";
 import { useLanguage } from "../i18n/language-provider";
-import { CONTACT } from "../data/contact";
 import { trackWhatsAppClick } from "../lib/analytics";
+import { whatsappHref } from "../lib/whatsapp-link";
 
 /** Sticky WhatsApp CTA, mobile only — the primary conversion action per brand instruction, always reachable while scrolling. */
 export function WhatsAppSticky() {
-  const { dict } = useLanguage();
+  const { dict, locale } = useLanguage();
   const pathname = usePathname();
 
   return (
     <a
-      href={CONTACT.whatsappHref}
+      href={whatsappHref(locale, pathname === "/trial" ? "trial" : "general")}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => trackWhatsAppClick(pathname, "sticky")}

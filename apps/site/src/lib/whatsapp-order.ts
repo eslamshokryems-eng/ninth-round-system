@@ -1,9 +1,10 @@
 import { CONTACT } from "../data/contact";
 import type { CartLine } from "./cart";
 
-// Sourced from the site's existing real contact configuration (data/contact.ts),
-// never a separately invented number. Digits only, as wa.me requires.
-const ORDER_WHATSAPP_DIGITS = CONTACT.callHref.replace(/\D/g, "");
+// Sourced from the site's real contact configuration (data/contact.ts), never a
+// separately invented number. Orders go to the WhatsApp number (digits only, as
+// wa.me requires) — previously this used the phone-call number by mistake.
+const ORDER_WHATSAPP_DIGITS = CONTACT.whatsappNumber;
 
 export interface WhatsAppOrderLine {
   name: string;

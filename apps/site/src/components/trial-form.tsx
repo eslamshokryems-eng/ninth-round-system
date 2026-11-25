@@ -1,24 +1,28 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { whatsappHrefWithText } from "../lib/whatsapp-link";
 import { PROGRAMS } from "../data/programs";
 import { useLanguage } from "../i18n/language-provider";
-import { trackTrialFormStart, trackTrialFormSubmit } from "../lib/analytics";
+import { trackTrialFormStart, trackTrialFormSubmit, trackWhatsAppClick } from "../lib/analytics";
 import { getStoredUtm } from "../lib/utm";
 
 /**
- * UX/structure only: this form does NOT call Supabase or any backend.
- * Submitting captures nothing beyond local component state and shows a
- * confirmation message — no lead is created, no production data is
- * touched. Wiring this to the CRM is a separate, explicitly-approved task.
+ * Submits to /api/trial, which creates a lead (source "website", status
+ * "new") in the Sales CRM through a narrow Supabase RPC. trial_form_submit /
+ * Meta Lead fire only after the server confirms the lead was stored, so the
+ * conversion count matches real leads. Analytics carry page + form type +
+ * session UTM only, never the field values.
  *
- * trial_form_start/trial_form_submit are still tracked here (page + form
- * type + session UTM only, never the field values) — analytics attribution
- * doesn't depend on the CRM wiring existing yet.
+ * If saving fails (offline, backend unavailable) the visitor is told so and
+ * given a WhatsApp link with the details pre-filled, so no one is lost.
  */
 export function TrialForm() {
   const { dict, locale } = useLanguage();
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [errorKind, setErrorKind] = useState<null | "invalid" | "failed">(null);
+  const [company, setCompany] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [program, setProgram] = useState(PROGRAMS[0]?.slug ?? "");
@@ -33,10 +37,47 @@ export function TrialForm() {
     trackTrialFormStart("/trial");
   }
 
-  function handleSubmit(event: FormEvent) {
+  const programName = PROGRAMS.find((item) => item.slug === program)?.name[locale] ?? program;
+
+  function whatsappHref(): string {
+    const text =
+      locale === "ar"
+        ? `أهلاً، أنا ${fullName || ""} وعايز أحجز أول حصة مجانية (${programName}) — من الموقع.`
+        : `Hi, I'm ${fullName || ""} and I'd like to book my free trial (${programName}) — from the website.`;
+    return whatsappHrefWithText(text);
+  }
+
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setIsSubmitted(true);
-    trackTrialFormSubmit("/trial", getStoredUtm());
+    if (isSending) return;
+    setIsSending(true);
+    setErrorKind(null);
+    try {
+      const response = await fetch("/api/trial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName,
+          phone,
+          program,
+          preferredDate,
+          preferredTime,
+          notes,
+          company,
+          utm: getStoredUtm(),
+        }),
+      });
+      if (response.ok) {
+        setIsSubmitted(true);
+        trackTrialFormSubmit("/trial", getStoredUtm());
+      } else {
+        setErrorKind(response.status === 400 ? "invalid" : "failed");
+      }
+    } catch {
+      setErrorKind("failed");
+    } finally {
+      setIsSending(false);
+    }
   }
 
   if (isSubmitted) {
@@ -47,9 +88,18 @@ export function TrialForm() {
         </p>
         <p className="mt-2 text-sm text-grey">
           {locale === "ar"
-            ? "الفورم ده لسه مش متوصل بنظام الحجز مباشرة — كلمنا على الواتساب وهنأكد معاك."
-            : "This form isn't wired to live booking yet — message us on WhatsApp and we'll confirm."}
+            ? "وصلنا طلبك. هنتواصل معاك قريب لتأكيد موعد أول حصة مجانية."
+            : "We got your request. We'll contact you shortly to confirm your free first session."}
         </p>
+        <a
+          href={whatsappHref()}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => trackWhatsAppClick("/trial", "trial_success")}
+          className="mt-4 inline-block text-sm font-bold text-bone underline underline-offset-4"
+        >
+          {locale === "ar" ? "عايز تسرّع التأكيد؟ كلمنا على الواتساب" : "Want a faster confirmation? Message us on WhatsApp"}
+        </a>
       </div>
     );
   }
@@ -119,11 +169,53 @@ export function TrialForm() {
         />
       </Field>
 
+      {/* Honeypot — hidden from people and screen readers, bots fill it in. */}
+      <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+        <label>
+          Company
+          <input
+            type="text"
+            name="company"
+            tabIndex={-1}
+            autoComplete="off"
+            value={company}
+            onChange={(event) => setCompany(event.target.value)}
+          />
+        </label>
+      </div>
+
+      {errorKind && (
+        <p role="alert" className="rounded-lg border border-red/40 bg-red/10 px-3 py-2 text-sm text-bone">
+          {errorKind === "invalid"
+            ? locale === "ar"
+              ? "راجع الاسم ورقم التليفون وجرّب تاني."
+              : "Please check your name and phone number and try again."
+            : locale === "ar"
+              ? "حصلت مشكلة وطلبك ماتسجلش. كلمنا على الواتساب وهنحجزلك."
+              : "Something went wrong and your request wasn't saved. Message us on WhatsApp and we'll book you in."}
+          {errorKind === "failed" && (
+            <>
+              {" "}
+              <a
+                href={whatsappHref()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackWhatsAppClick("/trial", "trial_error")}
+                className="font-bold underline underline-offset-4"
+              >
+                WhatsApp
+              </a>
+            </>
+          )}
+        </p>
+      )}
+
       <button
         type="submit"
-        className="w-full rounded-pill bg-red px-6 py-3 text-sm font-bold uppercase tracking-wide text-bone transition-colors hover:bg-red/90"
+        disabled={isSending}
+        className="w-full rounded-pill bg-red px-6 py-3 text-sm font-bold uppercase tracking-wide text-bone transition-colors hover:bg-red/90 disabled:opacity-60"
       >
-        {dict.pages.trial.formSubmit}
+        {isSending ? (locale === "ar" ? "جاري الإرسال..." : "Sending...") : dict.pages.trial.formSubmit}
       </button>
     </form>
   );

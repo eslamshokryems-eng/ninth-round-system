@@ -8,13 +8,13 @@ import { CategoryFilter } from "../../src/components/shop/category-filter";
 import { ProductCard } from "../../src/components/shop/product-card";
 import { ShopEmptyState } from "../../src/components/shop/empty-state";
 import { PRODUCTS } from "../../src/data/products";
-import { CONTACT } from "../../src/data/contact";
 import type { ProductCategorySlug } from "../../src/data/product-categories";
 import { useLanguage } from "../../src/i18n/language-provider";
+import { whatsappHref } from "../../src/lib/whatsapp-link";
 import { trackShopView } from "../../src/lib/analytics";
 
 export function ShopContent() {
-  const { dict } = useLanguage();
+  const { dict, locale } = useLanguage();
   const [activeCategory, setActiveCategory] = useState<ProductCategorySlug | "all">("all");
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export function ShopContent() {
           <h2 className="font-display text-2xl uppercase text-bone">{dict.shop.product.whatsappOrder}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-grey">{dict.shop.hero.sub}</p>
           <div className="mt-6 flex justify-center">
-            <ExternalCta href={CONTACT.whatsappHref} placement="shop_home_cta">
+            <ExternalCta href={whatsappHref(locale, "shop")} placement="shop_home_cta">
               {dict.shop.product.whatsappOrder}
             </ExternalCta>
           </div>

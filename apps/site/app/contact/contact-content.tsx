@@ -6,9 +6,10 @@ import { ExternalCta, PrimaryCta } from "../../src/components/cta-buttons";
 import { CONTACT } from "../../src/data/contact";
 import { useLanguage } from "../../src/i18n/language-provider";
 import { trackSocialClick } from "../../src/lib/analytics";
+import { whatsappHref } from "../../src/lib/whatsapp-link";
 
 export function ContactContent() {
-  const { dict } = useLanguage();
+  const { dict, locale } = useLanguage();
   const pathname = usePathname();
 
   return (
@@ -16,7 +17,7 @@ export function ContactContent() {
       <h1 className="font-display text-4xl uppercase text-bone sm:text-5xl">{dict.pages.contact.title}</h1>
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <ExternalCta href={CONTACT.whatsappHref} placement="contact">
+        <ExternalCta href={whatsappHref(locale, "general")} placement="contact">
           {dict.location.whatsapp} — {CONTACT.whatsappDisplay}
         </ExternalCta>
         <ExternalCta href={CONTACT.callHref} placement="contact">
