@@ -13,12 +13,17 @@ su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB" < "$ROOT/supabase/tests/sales
 su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB" < "$ROOT/supabase/tests/sales_crm/browser_setup.sql" | grep -E "ERROR"
 (setsid nohup node "$ROOT/tools/local-dev-stack/mail-sink.mjs" > "$RUN/sink.log" 2>&1 < /dev/null &)
 (LOCAL_DB="$DB" setsid nohup node "$ROOT/tools/local-dev-stack/gateway.mjs" > "$RUN/gw.log" 2>&1 < /dev/null &)
+mkdir -p "$RUN/push-tls" && openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1" -keyout "$RUN/push-tls/key.pem" -out "$RUN/push-tls/cert.pem" >/dev/null 2>&1
+export PUSH_MOCK_TLS_DIR="$RUN/push-tls" NODE_EXTRA_CA_CERTS="$RUN/push-tls/cert.pem"   # the local fake push service is HTTPS (web-push only speaks HTTPS)
+# Smart Reminders (P3): throw-away local VAPID keys + dispatch secret for this run only (never real secrets)
+eval "$(cd "$ROOT/apps/web" && node -e 'const k=require("web-push").generateVAPIDKeys();const s=require("crypto").randomBytes(32).toString("hex");console.log(`export NEXT_PUBLIC_VAPID_PUBLIC_KEY=${k.publicKey} VAPID_PRIVATE_KEY=${k.privateKey} VAPID_SUBJECT=mailto:local-test@example.com REMINDER_DISPATCH_SECRET=${s} REMINDER_PUSH_ALLOW_LOCAL=1`)')"
 (cd "$ROOT/apps/web" && setsid nohup npx next dev -p 3000 > "$RUN/web.log" 2>&1 < /dev/null &)
 for i in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:3000/login && break; sleep 1; done
 SHOTS_DIR="${SHOTS_DIR:-$RUN/shots}"; mkdir -p "$SHOTS_DIR"
 SHOTS_DIR="$SHOTS_DIR" LOCAL_DB="$DB" node "$ROOT/tools/local-dev-stack/browser/sales-workspace.mjs"; RC=$?
 SHOTS_DIR="$SHOTS_DIR" LOCAL_DB="$DB" LABEL=regression node "$ROOT/tools/local-dev-stack/browser/lead-double-submit.mjs"; RC2=$?; [ "$RC" = 0 ] && RC=$RC2
 SHOTS_DIR="$SHOTS_DIR" LOCAL_DB="$DB" node "$ROOT/tools/local-dev-stack/browser/followups-buttons.mjs"; RC3=$?; [ "$RC" = 0 ] && RC=$RC3
+SHOTS_DIR="$SHOTS_DIR" LOCAL_DB="$DB" node "$ROOT/tools/local-dev-stack/browser/reminders-push.mjs"; RC4=$?; [ "$RC" = 0 ] && RC=$RC4
 pkill -f gateway.mjs 2>/dev/null; pkill -f mail-sink.mjs 2>/dev/null; pkill -f "next dev" 2>/dev/null
 su postgres -c "psql -q -d postgres -c 'drop database if exists $DB'" 2>/dev/null
 exit $RC

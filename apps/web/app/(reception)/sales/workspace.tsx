@@ -10,6 +10,7 @@ import { Card } from "../../../src/components/ui/card";
 import { EmptyState } from "../../../src/components/ui/empty-state";
 import { PageHeader } from "../../../src/components/ui/page-header";
 import { SkeletonCardRow } from "../../../src/components/ui/loading-skeleton";
+import { PushRemindersToggle } from "../../../src/features/reminders/push-reminders-toggle";
 import { StatCard } from "../../../src/components/ui/stat-card";
 import { StatusBadge } from "../../../src/components/ui/status-badge";
 import { TextAreaField } from "../../../src/components/ui/text-field";
@@ -98,6 +99,8 @@ export function SalesWorkspace() {
           </div>
         }
       />
+
+      <PushRemindersToggle />
 
       {isLoading ? (
         <SkeletonCardRow count={4} />
